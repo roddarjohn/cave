@@ -3,8 +3,15 @@ name = "cave"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
-dependencies = [
-    "pydantic>=2.12.5",
-    "typer>=0.24.1",
+authors = [
+    { name = "Rodda John", email = "johnrod.john@gmail.com" }
 ]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+cave = "cave:main"
+
+[build-system]
+requires = ["uv_build>=0.10.8,<0.11.0"]
+build-backend = "uv_build"
