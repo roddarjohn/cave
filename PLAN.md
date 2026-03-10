@@ -1,0 +1,68 @@
+# Philosophy
+
+There are two types of things in the world: an event (something happened), and then objects that define what happened.
+
+The object that define what happened can be called a dimension.
+
+I believe the origin of dimensions come from accounting, where a dimension refers to a category for a transaction.  For example, a receivables entry may have a 'customer' dimension.
+
+# Dimensions
+
+Dimensions are in some ways simpler as they represent static data.
+
+Different types of dimensions can have different fields, e.g. a customer may have a name field.
+
+There are a few different mechanisms to represent a dimensional field in a Postgres database.
+
+n.b. these mechanisms are not specific to Postgres, but the implementation in many cases is.
+
+Implementing these consistently is irregular across companies.
+
+## The simple representation
+
+In the simple representation, a table simply is a dimension.  The type of the dimension is usually the tables name, and the columns of the table represent its fields.
+
+The simple representation is easiest to query. However, it doesn't store history, and changes require migrations to the data.
+
+## An append only log table
+
+Sometimes referred to as SCD type 2.
+
+In this model, the source of truth is an append only table which can be summarized into a simple representation. The append only table has an effective start and effective end date (which should be non overlapping).
+
+Changes still require migrations, there is more overhead and potential performance questions. This doesn't answer the question as to what changed well.
+
+## An entity attribute value table
+
+This would have a second table that would store e.g. dimension_id, attribute_name, and attribute_value.  The attribute value would be sparse so that many datatypes would be supported.
+
+This is very useful for auditing purposes. You could have a view, or materialized view, to show the summary table.
+
+# Transactions
+
+There is likely a privileged dimension called a transaction that specific transactional lines relate to.
+
+## Single entry
+
+transaction_id, timestamp, account, value
+
+## Double entry
+
+## Books
+
+A book permits the storing of multiple ledgers in the same table.
+
+## Summary tables
+
+Regardless of the ledger type, we can incrementally update summary tables.
+
+# Technical philosophy
+
+Postgres is king.
+
+# Questions
+
+Is account simply a dimension?
+- Is it special in some way?
+- The value should always be an int or numeric I'd assume
+- There's always a book right?
