@@ -65,6 +65,10 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"scripts/**" = [
+    "INP001",  # scripts/ doesn't need __init__.py
+    "T201",    # print is fine in scripts
+]
 "tests/**" = [
     "S101",    # assert is fine in tests
     "ANN",     # no annotations required in tests

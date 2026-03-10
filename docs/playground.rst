@@ -82,30 +82,7 @@ Commands
 
 All commands are run from the ``playground/`` directory.
 
-``just init``
-    Create the database and apply all migrations. Safe to re-run.
-
-``just migrate``
-    Apply all pending migrations.
-
-``just rollback``
-    Roll back the most recent migration.
-
-``just revision "describe your change"``
-    Auto-generate a new migration from the current state of ``models.py``.
-    Always review the generated file before applying it.
-
-``just history``
-    Show the full migration history.
-
-``just current``
-    Show which migration the database is currently at.
-
-``just downgrade <revision>``
-    Downgrade to a specific revision ID, e.g. ``just downgrade abc123``.
-
-``just db-shell``
-    Open a ``psql`` shell connected to the database using ``DATABASE_URL``.
+.. literalinclude:: _generated/playground_just_commands.txt
 
 Typical Workflow
 ----------------
@@ -146,8 +123,3 @@ Then generate and apply a migration::
 
 Alembic autogenerate compares your models against the live database schema, so
 it will pick up additions, removals, and column changes automatically.
-
-Commands Reference
-------------------
-
-.. literalinclude:: _generated/playground_just_commands.txt
