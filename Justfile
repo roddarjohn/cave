@@ -21,10 +21,12 @@ dev-test *args:
 
 # Build HTML docs (output in docs/_build/html)
 docs:
+    mkdir -p docs/_generated
     just --list > docs/_generated/just_commands.txt
     uv run --group docs sphinx-build -b html docs docs/_build/html
 
 # Serve docs locally with live reload (http://127.0.0.1:8000)
 serve-docs:
+    mkdir -p docs/_generated
     just --list > docs/_generated/just_commands.txt
     uv run --group docs sphinx-autobuild docs docs/_build/html

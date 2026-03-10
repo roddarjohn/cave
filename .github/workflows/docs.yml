@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - uses: extractions/setup-just@v2
-      - run: just docs
+      - run: mkdir -p docs/_generated && just docs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs/_build/html
