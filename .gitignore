@@ -7,3 +7,4 @@
 .tox/
 docs/_generated/
 docs/_build/
+playground/.env
