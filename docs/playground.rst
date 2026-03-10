@@ -50,6 +50,11 @@ By default, PostgreSQL requires a password for TCP connections. To avoid
 this, connect via a Unix socket instead — peer auth is passwordless for your
 local user with no extra configuration:
 
+.. warning::
+
+    Passwordless authentication is only appropriate for local development.
+    Production databases should always require credentials.
+
 Configuration
 -------------
 
