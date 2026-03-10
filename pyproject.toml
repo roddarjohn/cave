@@ -78,6 +78,12 @@ ignore = [
     "ANN",     # no annotations required in tests
     "D",       # no docstrings required in tests
 ]
+"src/cave/factory/dimension/simple.py" = [
+    "ANN401",  # **kwargs: Any is intentional, passed through to SQLAlchemy Table
+]
+"src/cave/factory/dimension/append_only.py" = [
+    "ANN401",  # **kwargs: Any is intentional, passed through to SQLAlchemy Table
+]
 "**/migrations/versions/*.py" = [
     "INP001",  # migration versions aren't a package
     "D400",    # migration docstrings don't need to end with a period

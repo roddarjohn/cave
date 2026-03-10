@@ -1,5 +1,7 @@
 """Append-only log dimension table factory."""
 
+from typing import Any
+
 from sqlalchemy import Column, Integer, MetaData, Table
 from sqlalchemy.schema import SchemaItem
 
@@ -13,6 +15,7 @@ def append_only_log_dimension_factory(
     metadata: MetaData,
     dimensions: list[SchemaItem],
     config: DimensionConfiguration | None = None,
+    **kwargs: Any,
 ) -> Table:
     """Create an append-only log dimension table and its root table."""
     config = config or DimensionConfiguration()
@@ -30,6 +33,7 @@ def append_only_log_dimension_factory(
         metadata,
         *attributes_columns,
         schema=schemaname,
+        **kwargs,
     )
 
     root_columns = [
@@ -41,6 +45,7 @@ def append_only_log_dimension_factory(
         metadata,
         *root_columns,
         schema=schemaname,
+        **kwargs,
     )
 
     return attributes_table

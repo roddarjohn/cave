@@ -1,5 +1,7 @@
 """Simple dimension table factory."""
 
+from typing import Any
+
 from sqlalchemy import Column, Integer, MetaData, Table
 from sqlalchemy.schema import SchemaItem
 
@@ -13,6 +15,7 @@ def simple_dimension_factory(
     metadata: MetaData,
     dimensions: list[SchemaItem],
     config: DimensionConfiguration | None = None,
+    **kwargs: Any,
 ) -> Table:
     """Create a simple dimension table with an auto-generated primary key."""
     config = config or DimensionConfiguration()
@@ -29,4 +32,5 @@ def simple_dimension_factory(
         metadata,
         *dimensions,
         schema=schemaname,
+        **kwargs,
     )
