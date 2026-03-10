@@ -56,10 +56,11 @@ matching what CI does)::
 
     just test
 
-You can pass arguments through to pytest in both cases::
+Both commands pass arguments through to pytest::
 
     just dev-test tests/test_cli.py
     just dev-test -k test_shoot
+    just test tests/test_cli.py
 
 Linting and Formatting
 -----------------------
