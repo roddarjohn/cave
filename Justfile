@@ -8,7 +8,7 @@ lint:
 
 # Run ty type checker
 type-check:
-    uv run --group lint ty check
+    uv run --group lint ty check src/
 
 # Run tests via tox (full isolation, builds package as sdist)
 test *args:

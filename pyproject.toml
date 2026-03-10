@@ -1,4 +1,4 @@
-[project]	
+[project]
 name = "cave"
 version = "0.1.0"
 description = "Add your description here"
@@ -43,6 +43,7 @@ lint = [
 
 [tool.ruff]
 exclude = ["docs", "playground", "tests/db/migrations"]
+
 
 [tool.ruff.lint]
 select = ["ALL"]

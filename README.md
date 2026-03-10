@@ -14,4 +14,3 @@ Why config files as opposed to just define it in some sort of code?
 How do you handle the queries to load objects
 
 There should be plugins that support the ability for more things to be added by external programmers.
-
