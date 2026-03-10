@@ -1,0 +1,40 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "schedule": ["before 6am on Monday"],
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "matchManagers": ["pre-commit"],
+      "groupName": "pre-commit hooks"
+    },
+    {
+      "matchDepTypes": ["dependencies"],
+      "groupName": "dependencies"
+    },
+    {
+      "matchDepTypes": ["build-system.requires"],
+      "groupName": "build system"
+    },
+    {
+      "matchDepTypes": ["dev"],
+      "groupName": "dev dependencies"
+    },
+    {
+      "matchDepTypes": ["docs"],
+      "groupName": "docs dependencies"
+    },
+    {
+      "matchDepTypes": ["lint"],
+      "groupName": "lint dependencies"
+    }
+  ],
+  "uv": {
+    "enabled": true
+  }
+}
