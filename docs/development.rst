@@ -101,4 +101,4 @@ The docs will automatically rebuild whenever you save a file.
 Commands Reference
 ------------------
 
-.. literalinclude:: _generated/just_commands.txt
+.. include:: _generated/just_commands.rst

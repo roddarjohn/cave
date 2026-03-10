@@ -82,7 +82,7 @@ Commands
 
 All commands are run from the ``playground/`` directory.
 
-.. literalinclude:: _generated/playground_just_commands.txt
+.. include:: _generated/playground_just_commands.rst
 
 Typical Workflow
 ----------------
