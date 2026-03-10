@@ -54,7 +54,6 @@ matching what CI does)::
     just test
 
 Both commands pass arguments through to pytest::
-------------------------------------------------
 
     just dev-test tests/test_cli.py
     just dev-test -k test_shoot
@@ -90,7 +89,7 @@ To build the docs::
 
     just docs
 
-To serve the docs locally with live reload at ``http://127.0.0.1:8000``::
+To serve the docs locally with live reload at ``http://localhost:8000``::
 
     just serve-docs
 
