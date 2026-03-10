@@ -46,6 +46,10 @@ Then create a local superuser so you can connect without switching to the
 
     sudo -u postgres createuser --superuser $USER
 
+By default, PostgreSQL requires a password for TCP connections. To avoid
+this, connect via a Unix socket instead — peer auth is passwordless for your
+local user with no extra configuration:
+
 Configuration
 -------------
 
@@ -59,7 +63,10 @@ Edit ``playground/.env`` with your connection details:
 
 .. code-block:: bash
 
-    # Docker or system postgres with no password:
+    # System postgres via Unix socket (passwordless, recommended):
+    DATABASE_URL=postgresql+psycopg:///cave
+
+    # Docker or system postgres via TCP with no password:
     DATABASE_URL=postgresql+psycopg://localhost/cave
 
     # System postgres with a user/password:
