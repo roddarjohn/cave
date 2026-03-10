@@ -1,5 +1,5 @@
 # Contributing
 
-See the [development guide](https://roddajohn.github.io/cave/development.html) for full instructions on setting up a local environment, running tests, linting, and submitting changes.
+See the [development guide](https://roddarjohn.github.io/cave/development.html) for full instructions on setting up a local environment, running tests, linting, and submitting changes.
 
 For security issues, see [SECURITY.md](SECURITY.md).
