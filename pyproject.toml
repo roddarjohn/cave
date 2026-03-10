@@ -25,6 +25,7 @@ dev = [
     "alembic>=1.18.4",
     "psycopg[binary]>=3.3.3",
     "pytest>=8",
+    "pytest-alembic>=0.12.1",
     "python-dotenv>=1.2.2",
     "sqlalchemy>=2.0.48",
 ]
@@ -40,7 +41,7 @@ lint = [
 
 [tool.ruff]
 target-version = "py314"
-exclude = ["docs", "playground"]
+exclude = ["docs", "playground", "tests/db/migrations"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -66,13 +67,13 @@ ignore = [
     "S101",    # assert is fine in tests
     "ANN",     # no annotations required in tests
     "D",       # no docstrings required in tests
-    "INP001",  # tests/ doesn't need __init__.py
 ]
 
 [tool.tox]
 requires = ["tox-uv>=1"]
-env_list = ["3.14"]
+env_list = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
 [tool.tox.env_run_base]
 dependency_groups = ["dev"]
+pass_env = ["DATABASE_URL"]
 commands = [["pytest", "{posargs:}"]]

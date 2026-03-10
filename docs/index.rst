@@ -7,3 +7,4 @@ Awesome Portal Gun CLI.
    :maxdepth: 2
 
    development
+   playground

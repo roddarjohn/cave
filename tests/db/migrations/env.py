@@ -3,14 +3,11 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-playground_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(playground_dir))
-load_dotenv(playground_dir / ".env")
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from models import Base  # noqa: E402
 
@@ -32,7 +29,6 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
-
     with context.begin_transaction():
         context.run_migrations()
 
@@ -44,10 +40,8 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
-
         with context.begin_transaction():
             context.run_migrations()
 
