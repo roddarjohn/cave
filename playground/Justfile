@@ -1,5 +1,11 @@
 set dotenv-load := true
 
+alias mr := migrate-revision
+alias fr := fresh-revision
+alias wm := wipe-migrations
+alias wd := wipe-db
+alias r := reset
+
 alembic := "uv run --directory .. alembic -c " + justfile_directory() + "/alembic.ini"
 
 # Create the database and apply all migrations
@@ -32,6 +38,29 @@ current:
 # Downgrade to a specific revision: just downgrade abc123
 downgrade rev:
     {{alembic}} downgrade {{rev}}
+
+# Apply migrations then generate a new one: just migrate-revision "add users table"
+migrate-revision msg: migrate
+    just revision "{{msg}}"
+
+# Delete all migration version files
+wipe-migrations:
+    #!/usr/bin/env bash
+    rm -f migrations/versions/*.py
+
+# Wipe migrations, apply, and generate a new one: just fresh-revision "add users table"
+fresh-revision msg: wipe-migrations migrate
+    just revision "{{msg}}"
+
+# Wipe migrations and drop the database
+reset: wipe-migrations wipe-db
+
+# Drop and recreate the database
+wipe-db:
+    #!/usr/bin/env bash
+    db=$(echo $DATABASE_URL | grep -oP '[^/]+$')
+    dropdb --if-exists "$db" && echo "Dropped database: $db"
+    createdb "$db" && echo "Created database: $db"
 
 # Open a psql shell using DATABASE_URL
 db-shell:

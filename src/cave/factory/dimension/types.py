@@ -1,0 +1,10 @@
+"""Configuration types for dimension factories."""
+
+from pydantic.dataclasses import dataclass
+
+
+@dataclass
+class DimensionConfiguration:
+    """Configuration for dimension table factories."""
+
+    id_field_name: str = "id"
