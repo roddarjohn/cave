@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Rodda John", email = "roddarjohn@protonmail.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.12.5",
     "typer>=0.24.1",
@@ -40,7 +40,7 @@ lint = [
 ]
 
 [tool.ruff]
-target-version = "py314"
+target-version = "py310"
 exclude = ["docs", "playground", "tests/db/migrations"]
 
 [tool.ruff.lint]
