@@ -5,6 +5,9 @@
   ],
   "schedule": ["before 6am on Monday"],
   "enabledManagers": ["github-actions", "pep621", "pre-commit"],
+  "pre-commit": {
+    "enabled": true
+  },
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
