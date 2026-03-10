@@ -4,6 +4,7 @@
     "config:recommended"
   ],
   "schedule": ["before 6am on Monday"],
+  "enabledManagers": ["github-actions", "pep621", "pre-commit"],
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
