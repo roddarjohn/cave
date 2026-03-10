@@ -2,16 +2,13 @@
 
 from collections.abc import Callable
 from functools import wraps
-from typing import ParamSpec
-
-P = ParamSpec("P")
 
 
 class CaveValidationError(Exception):
     """Raised when a cave validation check fails."""
 
 
-def raise_exception_on_false(
+def raise_exception_on_false[**P](
     func: Callable[P, bool],
 ) -> Callable[P, bool]:
     """Wrap a validator function to raise CaveValidationError on failure."""

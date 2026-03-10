@@ -15,7 +15,7 @@ def append_only_log_dimension_factory(
     metadata: MetaData,
     dimensions: list[SchemaItem],
     config: DimensionConfiguration | None = None,
-    **kwargs: Any,
+    **kwargs: Any,  # noqa: ANN401
 ) -> Table:
     """Create an append-only log dimension table and its root table."""
     config = config or DimensionConfiguration()

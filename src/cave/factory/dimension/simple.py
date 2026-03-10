@@ -15,7 +15,7 @@ def simple_dimension_factory(
     metadata: MetaData,
     dimensions: list[SchemaItem],
     config: DimensionConfiguration | None = None,
-    **kwargs: Any,
+    **kwargs: Any,  # noqa: ANN401
 ) -> Table:
     """Create a simple dimension table with an auto-generated primary key."""
     config = config or DimensionConfiguration()
