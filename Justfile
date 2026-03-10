@@ -30,3 +30,4 @@ serve-docs: _docs-setup
 _docs-setup:
     mkdir -p docs/_generated
     just --list > docs/_generated/just_commands.txt
+    just --justfile playground/Justfile --list > docs/_generated/playground_just_commands.txt

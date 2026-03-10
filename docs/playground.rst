@@ -146,3 +146,8 @@ Then generate and apply a migration::
 
 Alembic autogenerate compares your models against the live database schema, so
 it will pick up additions, removals, and column changes automatically.
+
+Commands Reference
+------------------
+
+.. literalinclude:: _generated/playground_just_commands.txt
