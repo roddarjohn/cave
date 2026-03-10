@@ -29,9 +29,6 @@ Fork and clone
     git clone https://github.com/<your-username>/cave
     cd cave
 
-Setting up
-----------
-
 Install all dependency groups and activate the virtual environment::
 
     uv sync --all-groups
@@ -103,3 +100,19 @@ Commands reference
 ------------------
 
 .. include:: _generated/just_commands.rst
+
+Contributing
+------------
+
+Contributions are welcome. Fork the repository, make your changes with tests
+where applicable, verify the test suite and linter pass (see the sections
+above), then open a pull request against ``main``.
+
+Type annotations are required on all public API.
+
+To report a bug, open a GitHub issue with a minimal reproduction case, what
+you expected, what happened, and your Python version and OS.
+
+For security vulnerabilities, see
+`SECURITY.md <https://github.com/roddajohn/cave/blob/main/SECURITY.md>`_
+rather than opening a public issue.
