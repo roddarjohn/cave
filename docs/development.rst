@@ -21,7 +21,7 @@ Install ``just`` by following the
 `just installation instructions <https://just.systems/man/en/packages.html>`_
 — prefer whatever method is listed as current there.
 
-Fork and Clone
+Fork and clone
 --------------
 
 `Fork the repository <https://github.com/roddajohn/cave/fork>`_ on GitHub, then clone your fork::
@@ -29,7 +29,7 @@ Fork and Clone
     git clone https://github.com/<your-username>/cave
     cd cave
 
-Setting Up
+Setting up
 ----------
 
 Install all dependency groups and activate the virtual environment::
@@ -42,7 +42,7 @@ Install the pre-commit hooks (runs ruff automatically on every commit)::
 
 That's it. You're ready to develop.
 
-Running Tests
+Running tests
 -------------
 
 cave uses `pytest <https://docs.pytest.org>`_ for testing.
@@ -57,12 +57,13 @@ matching what CI does)::
     just test
 
 Both commands pass arguments through to pytest::
+------------------------------------------------
 
     just dev-test tests/test_cli.py
     just dev-test -k test_shoot
     just test tests/test_cli.py
 
-Linting and Formatting
+Linting and formatting
 -----------------------
 
 cave uses `ruff <https://docs.astral.sh/ruff/>`_ for linting and formatting.
@@ -75,7 +76,7 @@ Ruff will check for style issues and verify formatting. To auto-fix and auto-for
     uv run --group lint ruff check --fix
     uv run --group lint ruff format
 
-Type Checking
+Type checking
 -------------
 
 cave uses `ty <https://github.com/astral-sh/ty>`_ for type checking::
@@ -98,7 +99,7 @@ To serve the docs locally with live reload at ``http://127.0.0.1:8000``::
 
 The docs will automatically rebuild whenever you save a file.
 
-Commands Reference
+Commands reference
 ------------------
 
 .. include:: _generated/just_commands.rst

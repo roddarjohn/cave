@@ -84,7 +84,7 @@ All commands are run from the ``playground/`` directory.
 
 .. include:: _generated/playground_just_commands.rst
 
-Typical Workflow
+Typical workflow
 ----------------
 
 1. Edit ``models.py`` to add or change a model
@@ -105,7 +105,8 @@ Typical Workflow
 
     just rollback
 
-Adding Models
+
+Adding models
 -------------
 
 Define new models in ``playground/models.py`` by extending ``Base``::
