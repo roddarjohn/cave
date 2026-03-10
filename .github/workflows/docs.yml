@@ -21,6 +21,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.14"
       - uses: extractions/setup-just@v2
       - run: mkdir -p docs/_generated && just docs
       - name: Deploy to gh-pages

@@ -9,7 +9,7 @@ Prerequisites
 
 You will need the following tools installed:
 
-* `Python 3.14+ <https://www.python.org/downloads/>`_
+* `Python 3.10+ <https://www.python.org/downloads/>`_
 * `uv <https://docs.astral.sh/uv/>`_ — dependency management and virtual environments
 * `just <https://just.systems>`_ — command runner
 

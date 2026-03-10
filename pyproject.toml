@@ -28,11 +28,13 @@ dev = [
     "pytest-alembic>=0.12.1",
     "python-dotenv>=1.2.2",
     "sqlalchemy>=2.0.48",
+    "tox>=4.49.1",
+    "tox-uv>=1.33.2",
 ]
 docs = [
-    "furo>=2025.12.19",
-    "sphinx>=9.1.0",
-    "sphinx-autobuild>=2025.8.25",
+    "furo>=2025.12.19 ; python_version >= '3.12'",
+    "sphinx>=7.0 ; python_version >= '3.12'",
+    "sphinx-autobuild>=2025.8.25 ; python_version >= '3.11'",
 ]
 lint = [
     "ruff>=0.15.5",
@@ -40,7 +42,6 @@ lint = [
 ]
 
 [tool.ruff]
-target-version = "py310"
 exclude = ["docs", "playground", "tests/db/migrations"]
 
 [tool.ruff.lint]
