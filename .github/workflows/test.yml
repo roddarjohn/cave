@@ -9,6 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    name: test (pg${{ matrix.postgres }})
     strategy:
       fail-fast: false
       matrix:
