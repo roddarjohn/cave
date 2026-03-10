@@ -26,6 +26,46 @@ dev = [
     "pytest>=8",
     "sqlalchemy>=2.0.48",
 ]
+docs = [
+    "furo>=2025.12.19",
+    "sphinx>=9.1.0",
+    "sphinx-autobuild>=2025.8.25",
+]
+lint = [
+    "ruff>=0.15.5",
+    "ty>=0.0.20",
+]
+
+[tool.ruff]
+target-version = "py314"
+exclude = ["docs", "playground"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    # Conflicts with formatter
+    "COM812",
+    "ISC001",
+    # Docstring convention (use D211 + D212)
+    "D203",
+    "D213",
+    # Not applicable to this project
+    "AIR",
+    "DJ",
+    "FAST",
+    "NPY",
+    "PD",
+    "INT",
+    "CPY",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",    # assert is fine in tests
+    "ANN",     # no annotations required in tests
+    "D",       # no docstrings required in tests
+    "INP001",  # tests/ doesn't need __init__.py
+]
 
 [tool.tox]
 requires = ["tox-uv>=1"]

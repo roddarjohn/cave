@@ -5,3 +5,5 @@
 # Python
 **/__pycache__/*
 .tox/
+docs/_generated/
+docs/_build/
