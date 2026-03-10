@@ -33,8 +33,5 @@
       "matchDepTypes": ["lint"],
       "groupName": "lint dependencies"
     }
-  ],
-  "uv": {
-    "enabled": true
-  }
+  ]
 }
