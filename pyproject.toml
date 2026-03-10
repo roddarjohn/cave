@@ -26,3 +26,11 @@ dev = [
     "pytest>=8",
     "sqlalchemy>=2.0.48",
 ]
+
+[tool.tox]
+requires = ["tox-uv>=1"]
+env_list = ["3.14"]
+
+[tool.tox.env_run_base]
+dependency_groups = ["dev"]
+commands = [["pytest", "{posargs:}"]]
