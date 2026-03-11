@@ -9,9 +9,9 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "pglast>=7.11",
     "pydantic>=2.12.5",
     "sqlalchemy-declarative-extensions>=0.16.8",
-    "sqlglot>=26",
     "typer>=0.24.1",
 ]
 
@@ -87,7 +87,7 @@ ignore = [
     "INP001",  # migration versions aren't a package
     "D400",    # migration docstrings don't need to end with a period
     "D415",    # migration docstrings don't need closing punctuation
-    "W291",    # trailing whitespace on "Revises:" line when there's no parent
+"W291",    # trailing whitespace on "Revises:" line when there's no parent
 ]
 
 [tool.ty.environment]

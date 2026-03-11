@@ -1,0 +1,4 @@
+BEGIN
+DELETE FROM ${root_table} WHERE id = OLD.id;
+RETURN OLD;
+END;
