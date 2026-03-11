@@ -261,14 +261,28 @@ def _refs_for_grant(
         )
     )
 
-    # Depend on referenced schemas.
+    # Depend on referenced schemas and target objects.
     if isinstance(grant_obj, GrantStatement):
         for target_name in grant_obj.targets:
-            schema_part, _, _ = target_name.partition(".")
-            if schema_part:
+            schema_part, sep, obj_name = target_name.partition(".")
+            if sep:
                 refs.add(
                     EntityIdentifier(
                         schema=schema_part.lower(),
+                        phase=phase,
+                    )
+                )
+                refs.add(
+                    EntityIdentifier(
+                        schema=schema_part.lower(),
+                        name=obj_name.lower(),
+                        phase=phase,
+                    )
+                )
+            else:
+                refs.add(
+                    EntityIdentifier(
+                        schema=target_name.lower(),
                         phase=phase,
                     )
                 )

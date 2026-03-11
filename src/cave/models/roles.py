@@ -1,14 +1,23 @@
 """PostgREST role and grant declarations."""
 
 from sqlalchemy import MetaData
-from sqlalchemy_declarative_extensions import Grants, Role, Roles
+from sqlalchemy_declarative_extensions import Grants, Roles
 from sqlalchemy_declarative_extensions.dialects.postgresql import (
     Grant as PgGrant,
 )
+from sqlalchemy_declarative_extensions.dialects.postgresql import (
+    Role,
+)
+from sqlalchemy_declarative_extensions.role.generic import Env
 
 from cave.resource import get_api_resources
 
-authenticator = Role("authenticator", in_roles=["anon"])
+authenticator = Role(
+    "authenticator",
+    login=True,
+    password=Env("PGRST_DB_PASSWORD", default="changeme"),
+    in_roles=["anon"],
+)
 anon = Role("anon")
 
 

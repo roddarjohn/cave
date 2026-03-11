@@ -79,11 +79,12 @@ def _wrap_sql(sql: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _render_execute(sql: str) -> str:
+def _render_execute(sql: str, *, fstring: bool = False) -> str:
     """Render ``op.execute(\"\"\"...\"\"\")``, going multi-line when needed."""
-    inline = f'op.execute("""{sql}""")'
+    prefix = "f" if fstring else ""
+    inline = f'op.execute({prefix}"""{sql}""")'
     if "\n" in sql or sql.endswith('"') or len(inline) > _MAX_LINE:
-        return f'op.execute("""\n{indent(sql, "    ")}\n""")'
+        return f'op.execute({prefix}"""\n{indent(sql, "    ")}\n""")'
     return inline
 
 
@@ -143,9 +144,13 @@ def _render_role(
     op: Any,  # noqa: ANN401
 ) -> list[str]:
     """Render a role op with word-wrapped SQL (sqlglot can't parse these)."""
-    if op.role.is_dynamic:
+    is_dynamic = op.role.is_dynamic
+    if is_dynamic:
         autogen_context.imports.add("import os")
-    return [_render_execute(_wrap_sql(cmd)) for cmd in op.to_sql(raw=False)]
+    return [
+        _render_execute(_wrap_sql(cmd), fstring=is_dynamic)
+        for cmd in op.to_sql(raw=False)
+    ]
 
 
 def _render_grant(

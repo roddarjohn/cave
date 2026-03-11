@@ -1,10 +1,13 @@
 from typing import Any
 
-from sqlalchemy import Column, Integer, MetaData, Table
+from sqlalchemy import Column, Integer, MetaData, Table, select
 from sqlalchemy.schema import SchemaItem
+from sqlalchemy_declarative_extensions import View, register_view
 
 from cave.factory.dimension.types import DimensionConfiguration
 from cave.factory.dimension.validator import validate_schema_items
+from cave.resource import APIResource, register_api_resource
+from cave.utils.query import compile_query
 
 
 def simple_dimension_factory(
@@ -37,10 +40,28 @@ def simple_dimension_factory(
         Column(config.id_field_name, Integer, primary_key=True),
     )
 
-    return Table(
+    table = Table(
         tablename,
         metadata,
         *dimensions,
         schema=schemaname,
         **kwargs,
     )
+
+    api_query = select(*[c.label(c.key) for c in table.columns]).select_from(
+        table
+    )
+    register_view(
+        metadata,
+        View(
+            tablename,
+            compile_query(api_query),
+            schema=config.api_schema_name,
+        ),
+    )
+    register_api_resource(
+        metadata,
+        APIResource(name=tablename, schema=config.api_schema_name),
+    )
+
+    return table

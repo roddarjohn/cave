@@ -25,6 +25,6 @@ append_only_log_dimension_factory(
     metadata=metadata,
     dimensions=[
         Column("name", String),
-        Column("users_id", ForeignKey("public.users.id")),
+        Column("user_id", ForeignKey("public.users.id")),
     ],
 )
