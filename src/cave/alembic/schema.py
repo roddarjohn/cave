@@ -2,6 +2,7 @@ from alembic.autogenerate import comparators, renderers
 from alembic.autogenerate.api import AutogenContext
 from alembic.operations import MigrateOperation, Operations
 from alembic.operations.ops import UpgradeOps
+from alembic_utils.replaceable_entity import registry
 from sqlalchemy import MetaData, text
 
 SYSTEM_SCHEMAS = {"public", "pg_catalog", "information_schema", "pg_toast"}
@@ -94,13 +95,14 @@ def _compare_schemas(
     raw_metadata = autogen_context.metadata
     if not isinstance(raw_metadata, MetaData):
         return
+
     metadata = raw_metadata
 
     desired = {
         table.schema
         for table in metadata.tables.values()
         if table.schema is not None
-    }
+    } | {entity.schema for entity in registry.entities()}
 
     for schema in desired - existing - SYSTEM_SCHEMAS:
         # Should be replaced by uniform dependency handling

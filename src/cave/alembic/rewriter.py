@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from alembic.autogenerate.rewriter import Rewriter
 from alembic.operations import ops as alembic_ops
 
-from cave.alembic.dependency import sort_migration_ops
+from cave.alembic.dependency import expand_replace_ops, sort_migration_ops
 
 if TYPE_CHECKING:
     from alembic.runtime.migration import MigrationContext
@@ -19,7 +19,8 @@ def _reorder_upgrade(
     _revision: "_GetRevArg",
     upgrade_ops: alembic_ops.UpgradeOps,
 ) -> alembic_ops.UpgradeOps:
-    upgrade_ops.ops[:] = sort_migration_ops(list(upgrade_ops.ops))
+    expanded = expand_replace_ops(list(upgrade_ops.ops))
+    upgrade_ops.ops[:] = sort_migration_ops(expanded)
     return upgrade_ops
 
 
@@ -29,8 +30,6 @@ def _reorder_downgrade(
     _revision: "_GetRevArg",
     downgrade_ops: alembic_ops.DowngradeOps,
 ) -> alembic_ops.DowngradeOps:
-    downgrade_ops.ops[:] = sort_migration_ops(
-        list(downgrade_ops.ops),
-        for_downgrade=True,
-    )
+    expanded = expand_replace_ops(list(downgrade_ops.ops))
+    downgrade_ops.ops[:] = sort_migration_ops(expanded)
     return downgrade_ops

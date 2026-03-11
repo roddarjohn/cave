@@ -1,5 +1,3 @@
-from typing import Any
-
 from alembic_utils.pg_view import PGView
 from alembic_utils.replaceable_entity import registry
 from sqlalchemy import (
@@ -11,76 +9,70 @@ from sqlalchemy import (
     Table,
     select,
 )
-from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import SchemaItem
 
 from cave.factory.dimension.types import DimensionConfiguration
 from cave.factory.dimension.validator import validate_schema_items
+from cave.utils.query import compile_query
 
 
-def append_only_log_dimension_factory(
+def _construct_attribute_table(
     tablename: str,
     schemaname: str,
     metadata: MetaData,
     dimensions: list[SchemaItem],
-    config: DimensionConfiguration | None = None,
-    **kwargs: Any,  # noqa: ANN401
-) -> None:
-    """Create an append-only log dimension table and its root table.
-
-    Creates three objects: ``<tablename>_attributes`` (the append-only log),
-    ``<tablename>_root`` (the entity root with a FK to the latest attributes
-    row), and a ``<tablename>`` view joining them.
-
-    :param tablename: Base name for the generated tables and view.
-    :param schemaname: PostgreSQL schema for all generated objects.
-    :param metadata: SQLAlchemy ``MetaData`` the tables are bound to.
-    :param dimensions: Column definitions for the attribute columns.  Must
-        not include a primary key column.
-    :param config: Factory configuration; defaults to
-        ``DimensionConfiguration()``.
-    :param kwargs: Extra keyword arguments forwarded to ``Table()``.
-    :raises CaveValidationError: If any item in *dimensions* fails validation.
-    """
-    config = config or DimensionConfiguration()
-
-    validate_schema_items(dimensions)
-
+    config: DimensionConfiguration,
+) -> Table:
     attributes_tablename = f"{tablename}_attributes"
+
     attributes_columns = [
         Column(config.id_field_name, Integer, primary_key=True),
         Column("created_at", DateTime(timezone=True), server_default="now()"),
         *dimensions,
     ]
 
-    attribute_table = Table(
+    return Table(
         attributes_tablename,
         metadata,
         *attributes_columns,
         schema=schemaname,
-        **kwargs,
     )
 
+
+def _construct_root_table(
+    tablename: str,
+    schemaname: str,
+    metadata: MetaData,
+    config: DimensionConfiguration,
+    attributes_table: Table,
+) -> Table:
     root_tablename = f"{tablename}_root"
+
     root_columns = [
         Column(config.id_field_name, Integer, primary_key=True),
         Column("created_at", DateTime(timezone=True), server_default="now()"),
         Column(
-            f"{attributes_tablename}_id",
-            ForeignKey(f"{schemaname}.{attributes_tablename}.id"),
+            f"{attributes_table.name}_id",
+            ForeignKey(f"{schemaname}.{attributes_table.name}.id"),
         ),
     ]
 
-    root_table = Table(
+    return Table(
         root_tablename,
         metadata,
         *root_columns,
         schema=schemaname,
-        **kwargs,
     )
 
-    # View definition
 
+def _construct_view(  # noqa: PLR0913
+    tablename: str,
+    schemaname: str,
+    dimensions: list[SchemaItem],
+    config: DimensionConfiguration,
+    root_table: Table,
+    attribute_table: Table,
+) -> Table:
     view_query = (
         select(
             root_table.c["id"].label("id"),
@@ -104,12 +96,112 @@ def append_only_log_dimension_factory(
             PGView(
                 schema=schemaname,
                 signature=tablename,
-                definition=str(
-                    view_query.compile(
-                        dialect=postgresql.dialect(),
-                        compile_kwargs={"literal_binds": True},
-                    )
-                ),
+                definition=compile_query(view_query),
             )
         ]
     )
+
+    return Table(
+        tablename,
+        MetaData(),
+        Column("id", Integer, primary_key=True),
+        Column("created_at", DateTime(timezone=True)),
+        Column("updated_at", DateTime(timezone=True)),
+        *[
+            Column(
+                dimension_column.key,
+                dimension_column.type,
+            )
+            for dimension_column in dimensions
+            if isinstance(dimension_column, Column)
+        ],
+        schema=schemaname,
+    )
+
+
+def _construct_api_view(
+    tablename: str,
+    dimensions: list[SchemaItem],
+    config: DimensionConfiguration,
+    view_table: Table,
+) -> PGView:
+    view_query = select(
+        view_table.c["id"].label("id"),
+        view_table.c["created_at"].label("created_at"),
+        view_table.c["updated_at"].label("updated_at"),
+        *[
+            getattr(view_table.c, dimension_column.key).label(
+                dimension_column.key
+            )
+            for dimension_column in dimensions
+            if isinstance(dimension_column, Column)
+        ],
+    ).select_from(view_table)
+
+    return PGView(
+        schema=config.api_schema_name,
+        signature=tablename,
+        definition=compile_query(view_query),
+    )
+
+
+def append_only_log_dimension_factory(
+    tablename: str,
+    schemaname: str,
+    metadata: MetaData,
+    dimensions: list[SchemaItem],
+    config: DimensionConfiguration | None = None,
+) -> None:
+    """Create an append-only log dimension table and its root table.
+
+    Creates three objects: ``<tablename>_attributes`` (the append-only log),
+    ``<tablename>_root`` (the entity root with a FK to the latest attributes
+    row), and a ``<tablename>`` view joining them.
+
+    :param tablename: Base name for the generated tables and view.
+    :param schemaname: PostgreSQL schema for all generated objects.
+    :param metadata: SQLAlchemy ``MetaData`` the tables are bound to.
+    :param dimensions: Column definitions for the attribute columns.  Must
+        not include a primary key column.
+    :param config: Factory configuration; defaults to
+        ``DimensionConfiguration()``.
+    :param kwargs: Extra keyword arguments forwarded to ``Table()``.
+    :raises CaveValidationError: If any item in *dimensions* fails validation.
+    """
+    config = config or DimensionConfiguration()
+
+    validate_schema_items(dimensions)
+
+    attributes_table = _construct_attribute_table(
+        tablename=tablename,
+        schemaname=schemaname,
+        metadata=metadata,
+        dimensions=dimensions,
+        config=config,
+    )
+
+    root_table = _construct_root_table(
+        tablename=tablename,
+        schemaname=schemaname,
+        metadata=metadata,
+        config=config,
+        attributes_table=attributes_table,
+    )
+
+    view_table = _construct_view(
+        tablename=tablename,
+        schemaname=schemaname,
+        dimensions=dimensions,
+        config=config,
+        root_table=root_table,
+        attribute_table=attributes_table,
+    )
+
+    api_view = _construct_api_view(
+        tablename=tablename,
+        dimensions=dimensions,
+        config=config,
+        view_table=view_table,
+    )
+
+    registry.register([api_view])

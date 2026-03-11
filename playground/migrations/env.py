@@ -35,6 +35,7 @@ def run_migrations_offline() -> None:
     context.configure(
         url=url,
         target_metadata=target_metadata,
+        include_schemas=True,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         process_revision_directives=cave_process_revision_directives,
@@ -56,6 +57,7 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
+            include_schemas=True,
             process_revision_directives=cave_process_revision_directives,
         )
 
