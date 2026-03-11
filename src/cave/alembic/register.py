@@ -1,7 +1,8 @@
-from cave.alembic import renderer as _renderer
-from cave.alembic import schema as _schema  # noqa: F401
+from sqlalchemy_declarative_extensions.alembic import register_alembic_events
+
+from cave.alembic.renderer import register_renderers
 from cave.alembic.rewriter import cave_process_revision_directives
-from cave.patches import apply_all as _apply_all
+from cave.patches import view_render
 
 __all__ = ["cave_alembic_hook", "cave_process_revision_directives"]
 
@@ -12,7 +13,7 @@ def cave_alembic_hook() -> None:
     Call this at the top of ``env.py`` and pass
     ``cave_process_revision_directives`` to ``process_revision_directives``::
 
-        from cave.alembic import (
+        from cave.alembic.register import (
             cave_alembic_hook,
             cave_process_revision_directives,
         )
@@ -30,5 +31,6 @@ def cave_alembic_hook() -> None:
 
         process_revision_directives=cave_process_revision_directives.chain(other),
     """
-    _apply_all()
-    _renderer.apply()
+    register_alembic_events()
+    register_renderers()
+    view_render.apply()

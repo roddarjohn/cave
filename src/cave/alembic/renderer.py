@@ -1,94 +1,144 @@
-import textwrap
-from typing import TYPE_CHECKING
+"""Custom alembic renderers that format SQL with sqlglot."""
+
+from textwrap import indent
+from typing import Any
 
 import sqlglot
-from alembic.autogenerate import renderers
-from alembic_utils.exceptions import UnreachableException
-from alembic_utils.replaceable_entity import ReplaceableEntity
-from alembic_utils.reversible_op import CreateOp, DropOp, ReplaceOp, RevertOp
-
-if TYPE_CHECKING:
-    from alembic.autogenerate.api import AutogenContext
-
-
-def _render_entity_code(target: ReplaceableEntity) -> str:
-    """Render the Python variable assignment for a replaceable entity.
-
-    The SQL definition is pretty-printed by sqlglot and embedded as a
-    triple-quoted string rather than a single ``repr()``-escaped line.
-    """
-    var_name = target.to_variable_name()
-    class_name = target.__class__.__name__
-    formatted_sql = sqlglot.parse_one(
-        target.definition, dialect="postgres"
-    ).sql(dialect="postgres", pretty=True)
-    # The SQL is pre-indented by 4 spaces.  alembic adds a further 4 spaces
-    # when writing the migration function body, so both the content and the
-    # closing """ land at 8 spaces in the final file.
-    indented_sql = textwrap.indent(formatted_sql, prefix="    ")
-    definition_value = f'"""\n{indented_sql}\n    """'
-
-    return (
-        f"{var_name} = {class_name}(\n"
-        f'    schema="{target.schema}",\n'
-        f'    signature="{target.signature}",\n'
-        f"    definition={definition_value}\n"
-        f")\n"
-    )
+from alembic.autogenerate.api import AutogenContext
+from alembic.autogenerate.render import renderers
+from sqlalchemy.sql.ddl import CreateSchema, DropSchema
+from sqlalchemy_declarative_extensions.function.compare import (
+    CreateFunctionOp,
+    DropFunctionOp,
+    UpdateFunctionOp,
+)
+from sqlalchemy_declarative_extensions.procedure.compare import (
+    CreateProcedureOp,
+    DropProcedureOp,
+    UpdateProcedureOp,
+)
+from sqlalchemy_declarative_extensions.schema.compare import (
+    CreateSchemaOp,
+    DropSchemaOp,
+    SchemaOp,
+)
+from sqlalchemy_declarative_extensions.trigger.compare import (
+    CreateTriggerOp,
+    DropTriggerOp,
+    UpdateTriggerOp,
+)
+from sqlalchemy_declarative_extensions.view.compare import (
+    CreateViewOp,
+    DropViewOp,
+    UpdateViewOp,
+)
 
 
-def _render_create_entity(
-    autogen_context: "AutogenContext", op: CreateOp
-) -> str:
-    autogen_context.imports.add(op.target.render_import_statement())
-    return _render_entity_code(op.target) + (
-        f"op.create_entity({op.target.to_variable_name()})\n"
-    )
+def _format_sql(sql: str) -> str:
+    """Format a SQL string using sqlglot."""
+    return sqlglot.transpile(
+        sql, read="postgres", write="postgres", pretty=True
+    )[0]
 
 
-def _render_drop_entity(autogen_context: "AutogenContext", op: DropOp) -> str:
-    autogen_context.imports.add(op.target.render_import_statement())
-    return _render_entity_code(op.target) + (
-        f"op.drop_entity({op.target.to_variable_name()})\n"
-    )
+def _render_command(command: str) -> str:
+    """Render a single SQL command as an ``op.execute(...)`` call."""
+    formatted = _format_sql(command)
+    if "\n" in formatted:
+        indented = indent(formatted, "    ")
+        return f'op.execute("""\n{indented}\n""")'
+    return f'op.execute("""{formatted}""")'
 
 
-def _render_replace_entity(
-    autogen_context: "AutogenContext", op: ReplaceOp
-) -> str:
-    autogen_context.imports.add(op.target.render_import_statement())
-    return _render_entity_code(op.target) + (
-        f"op.replace_entity({op.target.to_variable_name()})\n"
-    )
+def _render_view(
+    autogen_context: AutogenContext,
+    op: Any,  # noqa: ANN401
+) -> list[str]:
+    """Render a view op with sqlglot-formatted SQL."""
+    assert autogen_context.connection  # noqa: S101
+    dialect = autogen_context.connection.dialect
+    commands = op.to_sql(dialect)
+    return [_render_command(command) for command in commands]
 
 
-def _render_revert_entity(
-    autogen_context: "AutogenContext", op: RevertOp
-) -> str:
-    autogen_context.imports.add(op.target.render_import_statement())
-    db_target = op.target._version_to_replace  # noqa: SLF001
-    if db_target is None:
-        raise UnreachableException
-    assert isinstance(db_target, ReplaceableEntity)  # noqa: S101
-    return _render_entity_code(db_target) + (
-        f"op.replace_entity({db_target.to_variable_name()})"
-    )
+def _render_function(
+    _autogen_context: AutogenContext,
+    op: Any,  # noqa: ANN401
+) -> list[str]:
+    """Render a function op with sqlglot-formatted SQL."""
+    commands = op.to_sql()
+    return [_render_command(command) for command in commands]
 
 
-def apply() -> None:
-    """Register cave's renderers, overriding the alembic_utils defaults.
+def _render_procedure(
+    _autogen_context: AutogenContext,
+    op: Any,  # noqa: ANN401
+) -> list[str]:
+    """Render a procedure op with sqlglot-formatted SQL."""
+    commands = op.to_sql()
+    return [_render_command(command) for command in commands]
 
-    alembic_utils renders view/function definitions as a single
-    ``repr()``-escaped string, producing one very long line.  These
-    renderers replace that with a sqlglot pretty-printed triple-quoted
-    block for readable migration files.
 
-    alembic's renderer dispatcher is a simple dict — last registration wins.
-    Because this is called from ``cave_alembic_hook()`` at env.py startup,
-    after alembic_utils has already registered its own renderers on import,
-    cave's registrations take precedence with no monkey-patching required.
-    """
-    renderers.dispatch_for(CreateOp, replace=True)(_render_create_entity)
-    renderers.dispatch_for(DropOp, replace=True)(_render_drop_entity)
-    renderers.dispatch_for(ReplaceOp, replace=True)(_render_replace_entity)
-    renderers.dispatch_for(RevertOp, replace=True)(_render_revert_entity)
+def _render_trigger(
+    autogen_context: AutogenContext,
+    op: Any,  # noqa: ANN401
+) -> list[str]:
+    """Render a trigger op with sqlglot-formatted SQL."""
+    assert autogen_context.connection  # noqa: S101
+    commands = op.to_sql(autogen_context.connection)
+    return [_render_command(command) for command in commands]
+
+
+def _render_schema(
+    autogen_context: AutogenContext,
+    op: SchemaOp,
+) -> list[str]:
+    """Render a schema op, using DDL objects where possible."""
+    statements = op.to_sql()
+    cls_names = {
+        s.__class__.__name__
+        for s in statements
+        if isinstance(s, (CreateSchema, DropSchema))
+    }
+
+    if cls_names:
+        autogen_context.imports.add(
+            f"from sqlalchemy.sql.ddl import {', '.join(cls_names)}"
+        )
+
+    return [
+        (f'op.execute({command.__class__.__name__}("{command.element}"))')
+        if isinstance(command, (CreateSchema, DropSchema))
+        else _render_command(str(command))
+        for command in statements
+    ]
+
+
+def register_renderers() -> None:
+    """Override the library's renderers with sqlglot-formatted versions."""
+    for op_type in (CreateViewOp, UpdateViewOp, DropViewOp):
+        renderers.dispatch_for(op_type, replace=True)(_render_view)
+
+    for op_type in (
+        CreateFunctionOp,
+        UpdateFunctionOp,
+        DropFunctionOp,
+    ):
+        renderers.dispatch_for(op_type, replace=True)(_render_function)
+
+    for op_type in (
+        CreateProcedureOp,
+        UpdateProcedureOp,
+        DropProcedureOp,
+    ):
+        renderers.dispatch_for(op_type, replace=True)(_render_procedure)
+
+    for op_type in (
+        CreateTriggerOp,
+        UpdateTriggerOp,
+        DropTriggerOp,
+    ):
+        renderers.dispatch_for(op_type, replace=True)(_render_trigger)
+
+    for op_type in (CreateSchemaOp, DropSchemaOp):
+        renderers.dispatch_for(op_type, replace=True)(_render_schema)

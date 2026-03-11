@@ -1,9 +1,9 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from alembic.autogenerate.rewriter import Rewriter
 from alembic.operations import ops as alembic_ops
 
-from cave.alembic.dependency import expand_replace_ops, sort_migration_ops
+from cave.alembic.dependency import expand_update_ops, sort_migration_ops
 
 if TYPE_CHECKING:
     from alembic.runtime.migration import MigrationContext
@@ -19,8 +19,11 @@ def _reorder_upgrade(
     _revision: "_GetRevArg",
     upgrade_ops: alembic_ops.UpgradeOps,
 ) -> alembic_ops.UpgradeOps:
-    expanded = expand_replace_ops(list(upgrade_ops.ops))
-    upgrade_ops.ops[:] = sort_migration_ops(expanded)
+    expanded = expand_update_ops(list(upgrade_ops.ops))
+    upgrade_ops.ops[:] = cast(
+        "list[alembic_ops.MigrateOperation]",
+        sort_migration_ops(expanded),
+    )
     return upgrade_ops
 
 
@@ -30,6 +33,9 @@ def _reorder_downgrade(
     _revision: "_GetRevArg",
     downgrade_ops: alembic_ops.DowngradeOps,
 ) -> alembic_ops.DowngradeOps:
-    expanded = expand_replace_ops(list(downgrade_ops.ops))
-    downgrade_ops.ops[:] = sort_migration_ops(expanded)
+    expanded = expand_update_ops(list(downgrade_ops.ops))
+    downgrade_ops.ops[:] = cast(
+        "list[alembic_ops.MigrateOperation]",
+        sort_migration_ops(expanded),
+    )
     return downgrade_ops

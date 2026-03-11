@@ -5,20 +5,64 @@ from typing import Literal
 
 import sqlglot
 from alembic.operations import ops as alembic_ops
-from alembic_utils.reversible_op import (
-    CreateOp,
-    DropOp,
-    ReplaceOp,
-    ReversibleOp,
-    RevertOp,
+from sqlalchemy_declarative_extensions.alembic.function import (
+    CreateFunctionOp,
+    DropFunctionOp,
+    UpdateFunctionOp,
 )
+from sqlalchemy_declarative_extensions.alembic.procedure import (
+    CreateProcedureOp,
+    DropProcedureOp,
+    UpdateProcedureOp,
+)
+from sqlalchemy_declarative_extensions.alembic.schema import (
+    CreateSchemaOp,
+    DropSchemaOp,
+)
+from sqlalchemy_declarative_extensions.alembic.trigger import (
+    CreateTriggerOp,
+    DropTriggerOp,
+    UpdateTriggerOp,
+)
+from sqlalchemy_declarative_extensions.alembic.view import (
+    CreateViewOp,
+    DropViewOp,
+    UpdateViewOp,
+)
+from sqlalchemy_declarative_extensions.op import MigrateOp
 from sqlglot.expressions import Table as SqlglotTable
-
-from cave.alembic.schema import CreateSchemaOp, DropSchemaOp
 
 logger = logging.getLogger(__name__)
 
+# Union of alembic's built-in ops and sqlalchemy-declarative-extensions ops,
+# which don't share a common base class.
+AnyOp = alembic_ops.MigrateOperation | MigrateOp
+
 Phase = Literal["drop", "create"]
+
+# Op types grouped by direction.
+_CREATE_OPS = (
+    CreateSchemaOp,
+    alembic_ops.CreateTableOp,
+    CreateViewOp,
+    CreateFunctionOp,
+    CreateProcedureOp,
+    CreateTriggerOp,
+)
+_DROP_OPS = (
+    DropSchemaOp,
+    alembic_ops.DropTableOp,
+    DropViewOp,
+    DropFunctionOp,
+    DropProcedureOp,
+    DropTriggerOp,
+)
+_UPDATE_OPS = (
+    UpdateViewOp,
+    UpdateFunctionOp,
+    UpdateProcedureOp,
+    UpdateTriggerOp,
+)
 
 
 @dataclass(frozen=True)
@@ -30,7 +74,7 @@ class EntityIdentifier:
     unqualified object name and ``schema`` holds its containing schema.
 
     ``phase`` distinguishes drop and create ops for the same entity when
-    a ``ReplaceOp`` has been expanded.  ``"drop"`` ops are ordered before
+    an ``Update*Op`` has been expanded.  ``"drop"`` ops are ordered before
     ``"create"`` ops for the same entity.
     """
 
@@ -39,33 +83,71 @@ class EntityIdentifier:
     phase: Phase | None = None
 
 
-def _op_phase(op: alembic_ops.MigrateOperation) -> Phase | None:
+def _op_phase(op: AnyOp) -> Phase | None:
     """Return ``"drop"`` or ``"create"`` for ops that have a direction.
 
     Returns ``None`` for ``ModifyTableOps`` (column adds/drops) and any
-    ``ReplaceOp``/``RevertOp`` that wasn't split by ``expand_replace_ops``.
+    ``Update*Op`` that wasn't split by ``expand_update_ops``.
     """
-    if isinstance(op, (DropSchemaOp, alembic_ops.DropTableOp, DropOp)):
+    if isinstance(op, _DROP_OPS):
         return "drop"
 
-    if isinstance(op, (CreateSchemaOp, alembic_ops.CreateTableOp, CreateOp)):
+    if isinstance(op, _CREATE_OPS):
         return "create"
 
     return None
 
 
+def _entity_schema(op: AnyOp) -> str | None:
+    """Extract the schema name from an entity op."""
+    if isinstance(op, (CreateSchemaOp, DropSchemaOp)):
+        return op.schema.name
+
+    if isinstance(op, _CREATE_OPS + _DROP_OPS):
+        # View/Function/Procedure/Trigger ops store the entity
+        # as the first dataclass field.
+        for attr in ("view", "function", "procedure", "trigger"):
+            entity = getattr(op, attr, None)
+            if entity is not None:
+                return entity.schema or "public"
+
+    return None
+
+
+def _entity_name(op: AnyOp) -> str | None:
+    """Extract the entity name from a declarative-extensions op."""
+    for attr in ("view", "function", "procedure", "trigger"):
+        entity = getattr(op, attr, None)
+        if entity is not None:
+            return entity.name
+    return None
+
+
+def _entity_definition(op: AnyOp) -> str | None:
+    """Extract the SQL definition from a declarative-extensions op."""
+    for attr in ("view", "function", "procedure", "trigger"):
+        entity = getattr(op, attr, None)
+        if entity is not None and hasattr(entity, "definition"):
+            defn = entity.definition
+            if isinstance(defn, str):
+                return defn
+    return None
+
+
 def _entity_identifier(
-    op: alembic_ops.MigrateOperation,
+    op: AnyOp,
 ) -> EntityIdentifier | None:
     """Return the identifier for the entity this op acts on.
 
-    Returns ``None`` for ops whose ordering relative to others is
-    unconstrained (e.g. column modifications on existing tables).
+    Returns ``None`` for unrecognised op types (logged as a warning).
     """
     phase = _op_phase(op)
 
     if isinstance(op, (CreateSchemaOp, DropSchemaOp)):
-        return EntityIdentifier(schema=op.schema_name.lower(), phase=phase)
+        return EntityIdentifier(
+            schema=op.schema.name.lower(),
+            phase=phase,
+        )
 
     if isinstance(op, (alembic_ops.CreateTableOp, alembic_ops.DropTableOp)):
         return EntityIdentifier(
@@ -80,24 +162,25 @@ def _entity_identifier(
             name=op.table_name.lower(),
         )
 
-    if isinstance(op, ReversibleOp):
-        # Strip the argument list from function signatures like
-        # "my_func(integer, text)" to get the bare name.
-        base_name = op.target.signature.lower().split("(")[0].strip()
+    # Declarative-extensions entity ops (views, functions, etc.)
+    name = _entity_name(op)
+    if name is not None:
+        schema = _entity_schema(op) or "public"
         return EntityIdentifier(
-            schema=op.target.schema.lower(),
-            name=base_name,
+            schema=schema.lower(),
+            name=name.lower(),
             phase=phase,
         )
 
     logger.warning(
-        "Unhandled op type %s; ordering is unconstrained", type(op).__name__
+        "Unhandled op type %s; ordering is unconstrained",
+        type(op).__name__,
     )
     return None
 
 
 def _entity_references(
-    op: alembic_ops.MigrateOperation,
+    op: AnyOp,
 ) -> set[EntityIdentifier]:
     """Return identifiers of entities this op references.
 
@@ -119,12 +202,13 @@ def _entity_references(
             )
         }
 
-    if isinstance(op, ReversibleOp):
-        self_schema = op.target.schema.lower()
-        base_name = op.target.signature.lower().split("(")[0].strip()
+    # Declarative-extensions entity ops.
+    name = _entity_name(op)
+    if name is not None:
+        schema = (_entity_schema(op) or "public").lower()
         self_id = EntityIdentifier(
-            schema=self_schema,
-            name=base_name,
+            schema=schema,
+            name=name.lower(),
             phase=phase,
         )
 
@@ -134,8 +218,8 @@ def _entity_references(
             # Must drop ourselves before recreating.
             refs.add(
                 EntityIdentifier(
-                    schema=self_schema,
-                    name=base_name,
+                    schema=schema,
+                    name=name.lower(),
                     phase="drop",
                 )
             )
@@ -144,14 +228,15 @@ def _entity_references(
         if phase != "drop":
             refs.add(
                 EntityIdentifier(
-                    schema=self_schema,
+                    schema=schema,
                     phase=phase,
                 )
             )
 
         # SQL-level references to tables and views.
-        if hasattr(op.target, "definition"):
-            ast = sqlglot.parse_one(op.target.definition, dialect="postgres")
+        definition = _entity_definition(op)
+        if definition is not None:
+            ast = sqlglot.parse_one(definition, dialect="postgres")
             for table_ref in ast.find_all(SqlglotTable):
                 if table_ref.db:
                     ref_schema = table_ref.db.lower()
@@ -163,9 +248,10 @@ def _entity_references(
                             phase=phase,
                         )
                     )
-                    # Also reference any ModifyTableOps (phase=None) for
-                    # the same table, so column changes are ordered
-                    # correctly relative to view drops/creates.
+                    # Also reference any ModifyTableOps (phase=None)
+                    # for the same table, so column changes are
+                    # ordered correctly relative to view
+                    # drops/creates.
                     if phase is not None:
                         refs.add(
                             EntityIdentifier(
@@ -180,10 +266,10 @@ def _entity_references(
     return set()
 
 
-def _op_label(op: alembic_ops.MigrateOperation) -> str:
+def _op_label(op: AnyOp) -> str:
     """Return a compact label for an op, used in log messages.
 
-    Format is ``OpType(schema.name)`` e.g. ``CreateOp(private.students)``,
+    Format is ``OpType(schema.name)`` e.g. ``CreateViewOp(private.students)``,
     or ``OpType(schema)`` for schema-level ops.
     """
     identifier = _entity_identifier(op)
@@ -200,32 +286,34 @@ def _op_label(op: alembic_ops.MigrateOperation) -> str:
     return f"{type(op).__name__}({entity})"
 
 
-def expand_replace_ops(
-    migration_ops: list[alembic_ops.MigrateOperation],
-) -> list[alembic_ops.MigrateOperation]:
-    """Split ``ReplaceOp`` and ``RevertOp`` into ``DropOp`` + ``CreateOp``.
+def expand_update_ops(
+    migration_ops: list[AnyOp],
+) -> list[AnyOp]:
+    """Split ``Update*Op`` into ``Drop*Op`` + ``Create*Op``.
 
-    ``CREATE OR REPLACE VIEW`` fails when another view that depends on this
-    one has an incompatible column list.  Splitting into separate drop/create
-    operations lets the topological sort interleave them correctly: drop
-    dependents first, then drop and recreate dependencies, then recreate
-    dependents.
+    ``CREATE OR REPLACE VIEW`` fails when another view that depends on
+    this one has an incompatible column list.  Splitting into separate
+    drop/create operations lets the topological sort interleave them
+    correctly: drop dependents first, then drop and recreate
+    dependencies, then recreate dependents.
     """
-    result: list[alembic_ops.MigrateOperation] = []
+    result: list[AnyOp] = []
     for op in migration_ops:
-        if isinstance(op, ReplaceOp):
-            result.append(DropOp(op.target))
-            result.append(CreateOp(op.target))
+        if isinstance(op, UpdateViewOp):
+            result.append(DropViewOp(op.from_view))
+            result.append(CreateViewOp(op.view))
 
-        elif isinstance(op, RevertOp):
-            old_target = op.target._version_to_replace  # noqa: SLF001
-            result.append(DropOp(op.target))
+        elif isinstance(op, UpdateFunctionOp):
+            result.append(DropFunctionOp(op.from_function))
+            result.append(CreateFunctionOp(op.function))
 
-            if old_target is not None:
-                result.append(CreateOp(old_target))
+        elif isinstance(op, UpdateProcedureOp):
+            result.append(DropProcedureOp(op.from_procedure))
+            result.append(CreateProcedureOp(op.procedure))
 
-            else:
-                result.append(CreateOp(op.target))
+        elif isinstance(op, UpdateTriggerOp):
+            result.append(DropTriggerOp(op.from_trigger))
+            result.append(CreateTriggerOp(op.trigger))
 
         else:
             result.append(op)
@@ -234,15 +322,16 @@ def expand_replace_ops(
 
 
 def sort_migration_ops(
-    migration_ops: list[alembic_ops.MigrateOperation],
-) -> list[alembic_ops.MigrateOperation]:
+    migration_ops: list[AnyOp],
+) -> list[AnyOp]:
     """Return *migration_ops* topologically sorted by entity dependencies.
 
     Dependency edges are derived from the ops themselves:
 
     - A table depends on its schema.
-    - A replaceable entity (view, function, …) depends on its schema and on
-      every schema-qualified table or view referenced in its SQL definition.
+    - A replaceable entity (view, function, ...) depends on its schema
+      and on every schema-qualified table or view referenced in its SQL
+      definition.
 
     Only dependencies between ops in the current migration produce edges;
     references to already-existing objects are ignored.
@@ -260,45 +349,48 @@ def sort_migration_ops(
         [_op_label(op) for op in migration_ops],
     )
 
-    op_by_entity: dict[EntityIdentifier, alembic_ops.MigrateOperation] = {
-        entity: op
-        for op in migration_ops
-        if (entity := _entity_identifier(op)) is not None
-    }
+    # Build a mapping from entity identifier to op.  Ops without a
+    # recognised identifier are appended at the end in original order.
+    op_by_entity: dict[EntityIdentifier, AnyOp] = {}
+    unkeyed_ops: list[AnyOp] = []
+    for op in migration_ops:
+        entity = _entity_identifier(op)
+        if entity is not None:
+            op_by_entity[entity] = op
+        else:
+            unkeyed_ops.append(op)
 
-    sorter: TopologicalSorter[alembic_ops.MigrateOperation] = (
-        TopologicalSorter()
-    )
+    # Use EntityIdentifier (frozen dataclass, hashable) as graph nodes.
+    sorter: TopologicalSorter[EntityIdentifier] = TopologicalSorter()
 
-    for current_op in migration_ops:
-        sorter.add(current_op)
+    for current_id, current_op in op_by_entity.items():
+        sorter.add(current_id)
         phase = _op_phase(current_op)
 
         for ref_id in _entity_references(current_op):
-            ref_op = op_by_entity.get(ref_id)
-
             # Only add edges for references that resolve to an op in
             # this migration.  Unresolved references point to entities
             # that already exist in the database.
-            if ref_op is not None:
+            if ref_id in op_by_entity:
                 # Drop-phase: reverse the edge — dependents must be
                 # dropped first.  Create-phase/unphased: normal
                 # direction — the referenced entity must exist before
                 # we use it.
                 if phase == "drop":
-                    node, prerequisite = ref_op, current_op
-
+                    node, prerequisite = ref_id, current_id
                 else:
-                    node, prerequisite = current_op, ref_op
+                    node, prerequisite = current_id, ref_id
 
                 logger.debug(
                     "Edge: %s before %s",
-                    _op_label(prerequisite),
-                    _op_label(node),
+                    _op_label(op_by_entity[prerequisite]),
+                    _op_label(op_by_entity[node]),
                 )
                 sorter.add(node, prerequisite)
 
-    sorted_ops = list(sorter.static_order())
+    sorted_ops = [
+        op_by_entity[eid] for eid in sorter.static_order()
+    ] + unkeyed_ops
 
     logger.debug(
         "Sorted order: %s",

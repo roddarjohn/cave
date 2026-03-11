@@ -1,130 +1,56 @@
-from alembic.autogenerate import comparators, renderers
-from alembic.autogenerate.api import AutogenContext
-from alembic.operations import MigrateOperation, Operations
-from alembic.operations.ops import UpgradeOps
-from alembic_utils.replaceable_entity import registry
-from sqlalchemy import MetaData, text
+"""Automatic schema discovery for alembic autogenerate.
 
-SYSTEM_SCHEMAS = {"public", "pg_catalog", "information_schema", "pg_toast"}
+Scans a :class:`~sqlalchemy.MetaData` instance for schemas referenced by
+tables and views, then registers them with
+``sqlalchemy-declarative-extensions`` so its built-in schema comparator
+emits the appropriate ``CREATE SCHEMA`` / ``DROP SCHEMA`` ops.
+"""
 
+from sqlalchemy import MetaData
+from sqlalchemy_declarative_extensions import Schemas, Views
 
-class CreateSchemaOp(MigrateOperation):
-    """Alembic operation to create a PostgreSQL schema."""
-
-    def __init__(self, schema_name: str) -> None:
-        """Initialise with the name of the schema to create.
-
-        :param schema_name: Name of the PostgreSQL schema to create.
-        """
-        self.schema_name = schema_name
-
-    @classmethod
-    def create_schema(cls, operations: Operations, schema_name: str) -> None:
-        """Invoke the create schema operation.
-
-        :param operations: Alembic operations proxy.
-        :param schema_name: Name of the schema to create.
-        """
-        return operations.invoke(cls(schema_name))
-
-    def reverse(self) -> "DropSchemaOp":
-        """Return the inverse operation.
-
-        :returns: A ``DropSchemaOp`` for the same schema.
-        """
-        return DropSchemaOp(self.schema_name)
+SYSTEM_SCHEMAS = frozenset(
+    {"public", "pg_catalog", "information_schema", "pg_toast"}
+)
 
 
-class DropSchemaOp(MigrateOperation):
-    """Alembic operation to drop a PostgreSQL schema."""
+def collect_schemas(metadata: MetaData) -> set[str]:
+    """Return non-system schema names referenced by tables and views."""
+    schemas: set[str] = set()
 
-    def __init__(self, schema_name: str) -> None:
-        """Initialise with the name of the schema to drop.
+    for table in metadata.tables.values():
+        if table.schema is not None:
+            schemas.add(table.schema)
 
-        :param schema_name: Name of the PostgreSQL schema to drop.
-        """
-        self.schema_name = schema_name
+    views: Views | None = metadata.info.get("views")
+    if views is not None:
+        for view in views.views:
+            if view.schema is not None:
+                schemas.add(view.schema)
 
-    @classmethod
-    def drop_schema(cls, operations: Operations, schema_name: str) -> None:
-        """Invoke the drop schema operation.
-
-        :param operations: Alembic operations proxy.
-        :param schema_name: Name of the schema to drop.
-        """
-        return operations.invoke(cls(schema_name))
-
-    def reverse(self) -> CreateSchemaOp:
-        """Return the inverse operation.
-
-        :returns: A ``CreateSchemaOp`` for the same schema.
-        """
-        return CreateSchemaOp(self.schema_name)
+    return schemas - SYSTEM_SCHEMAS
 
 
-@Operations.implementation_for(CreateSchemaOp)
-def _create_schema(operations: Operations, operation: CreateSchemaOp) -> None:
-    """Execute CREATE SCHEMA for the given operation."""
-    operations.execute(f"CREATE SCHEMA IF NOT EXISTS {operation.schema_name}")
+def register_schemas(metadata: MetaData) -> None:
+    """Populate ``metadata.info["schemas"]`` from tables and views.
 
-
-@Operations.implementation_for(DropSchemaOp)
-def _drop_schema(operations: Operations, operation: DropSchemaOp) -> None:
-    """Execute DROP SCHEMA for the given operation."""
-    operations.execute(f"DROP SCHEMA IF EXISTS {operation.schema_name}")
-
-
-@comparators.dispatch_for("schema")
-def _compare_schemas(
-    autogen_context: AutogenContext,
-    upgrade_ops: UpgradeOps,
-    _schemas: frozenset[str | None],
-) -> None:
-    """Compare desired schemas against the database and emit create/drop ops."""
-    conn = autogen_context.connection
-    if conn is None:
+    Merges with any schemas already registered on the metadata.
+    Safe to call multiple times — existing entries are preserved.
+    """
+    discovered = collect_schemas(metadata)
+    if not discovered:
         return
 
-    existing = {
-        row[0]
-        for row in conn.execute(
-            text("SELECT schema_name FROM information_schema.schemata")
-        )
-    }
+    existing: Schemas | None = metadata.info.get("schemas")
+    already_registered = (
+        {s.name for s in existing.schemas} if existing is not None else set()
+    )
 
-    raw_metadata = autogen_context.metadata
-    if not isinstance(raw_metadata, MetaData):
+    new = discovered - already_registered
+    if not new:
         return
 
-    metadata = raw_metadata
-
-    desired = {
-        table.schema
-        for table in metadata.tables.values()
-        if table.schema is not None
-    } | {entity.schema for entity in registry.entities()}
-
-    for schema in desired - existing - SYSTEM_SCHEMAS:
-        # Should be replaced by uniform dependency handling
-        upgrade_ops.ops.insert(
-            0, CreateSchemaOp(schema)
-        )  # prepend so it runs first
-
-    for schema in existing - desired - SYSTEM_SCHEMAS:
-        upgrade_ops.ops.append(DropSchemaOp(schema))
-
-
-@renderers.dispatch_for(CreateSchemaOp)
-def _render_create_schema(
-    _autogen_context: AutogenContext, op: CreateSchemaOp
-) -> str:
-    """Render a CreateSchemaOp as a migration script string."""
-    return f"op.execute('CREATE SCHEMA IF NOT EXISTS {op.schema_name}')"
-
-
-@renderers.dispatch_for(DropSchemaOp)
-def _render_drop_schema(
-    _autogen_context: AutogenContext, op: DropSchemaOp
-) -> str:
-    """Render a DropSchemaOp as a migration script string."""
-    return f"op.execute('DROP SCHEMA IF EXISTS {op.schema_name}')"
+    base = (
+        existing if existing is not None else Schemas(ignore_unspecified=True)
+    )
+    metadata.info["schemas"] = base.are(*new)

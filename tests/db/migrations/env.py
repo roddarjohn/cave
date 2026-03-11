@@ -3,9 +3,12 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
+from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
+from cave.alembic.register import cave_alembic_hook, cave_process_revision_directives
+
+cave_alembic_hook()
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -26,8 +29,10 @@ def run_migrations_offline() -> None:
     context.configure(
         url=url,
         target_metadata=target_metadata,
+        include_schemas=True,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        process_revision_directives=cave_process_revision_directives,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -41,7 +46,12 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_schemas=True,
+            process_revision_directives=cave_process_revision_directives,
+        )
         with context.begin_transaction():
             context.run_migrations()
 
