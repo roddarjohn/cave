@@ -93,6 +93,10 @@ ignore = [
 [tool.ty.environment]
 extra-paths = ["tests/db"]
 
+[tool.ty.analysis]
+# pglast has no type stubs.
+allowed-unresolved-imports = ["pglast.**"]
+
 [tool.tox]
 requires = ["tox-uv>=1"]
 env_list = ["3.12", "3.13", "3.14"]
