@@ -7,7 +7,7 @@ license = { file = "LICENSE" }
 authors = [
     { name = "Rodda John", email = "roddarjohn@protonmail.com" }
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.12.5",
     "typer>=0.24.1",
@@ -33,9 +33,9 @@ dev = [
     "tox-uv>=1.33.2",
 ]
 docs = [
-    "furo>=2025.12.19 ; python_version >= '3.12'",
-    "sphinx>=7.0 ; python_version >= '3.12'",
-    "sphinx-autobuild>=2025.8.25 ; python_version >= '3.11'",
+    "furo>=2025.12.19",
+    "sphinx>=7.0",
+    "sphinx-autobuild>=2025.8.25",
     "sphinx-autodoc-typehints>=3.0.1",
     "sphinx-copybutton>=0.5.2",
 ]
@@ -45,6 +45,7 @@ lint = [
 ]
 
 [tool.ruff]
+line-length = 80
 exclude = ["docs", "playground", "tests/db/migrations"]
 
 
@@ -77,10 +78,16 @@ ignore = [
     "ANN",     # no annotations required in tests
     "D",       # no docstrings required in tests
 ]
+"**/migrations/versions/*.py" = [
+    "INP001",  # migration versions aren't a package
+    "D400",    # migration docstrings don't need to end with a period
+    "D415",    # migration docstrings don't need closing punctuation
+    "W291",    # trailing whitespace on "Revises:" line when there's no parent
+]
 
 [tool.tox]
 requires = ["tox-uv>=1"]
-env_list = ["3.10", "3.11", "3.12", "3.13", "3.14"]
+env_list = ["3.12", "3.13", "3.14"]
 
 [tool.tox.env_run_base]
 dependency_groups = ["dev"]

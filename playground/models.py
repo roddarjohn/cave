@@ -1,13 +1,27 @@
-from sqlalchemy import Integer, String
+from cave.factory.dimension.append_only import append_only_log_dimension_factory
+from cave.factory.dimension.simple import (
+    simple_dimension_factory,
+)
+from sqlalchemy import Integer, String, MetaData, Column
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-
-class Base(DeclarativeBase):
-    pass
+metadata = MetaData()
 
 
-class User(Base):
-    __tablename__ = "users"
+simple_dimension_factory(
+    tablename="users",
+    schemaname="public",
+    metadata=metadata,
+    dimensions=[
+        Column("name", Integer),
+    ],
+)
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+append_only_log_dimension_factory(
+    tablename="students",
+    schemaname="private",
+    metadata=metadata,
+    dimensions=[
+        Column("name", Integer),
+    ],
+)
