@@ -15,7 +15,19 @@ def simple_dimension_factory(
     config: DimensionConfiguration | None = None,
     **kwargs: Any,  # noqa: ANN401
 ) -> Table:
-    """Create a simple dimension table with an auto-generated primary key."""
+    """Create a simple dimension table with an auto-generated primary key.
+
+    :param tablename: Name of the dimension table.
+    :param schemaname: PostgreSQL schema to create the table in.
+    :param metadata: SQLAlchemy ``MetaData`` the table is bound to.
+    :param dimensions: Column and constraint definitions for the dimension
+        attributes.  Must not include a primary key column.
+    :param config: Factory configuration; defaults to
+        ``DimensionConfiguration()``.
+    :param kwargs: Extra keyword arguments forwarded to ``Table()``.
+    :returns: The created ``Table`` object.
+    :raises CaveValidationError: If any item in *dimensions* fails validation.
+    """
     config = config or DimensionConfiguration()
 
     validate_schema_items(dimensions)

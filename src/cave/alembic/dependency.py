@@ -123,6 +123,11 @@ def sort_migration_ops(
 
     When *for_downgrade* is ``True``, the graph is traversed in reverse so
     that dependents are dropped before the entities they depend on.
+
+    :param migration_ops: Operations from a single migration script.
+    :param for_downgrade: When ``True``, reverse the sort so dependents are
+        dropped before their dependencies.
+    :returns: A new list containing the same ops in dependency order.
     """
     direction = "downgrade" if for_downgrade else "upgrade"
     logger.debug(

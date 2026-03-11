@@ -26,7 +26,22 @@ def append_only_log_dimension_factory(
     config: DimensionConfiguration | None = None,
     **kwargs: Any,  # noqa: ANN401
 ) -> None:
-    """Create an append-only log dimension table and its root table."""
+    """Create an append-only log dimension table and its root table.
+
+    Creates three objects: ``<tablename>_attributes`` (the append-only log),
+    ``<tablename>_root`` (the entity root with a FK to the latest attributes
+    row), and a ``<tablename>`` view joining them.
+
+    :param tablename: Base name for the generated tables and view.
+    :param schemaname: PostgreSQL schema for all generated objects.
+    :param metadata: SQLAlchemy ``MetaData`` the tables are bound to.
+    :param dimensions: Column definitions for the attribute columns.  Must
+        not include a primary key column.
+    :param config: Factory configuration; defaults to
+        ``DimensionConfiguration()``.
+    :param kwargs: Extra keyword arguments forwarded to ``Table()``.
+    :raises CaveValidationError: If any item in *dimensions* fails validation.
+    """
     config = config or DimensionConfiguration()
 
     validate_schema_items(dimensions)
