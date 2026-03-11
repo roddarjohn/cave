@@ -14,6 +14,11 @@ html_title = "cave"
 exclude_patterns = ["_generated"]
 add_module_names = False
 nitpicky = True
+nitpick_ignore = [
+    # alembic does not publish an intersphinx inventory
+    ("py:class", "alembic.operations.ops.MigrateOperation"),
+    ("py:class", "alembic.autogenerate.rewriter.Rewriter"),
+]
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
