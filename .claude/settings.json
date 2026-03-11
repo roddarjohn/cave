@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "just lint && just type-check && pre-commit run --all-files"
+          }
+        ]
+      }
+    ]
+  }
+}

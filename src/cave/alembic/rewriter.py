@@ -1,9 +1,3 @@
-"""cave's alembic Rewriter plugins for autogenerate.
-
-Add new ``@cave_process_revision_directives.rewrites(...)`` handlers here
-as further plugins are developed.
-"""
-
 from typing import TYPE_CHECKING
 
 from alembic.autogenerate.rewriter import Rewriter

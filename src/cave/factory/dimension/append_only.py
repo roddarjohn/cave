@@ -1,5 +1,3 @@
-"""Append-only log dimension table factory."""
-
 from typing import Any
 
 from alembic_utils.pg_view import PGView

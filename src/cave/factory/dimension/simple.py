@@ -1,5 +1,3 @@
-"""Simple dimension table factory."""
-
 from typing import Any
 
 from sqlalchemy import Column, Integer, MetaData, Table

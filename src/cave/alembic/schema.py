@@ -1,5 +1,3 @@
-"""Alembic operations and comparators for managing PostgreSQL schemas."""
-
 from alembic.autogenerate import comparators, renderers
 from alembic.autogenerate.api import AutogenContext
 from alembic.operations import MigrateOperation, Operations

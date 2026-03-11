@@ -1,36 +1,3 @@
-"""Dependency-ordered rewriting of migration operations.
-
-Operations within a single migration are topologically sorted so that each
-entity is created after everything it depends on, and dropped before
-everything it depends on.
-
-Dependency edges are derived dynamically:
-
-- A table depends on its schema (``CreateSchemaOp`` → ``CreateTableOp``).
-- A replaceable entity (view, function, …) depends on its schema and on
-  every schema-qualified table or view referenced in its SQL definition.
-
-For downgrade the same graph is traversed in reverse: dependents are
-dropped before their dependencies.
-
-Usage
------
-Pass ``cave_process_revision_directives`` to
-``process_revision_directives`` in ``env.py``::
-
-    context.configure(
-        ...,
-        process_revision_directives=cave_process_revision_directives,
-    )
-
-Or chain it with another rewriter::
-
-    context.configure(
-        ...,
-        process_revision_directives=cave_process_revision_directives.chain(other),
-    )
-"""
-
 import logging
 from dataclasses import dataclass
 from graphlib import TopologicalSorter
@@ -145,8 +112,17 @@ def sort_migration_ops(
 ) -> list[alembic_ops.MigrateOperation]:
     """Return *migration_ops* topologically sorted by entity dependencies.
 
-    When *for_downgrade* is ``True``, the sort is reversed so that
-    dependents are dropped before their dependencies.
+    Dependency edges are derived from the ops themselves:
+
+    - A table depends on its schema.
+    - A replaceable entity (view, function, …) depends on its schema and on
+      every schema-qualified table or view referenced in its SQL definition.
+
+    Only dependencies between ops in the current migration produce edges;
+    references to already-existing objects are ignored.
+
+    When *for_downgrade* is ``True``, the graph is traversed in reverse so
+    that dependents are dropped before the entities they depend on.
     """
     direction = "downgrade" if for_downgrade else "upgrade"
     logger.debug(

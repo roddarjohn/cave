@@ -1,5 +1,3 @@
-"""Validators for SQLAlchemy SchemaItems used in dimension factories."""
-
 from typing import Protocol
 
 from sqlalchemy.schema import SchemaItem

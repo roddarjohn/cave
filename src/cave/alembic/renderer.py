@@ -1,16 +1,3 @@
-"""cave's SQL formatting for alembic_utils migration rendering.
-
-alembic_utils embeds view/function definitions as a single ``repr()``-escaped
-string, producing one very long line.  This module registers cave's own
-renderers for the four alembic_utils op types using alembic's
-``renderers.dispatch_for`` extension point, replacing the definition string
-with a sqlglot pretty-printed triple-quoted block.
-
-``apply()`` must be called after alembic_utils has been imported (and has
-registered its own renderers) so that cave's registrations take precedence.
-``cave_alembic_hook()`` handles this ordering.
-"""
-
 import textwrap
 from typing import TYPE_CHECKING
 
@@ -90,6 +77,11 @@ def _render_revert_entity(
 
 def apply() -> None:
     """Register cave's renderers, overriding the alembic_utils defaults.
+
+    alembic_utils renders view/function definitions as a single
+    ``repr()``-escaped string, producing one very long line.  These
+    renderers replace that with a sqlglot pretty-printed triple-quoted
+    block for readable migration files.
 
     alembic's renderer dispatcher is a simple dict — last registration wins.
     Because this is called from ``cave_alembic_hook()`` at env.py startup,

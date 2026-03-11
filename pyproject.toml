@@ -60,6 +60,9 @@ ignore = [
     # Docstring convention (use D211 + D212)
     "D203",
     "D213",
+    # Only enforce docstrings on public classes, functions, and methods
+    "D100",  # missing docstring in public module
+    "D104",  # missing docstring in public package
     # Not applicable to this project
     "AIR",
     "DJ",

@@ -1,5 +1,3 @@
-"""Configuration types for dimension factories."""
-
 from pydantic.dataclasses import dataclass
 
 

@@ -1,1 +1,0 @@
-"""Dimension table factory functions."""

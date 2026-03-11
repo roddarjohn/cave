@@ -1,5 +1,3 @@
-"""Monkey-patches for upstream libraries, pending upstreaming."""
-
 from collections.abc import Callable
 
 from cave.patches.alembic_utils.comparator import (
