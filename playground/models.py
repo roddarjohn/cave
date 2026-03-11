@@ -17,6 +17,7 @@ simple_dimension_factory(
     dimensions=[
         Column("name", Integer),
     ],
+    grants=["select", "insert", "update", "delete"],
 )
 
 append_only_log_dimension_factory(

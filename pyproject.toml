@@ -4,15 +4,13 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 license = { file = "LICENSE" }
-authors = [
-    { name = "Rodda John", email = "roddarjohn@protonmail.com" }
-]
+authors = [{ name = "Rodda John", email = "roddarjohn@protonmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
-    "pydantic>=2.12.5",
-    "sqlalchemy-declarative-extensions>=0.16.8",
-    "sqlglot>=26",
-    "typer>=0.24.1",
+  "pglast>=7.11",
+  "pydantic>=2.12.5",
+  "sqlalchemy-declarative-extensions>=0.16.8",
+  "typer>=0.24.1",
 ]
 
 [project.scripts]
@@ -25,26 +23,23 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "alembic>=1.18.4",
-    "psycopg[binary]>=3.3.3",
-    "pytest>=8",
-    "pytest-alembic>=0.12.1",
-    "python-dotenv>=1.2.2",
-    "sqlalchemy>=2.0.48",
-    "tox>=4.49.1",
-    "tox-uv>=1.33.2",
+  "alembic>=1.18.4",
+  "psycopg[binary]>=3.3.3",
+  "pytest>=8",
+  "pytest-alembic>=0.12.1",
+  "python-dotenv>=1.2.2",
+  "sqlalchemy>=2.0.48",
+  "tox>=4.49.1",
+  "tox-uv>=1.33.2",
 ]
 docs = [
-    "furo>=2025.12.19",
-    "sphinx>=7.0",
-    "sphinx-autobuild>=2025.8.25",
-    "sphinx-autodoc-typehints>=3.0.1",
-    "sphinx-copybutton>=0.5.2",
+  "furo>=2025.12.19",
+  "sphinx>=7.0",
+  "sphinx-autobuild>=2025.8.25",
+  "sphinx-autodoc-typehints>=3.0.1",
+  "sphinx-copybutton>=0.5.2",
 ]
-lint = [
-    "ruff>=0.15.5",
-    "ty>=0.0.20",
-]
+lint = ["ruff>=0.15.5", "ty>=0.0.20"]
 
 [tool.ruff]
 line-length = 80
@@ -54,44 +49,48 @@ exclude = ["docs", "playground", "tests/db/migrations"]
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    # Conflicts with formatter
-    "COM812",
-    "ISC001",
-    # Docstring convention (use D211 + D212)
-    "D203",
-    "D213",
-    # Only enforce docstrings on public classes, functions, and methods
-    "D100",  # missing docstring in public module
-    "D104",  # missing docstring in public package
-    # Not applicable to this project
-    "AIR",
-    "DJ",
-    "FAST",
-    "NPY",
-    "PD",
-    "INT",
-    "CPY",
+  # Conflicts with formatter
+  "COM812",
+  "ISC001",
+  # Docstring convention (use D211 + D212)
+  "D203",
+  "D213",
+  # Only enforce docstrings on public classes, functions, and methods
+  "D100", # missing docstring in public module
+  "D104", # missing docstring in public package
+  # Not applicable to this project
+  "AIR",
+  "DJ",
+  "FAST",
+  "NPY",
+  "PD",
+  "INT",
+  "CPY",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/**" = [
-    "INP001",  # scripts/ doesn't need __init__.py
-    "T201",    # print is fine in scripts
+  "INP001", # scripts/ doesn't need __init__.py
+  "T201",   # print is fine in scripts
 ]
 "tests/**" = [
-    "S101",    # assert is fine in tests
-    "ANN",     # no annotations required in tests
-    "D",       # no docstrings required in tests
+  "S101", # assert is fine in tests
+  "ANN",  # no annotations required in tests
+  "D",    # no docstrings required in tests
 ]
 "**/migrations/versions/*.py" = [
-    "INP001",  # migration versions aren't a package
-    "D400",    # migration docstrings don't need to end with a period
-    "D415",    # migration docstrings don't need closing punctuation
-    "W291",    # trailing whitespace on "Revises:" line when there's no parent
+  "INP001", # migration versions aren't a package
+  "D400",   # migration docstrings don't need to end with a period
+  "D415",   # migration docstrings don't need closing punctuation
+  "W291",   # trailing whitespace on "Revises:" line when there's no parent
 ]
 
 [tool.ty.environment]
 extra-paths = ["tests/db"]
+
+[tool.ty.analysis]
+# pglast has no type stubs.
+allowed-unresolved-imports = ["pglast.**"]
 
 [tool.tox]
 requires = ["tox-uv>=1"]

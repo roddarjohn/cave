@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 from graphlib import TopologicalSorter
 from typing import Literal
 
-import sqlglot
+import pglast
+import pglast.parser
 from alembic.operations import ops as alembic_ops
+from pglast.visitors import Visitor
 from sqlalchemy_declarative_extensions.alembic.function import (
     CreateFunctionOp,
     DropFunctionOp,
@@ -43,7 +47,6 @@ from sqlalchemy_declarative_extensions.role.compare import (
     DropRoleOp,
 )
 from sqlalchemy_declarative_extensions.role.generic import Role
-from sqlglot.expressions import Table as SqlglotTable
 
 logger = logging.getLogger(__name__)
 
@@ -121,34 +124,127 @@ def _entity_schema(op: AnyOp) -> str | None:
         return op.schema.name
 
     if isinstance(op, _CREATE_OPS + _DROP_OPS):
-        # View/Function/Procedure/Trigger ops store the entity
-        # as the first dataclass field.
-        for attr in ("view", "function", "procedure", "trigger"):
+        for attr in ("view", "function", "procedure"):
             entity = getattr(op, attr, None)
             if entity is not None:
                 return entity.schema or "public"
+
+        trigger = getattr(op, "trigger", None)
+        if trigger is not None:
+            # PostgreSQL triggers store the target as "schema.table"
+            # in the `on` attribute; they have no `schema` field.
+            on_schema, _ = _parse_qualified_name(trigger.on)
+            return f"__triggers__{on_schema}"
 
     return None
 
 
 def _entity_name(op: AnyOp) -> str | None:
     """Extract the entity name from a declarative-extensions op."""
-    for attr in ("view", "function", "procedure", "trigger"):
+    for attr in ("view", "function", "procedure"):
         entity = getattr(op, attr, None)
         if entity is not None:
             return entity.name
+
+    trigger = getattr(op, "trigger", None)
+    if trigger is not None:
+        return trigger.name
     return None
 
 
 def _entity_definition(op: AnyOp) -> str | None:
-    """Extract the SQL definition from a declarative-extensions op."""
-    for attr in ("view", "function", "procedure", "trigger"):
-        entity = getattr(op, attr, None)
-        if entity is not None and hasattr(entity, "definition"):
-            defn = entity.definition
-            if isinstance(defn, str):
-                return defn
+    """Extract a parseable SQL definition (views only).
+
+    Function/procedure bodies contain PL/pgSQL which needs special handling;
+    use :func:`_plpgsql_table_refs` for those.
+    """
+    view = getattr(op, "view", None)
+    if view is not None and hasattr(view, "definition"):
+        defn = view.definition
+        if isinstance(defn, str):
+            return defn
     return None
+
+
+def _plpgsql_queries(obj: object) -> list[str]:
+    """Recursively collect SQL query strings from a ``parse_plpgsql`` tree."""
+    queries: list[str] = []
+    if isinstance(obj, dict):
+        if "PLpgSQL_expr" in obj:
+            query = obj["PLpgSQL_expr"].get("query", "")  # ty: ignore[invalid-argument-type, unresolved-attribute]
+            # Skip trivial expressions like NEW/OLD.
+            if query and query.upper() not in ("NEW", "OLD"):
+                queries.append(query)
+        else:
+            for value in obj.values():
+                queries.extend(_plpgsql_queries(value))
+    elif isinstance(obj, list):
+        for item in obj:
+            queries.extend(_plpgsql_queries(item))
+    return queries
+
+
+def _plpgsql_table_refs(
+    op: AnyOp,
+) -> set[tuple[str, str]]:
+    """Extract ``(schema, table)`` pairs from a PL/pgSQL function body.
+
+    Uses ``pglast.parse_plpgsql`` to extract embedded SQL statements from
+    the function body, then ``pglast.parse_sql`` to find table references
+    within those statements.
+
+    Returns an empty set for non-function ops or if parsing fails.
+    """
+    func = getattr(op, "function", None)
+    if func is None:
+        return set()
+
+    defn = getattr(func, "definition", None)
+    language = getattr(func, "language", "")
+    if not defn or language.lower() != "plpgsql":
+        return set()
+
+    # pglast.parse_plpgsql requires a full CREATE FUNCTION statement.
+    schema_part = f"{func.schema}." if func.schema else ""
+    wrapper = (
+        f"CREATE FUNCTION {schema_part}__cave_parse_helper()"
+        f" RETURNS trigger LANGUAGE plpgsql AS $${defn}$$;"
+    )
+
+    try:
+        tree = pglast.parse_plpgsql(wrapper)
+    except pglast.parser.ParseError:  # ty: ignore[possibly-missing-attribute]
+        logger.debug(
+            "Could not parse PL/pgSQL body for %s",
+            func.name,
+        )
+        return set()
+
+    refs: set[tuple[str, str]] = set()
+    for query in _plpgsql_queries(tree):
+        try:
+
+            class _TableFinder(Visitor):
+                def visit_RangeVar(  # noqa: N802
+                    self,
+                    _ancestors: object,
+                    node: object,
+                ) -> None:
+                    schema = getattr(node, "schemaname", None)
+                    name = getattr(node, "relname", None)
+                    if schema and name:
+                        refs.add((schema.lower(), name.lower()))
+
+            parsed = pglast.parse_sql(query)  # ty: ignore[possibly-missing-attribute]
+            _TableFinder()(parsed)
+        except pglast.parser.ParseError:  # ty: ignore[possibly-missing-attribute]
+            logger.debug(
+                "Could not parse embedded SQL in %s: %s",
+                func.name,
+                query[:80],
+            )
+
+    return refs
 
 
 def _role_name(member: Role | str) -> str:
@@ -298,11 +394,128 @@ def _refs_for_grant(
     return refs
 
 
+def _parse_qualified_name(
+    qualified: str,
+) -> tuple[str, str]:
+    """Split ``schema.name`` into ``(schema, name)``."""
+    parts = qualified.split(".", 1)
+    if len(parts) > 1:
+        return parts[0].lower(), parts[1].lower()
+    return "public", parts[0].lower()
+
+
+def _refs_for_trigger(
+    op: AnyOp,
+    phase: Phase | None,
+) -> set[EntityIdentifier]:
+    """Return refs for trigger ops (target view and executed function)."""
+    trigger = getattr(op, "trigger", None)
+    if trigger is None:
+        return set()
+
+    refs: set[EntityIdentifier] = set()
+
+    # Depend on the target view/table (``on``).
+    on_schema, on_name = _parse_qualified_name(trigger.on)
+    refs.add(
+        EntityIdentifier(
+            schema=on_schema,
+            name=on_name,
+            phase=phase,
+        )
+    )
+    refs.add(EntityIdentifier(schema=on_schema, phase=phase))
+
+    # Depend on the executed function.
+    fn_schema, fn_name = _parse_qualified_name(trigger.execute)
+    refs.add(
+        EntityIdentifier(
+            schema=fn_schema,
+            name=fn_name,
+            phase=phase,
+        )
+    )
+
+    return refs
+
+
+def _add_table_refs(
+    refs: set[EntityIdentifier],
+    table_pairs: set[tuple[str, str]],
+    phase: Phase | None,
+) -> None:
+    """Add ``EntityIdentifier`` entries for ``(schema, name)`` pairs."""
+    for ref_schema, ref_name in table_pairs:
+        refs.add(
+            EntityIdentifier(
+                schema=ref_schema,
+                name=ref_name,
+                phase=phase,
+            )
+        )
+        if phase is not None:
+            refs.add(
+                EntityIdentifier(
+                    schema=ref_schema,
+                    name=ref_name,
+                )
+            )
+
+
+def _view_table_refs(definition: str) -> set[tuple[str, str]]:
+    """Extract ``(schema, table)`` pairs from a view SQL definition."""
+    refs: set[tuple[str, str]] = set()
+    try:
+        parsed = pglast.parse_sql(definition)  # ty: ignore[possibly-missing-attribute]
+
+        class _TableFinder(Visitor):
+            def visit_RangeVar(  # noqa: N802
+                self,
+                _ancestors: object,
+                node: object,
+            ) -> None:
+                schema = getattr(node, "schemaname", None)
+                name = getattr(node, "relname", None)
+                if schema and name:
+                    refs.add((schema.lower(), name.lower()))
+
+        _TableFinder()(parsed)
+    except pglast.parser.ParseError:  # ty: ignore[possibly-missing-attribute]
+        logger.debug(
+            "Could not parse view definition: %s",
+            definition[:80],
+        )
+    return refs
+
+
+def _refs_from_definitions(
+    op: AnyOp,
+    phase: Phase | None,
+) -> set[EntityIdentifier]:
+    """Extract entity refs from view SQL and PL/pgSQL function bodies."""
+    refs: set[EntityIdentifier] = set()
+
+    # View definitions: parse with pglast.
+    definition = _entity_definition(op)
+    if definition is not None:
+        _add_table_refs(refs, _view_table_refs(definition), phase)
+
+    # PL/pgSQL function bodies: parse with pglast.
+    _add_table_refs(refs, _plpgsql_table_refs(op), phase)
+
+    return refs
+
+
 def _refs_for_declarative_op(
     op: AnyOp,
     phase: Phase | None,
 ) -> set[EntityIdentifier]:
     """Return references for view/function/procedure/trigger ops."""
+    # Triggers have their own reference logic via the `on` field.
+    trigger_refs = _refs_for_trigger(op, phase)
+    if trigger_refs:
+        return trigger_refs
+
     name = _entity_name(op)
     if name is None:
         return set()
@@ -328,27 +541,7 @@ def _refs_for_declarative_op(
     if phase != "drop":
         refs.add(EntityIdentifier(schema=schema, phase=phase))
 
-    definition = _entity_definition(op)
-    if definition is not None:
-        ast = sqlglot.parse_one(definition, dialect="postgres")
-        for table_ref in ast.find_all(SqlglotTable):
-            if table_ref.db:
-                ref_schema = table_ref.db.lower()
-                ref_name = table_ref.name.lower()
-                refs.add(
-                    EntityIdentifier(
-                        schema=ref_schema,
-                        name=ref_name,
-                        phase=phase,
-                    )
-                )
-                if phase is not None:
-                    refs.add(
-                        EntityIdentifier(
-                            schema=ref_schema,
-                            name=ref_name,
-                        )
-                    )
+    refs |= _refs_from_definitions(op, phase)
 
     refs.discard(self_id)
     return refs

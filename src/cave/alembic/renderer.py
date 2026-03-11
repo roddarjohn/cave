@@ -1,9 +1,10 @@
-"""Custom alembic renderers that format SQL with sqlglot."""
+"""Custom alembic renderers that format SQL with pglast."""
 
+import re
 from textwrap import indent
 from typing import Any
 
-import sqlglot
+import pglast
 from alembic.autogenerate.api import AutogenContext
 from alembic.autogenerate.render import renderers
 from sqlalchemy.sql.ddl import CreateSchema, DropSchema
@@ -44,8 +45,11 @@ from sqlalchemy_declarative_extensions.view.compare import (
 
 # Maximum line width for inline SQL before forcing multi-line.
 _MAX_LINE = 80
-# Width budget for SQL content inside an indented triple-quoted block.
-_WRAP_WIDTH = 68
+# Margin at which pglast keeps comma-separated lists on one line.
+_COMPACT_LISTS_MARGIN = 80
+
+# Regex matching a ``$$ ... $$`` function body in prettified output.
+_BODY_RE = re.compile(r"(AS \$\$)(.*?)(\$\$)", re.DOTALL)
 
 
 # ---------------------------------------------------------------------------
@@ -53,25 +57,37 @@ _WRAP_WIDTH = 68
 # ---------------------------------------------------------------------------
 
 
-def _format_sql(sql: str) -> str:
-    """Format a SQL query using sqlglot (SELECT, CREATE VIEW, etc.)."""
-    return sqlglot.transpile(
-        sql, read="postgres", write="postgres", pretty=True
-    )[0]
+def _prettify(sql: str) -> str:
+    """Format a SQL statement using pglast."""
+    return pglast.prettify(sql, compact_lists_margin=_COMPACT_LISTS_MARGIN)
 
 
-def _wrap_sql(sql: str) -> str:
-    """Word-wrap SQL that sqlglot can't parse (GRANT, CREATE ROLE, etc.)."""
-    if "\n" in sql or len(sql) <= _WRAP_WIDTH:
-        return sql
-    words = sql.split()
-    lines: list[str] = [words[0]]
-    for word in words[1:]:
-        if len(lines[-1]) + 1 + len(word) <= _WRAP_WIDTH:
-            lines[-1] += " " + word
+def _format_function_body(sql: str) -> str:
+    """Format a CREATE FUNCTION, indenting the PL/pgSQL body."""
+    formatted = _prettify(sql)
+    m = _BODY_RE.search(formatted)
+    if not m:
+        return formatted
+
+    body = m.group(2)
+    lines = body.strip().splitlines()
+    indented: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped in ("BEGIN", "END;"):
+            indented.append(stripped)
         else:
-            lines.append(word)
-    return "\n".join(lines)
+            # Preserve relative indentation within the body.
+            leading = len(line) - len(line.lstrip())
+            indented.append("    " + " " * leading + stripped)
+    new_body = "\n".join(indented)
+    return (
+        formatted[: m.start()]
+        + "AS $$\n"
+        + new_body
+        + "\n$$"
+        + formatted[m.end() :]
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -104,16 +120,29 @@ def _render_sql_op(
     autogen_context: AutogenContext,
     op: Any,  # noqa: ANN401
 ) -> list[str]:
-    """Render ops whose SQL sqlglot can format (views, functions, etc.)."""
-    if isinstance(op, (CreateViewOp, DropViewOp, UpdateViewOp)):
-        assert autogen_context.connection  # noqa: S101
-        commands = op.to_sql(autogen_context.connection.dialect)
-    elif isinstance(op, (CreateTriggerOp, DropTriggerOp, UpdateTriggerOp)):
-        assert autogen_context.connection  # noqa: S101
-        commands = op.to_sql(autogen_context.connection)
-    else:
-        commands = op.to_sql()
-    return [_render_execute(_format_sql(cmd)) for cmd in commands]
+    """Render ops whose SQL pglast can format (views, etc.)."""
+    assert autogen_context.connection  # noqa: S101
+    commands = op.to_sql(autogen_context.connection.dialect)
+    return [_render_execute(_prettify(cmd)) for cmd in commands]
+
+
+def _render_ddl_op(
+    _autogen_context: AutogenContext,
+    op: Any,  # noqa: ANN401
+) -> list[str]:
+    """Render function/procedure ops with formatted bodies."""
+    commands = op.to_sql()
+    return [_render_execute(_format_function_body(cmd)) for cmd in commands]
+
+
+def _render_trigger(
+    autogen_context: AutogenContext,
+    op: Any,  # noqa: ANN401
+) -> list[str]:
+    """Render trigger ops."""
+    assert autogen_context.connection  # noqa: S101
+    commands = op.to_sql(autogen_context.connection)
+    return [_render_execute(_prettify(cmd)) for cmd in commands]
 
 
 def _render_schema(
@@ -134,7 +163,7 @@ def _render_schema(
     return [
         f'op.execute({cmd.__class__.__name__}("{cmd.element}"))'
         if isinstance(cmd, (CreateSchema, DropSchema))
-        else _render_execute(_format_sql(str(cmd)))
+        else _render_execute(_prettify(str(cmd)))
         for cmd in statements
     ]
 
@@ -143,12 +172,12 @@ def _render_role(
     autogen_context: AutogenContext,
     op: Any,  # noqa: ANN401
 ) -> list[str]:
-    """Render a role op with word-wrapped SQL (sqlglot can't parse these)."""
+    """Render a role op with pglast-formatted SQL."""
     is_dynamic = op.role.is_dynamic
     if is_dynamic:
         autogen_context.imports.add("import os")
     return [
-        _render_execute(_wrap_sql(cmd), fstring=is_dynamic)
+        _render_execute(_prettify(cmd), fstring=is_dynamic)
         for cmd in op.to_sql(raw=False)
     ]
 
@@ -157,23 +186,23 @@ def _render_grant(
     _autogen_context: AutogenContext,
     op: Any,  # noqa: ANN401
 ) -> str:
-    """Render a grant/revoke with word-wrapped SQL."""
-    return _render_execute_text(_wrap_sql(str(op.to_sql())))
+    """Render a grant/revoke with pglast-formatted SQL."""
+    return _render_execute_text(_prettify(str(op.to_sql())))
 
 
 _RENDERER_MAP: dict[type, Any] = {
     CreateViewOp: _render_sql_op,
     UpdateViewOp: _render_sql_op,
     DropViewOp: _render_sql_op,
-    CreateFunctionOp: _render_sql_op,
-    UpdateFunctionOp: _render_sql_op,
-    DropFunctionOp: _render_sql_op,
-    CreateProcedureOp: _render_sql_op,
-    UpdateProcedureOp: _render_sql_op,
-    DropProcedureOp: _render_sql_op,
-    CreateTriggerOp: _render_sql_op,
-    UpdateTriggerOp: _render_sql_op,
-    DropTriggerOp: _render_sql_op,
+    CreateFunctionOp: _render_ddl_op,
+    UpdateFunctionOp: _render_ddl_op,
+    DropFunctionOp: _render_ddl_op,
+    CreateProcedureOp: _render_ddl_op,
+    UpdateProcedureOp: _render_ddl_op,
+    DropProcedureOp: _render_ddl_op,
+    CreateTriggerOp: _render_trigger,
+    UpdateTriggerOp: _render_trigger,
+    DropTriggerOp: _render_trigger,
     CreateSchemaOp: _render_schema,
     DropSchemaOp: _render_schema,
     CreateRoleOp: _render_role,
@@ -185,6 +214,6 @@ _RENDERER_MAP: dict[type, Any] = {
 
 
 def register_renderers() -> None:
-    """Override the library's renderers with sqlglot-formatted versions."""
+    """Override the library's renderers with pglast-formatted versions."""
     for op_type, renderer in _RENDERER_MAP.items():
         renderers.dispatch_for(op_type, replace=True)(renderer)
