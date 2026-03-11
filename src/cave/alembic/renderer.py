@@ -114,31 +114,25 @@ def _render_schema(
     ]
 
 
+_RENDERER_MAP: dict[type, Any] = {
+    CreateViewOp: _render_view,
+    UpdateViewOp: _render_view,
+    DropViewOp: _render_view,
+    CreateFunctionOp: _render_function,
+    UpdateFunctionOp: _render_function,
+    DropFunctionOp: _render_function,
+    CreateProcedureOp: _render_procedure,
+    UpdateProcedureOp: _render_procedure,
+    DropProcedureOp: _render_procedure,
+    CreateTriggerOp: _render_trigger,
+    UpdateTriggerOp: _render_trigger,
+    DropTriggerOp: _render_trigger,
+    CreateSchemaOp: _render_schema,
+    DropSchemaOp: _render_schema,
+}
+
+
 def register_renderers() -> None:
     """Override the library's renderers with sqlglot-formatted versions."""
-    for op_type in (CreateViewOp, UpdateViewOp, DropViewOp):
-        renderers.dispatch_for(op_type, replace=True)(_render_view)
-
-    for op_type in (
-        CreateFunctionOp,
-        UpdateFunctionOp,
-        DropFunctionOp,
-    ):
-        renderers.dispatch_for(op_type, replace=True)(_render_function)
-
-    for op_type in (
-        CreateProcedureOp,
-        UpdateProcedureOp,
-        DropProcedureOp,
-    ):
-        renderers.dispatch_for(op_type, replace=True)(_render_procedure)
-
-    for op_type in (
-        CreateTriggerOp,
-        UpdateTriggerOp,
-        DropTriggerOp,
-    ):
-        renderers.dispatch_for(op_type, replace=True)(_render_trigger)
-
-    for op_type in (CreateSchemaOp, DropSchemaOp):
-        renderers.dispatch_for(op_type, replace=True)(_render_schema)
+    for op_type, renderer in _RENDERER_MAP.items():
+        renderers.dispatch_for(op_type, replace=True)(renderer)
