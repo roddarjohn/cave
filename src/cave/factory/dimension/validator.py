@@ -1,13 +1,10 @@
 """Validators for SQLAlchemy SchemaItems used in dimension factories."""
 
-import logging
 from typing import Protocol
 
 from sqlalchemy.schema import SchemaItem
 
 from cave.factory.dimension.utils import raise_exception_on_false
-
-logger = logging.getLogger(__name__)
 
 
 class _SchemaItemValidator(Protocol):
@@ -16,7 +13,6 @@ class _SchemaItemValidator(Protocol):
 
 def is_schema_item_not_primary_key(item: SchemaItem) -> bool:
     """Return True if the item is not a primary key column."""
-    logger.debug(getattr(item, "primary_key", False))
     return not getattr(item, "primary_key", False)
 
 
