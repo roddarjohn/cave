@@ -6,7 +6,7 @@ Problem
 -------
 ``ReplaceableEntity.get_database_definition`` always simulates the entity
 (temporarily creates it in the database inside a rolled-back transaction) to
-obtain PostgreSQL's normalised form of the definition before comparison.
+obtain PostgreSQL's normalized form of the definition before comparison.
 
 For entities that do not yet exist in the database — i.e. entities that will
 receive a ``CreateOp`` — simulation fails if any dependency (e.g. a table the
@@ -18,7 +18,7 @@ Fix
 Check whether the entity already exists in the database before simulating.
 If it does not, return ``self`` directly.  No comparison is needed for a
 create — the definition is used as-is.  Simulation still runs for existing
-entities, preserving the normalised-comparison behaviour for ``ReplaceOp``
+entities, preserving the normalized-comparison behaviour for ``ReplaceOp``
 detection.
 
 Upstream
@@ -41,7 +41,7 @@ def _get_database_definition[T: ReplaceableEntity](
     sess: Session,
     dependencies: list[ReplaceableEntity] | None = None,
 ) -> T:
-    """Return PostgreSQL's normalised form of this entity.
+    """Return PostgreSQL's normalized form of this entity.
 
     If the entity does not yet exist in the database, returns ``self``
     directly to avoid simulating against missing dependencies.
