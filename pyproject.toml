@@ -9,7 +9,9 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "alembic-utils>=0.8.8",
     "pydantic>=2.12.5",
+    "sqlglot>=26",
     "typer>=0.24.1",
 ]
 
@@ -84,6 +86,9 @@ ignore = [
     "D415",    # migration docstrings don't need closing punctuation
     "W291",    # trailing whitespace on "Revises:" line when there's no parent
 ]
+
+[tool.ty.environment]
+extra-paths = ["tests/db"]
 
 [tool.tox]
 requires = ["tox-uv>=1"]

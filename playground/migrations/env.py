@@ -3,14 +3,13 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
+from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
+from cave.alembic.register import cave_alembic_hook, cave_process_revision_directives
 
-from cave.alembic.register import register_alembic_extensions
-
-register_alembic_extensions()
+cave_alembic_hook()
 
 playground_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(playground_dir))
@@ -25,7 +24,7 @@ if config.config_file_name is not None:
 # Import must happen after fileConfig so that logging is configured before
 # models.py runs. Importing models triggers cave's factory code, which logs
 # at module load time — if logging isn't set up yet, those messages are lost.
-from models import metadata  # noqa: E402
+from models import metadata  # noqa: E402  # type: ignore[unresolved-import]
 
 target_metadata = metadata
 
@@ -38,6 +37,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        process_revision_directives=cave_process_revision_directives,
     )
 
     with context.begin_transaction():
@@ -54,7 +54,9 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            process_revision_directives=cave_process_revision_directives,
         )
 
         with context.begin_transaction():

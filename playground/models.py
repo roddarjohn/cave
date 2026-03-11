@@ -22,6 +22,6 @@ append_only_log_dimension_factory(
     schemaname="private",
     metadata=metadata,
     dimensions=[
-        Column("name", Integer),
+        Column("name", String),
     ],
 )
