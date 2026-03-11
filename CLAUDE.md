@@ -6,6 +6,13 @@ A configuration-driven PostgreSQL dimension/data warehouse framework.
 Generates SQLAlchemy models, Alembic migrations, and PostgREST APIs from
 declarative dimension configurations. See `PLAN.md` for design philosophy.
 
+## Tooling
+
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management
+and virtual environments. Always use `uv run` to execute commands (not raw
+`python` or `pip`). Install all dependency groups with `uv sync --all-groups`.
+Add dependencies via `uv add`, not `pip install`.
+
 ## Commands
 
 ```bash
