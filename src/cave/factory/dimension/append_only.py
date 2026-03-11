@@ -1,7 +1,3 @@
-from pathlib import Path
-from typing import cast
-
-from mako.template import Template
 from sqlalchemy import (
     Column,
     DateTime,
@@ -14,20 +10,16 @@ from sqlalchemy import (
 from sqlalchemy.schema import SchemaItem
 from sqlalchemy_declarative_extensions import (
     View,
-    register_function,
-    register_trigger,
     register_view,
-)
-from sqlalchemy_declarative_extensions.dialects.postgresql import (
-    Function,
-    FunctionSecurity,
-    Trigger,
 )
 
 from cave.factory.dimension.types import DimensionConfiguration
 from cave.factory.dimension.validator import validate_schema_items
 from cave.resource import APIResource, register_api_resource
+from cave.utils.naming import resolve_name
 from cave.utils.query import compile_query
+from cave.utils.template import load_template
+from cave.utils.trigger import register_view_triggers
 
 # Default naming convention templates for append-only tables.
 _NAMING_DEFAULTS = {
@@ -37,26 +29,6 @@ _NAMING_DEFAULTS = {
     "append_only_trigger": "%(schema)s_%(table_name)s_%(op)s",
 }
 
-_TEMPLATE_DIR = Path(__file__).parent / "templates"
-
-
-def _load_template(name: str) -> Template:
-    """Load a Mako template from the templates directory."""
-    return Template(filename=str(_TEMPLATE_DIR / name))  # noqa: S702
-
-
-def _resolve_name(
-    metadata: MetaData,
-    key: str,
-    substitutions: dict[str, str],
-) -> str:
-    """Resolve a name using the metadata naming convention or a default."""
-    template = cast(
-        "str",
-        metadata.naming_convention.get(key, _NAMING_DEFAULTS[key]),
-    )
-    return template % substitutions
-
 
 def _construct_attribute_table(
     tablename: str,
@@ -65,10 +37,11 @@ def _construct_attribute_table(
     dimensions: list[SchemaItem],
     config: DimensionConfiguration,
 ) -> Table:
-    attributes_tablename = _resolve_name(
+    attributes_tablename = resolve_name(
         metadata,
         "append_only_attributes",
         {"table_name": tablename, "schema": schemaname},
+        _NAMING_DEFAULTS,
     )
 
     attributes_columns = [
@@ -92,10 +65,11 @@ def _construct_root_table(
     config: DimensionConfiguration,
     attributes_table: Table,
 ) -> Table:
-    root_tablename = _resolve_name(
+    root_tablename = resolve_name(
         metadata,
         "append_only_root",
         {"table_name": tablename, "schema": schemaname},
+        _NAMING_DEFAULTS,
     )
 
     root_columns = [
@@ -223,53 +197,30 @@ def _register_triggers(  # noqa: PLR0913
         "attr_fk_col": f"{attribute_table.name}_id",
     }
 
-    views_to_trigger = [
-        (schemaname, f"{schemaname}.{tablename}"),
-        (config.api_schema_name, f"{config.api_schema_name}.{tablename}"),
-    ]
-
     ops = [
-        ("insert", _load_template("append_only_insert.mako")),
-        ("update", _load_template("append_only_update.mako")),
-        ("delete", _load_template("append_only_delete.mako")),
+        ("insert", load_template("append_only_insert.mako")),
+        ("update", load_template("append_only_update.mako")),
+        ("delete", load_template("append_only_delete.mako")),
     ]
 
-    for view_schema, view_fullname in views_to_trigger:
-        subs = {"table_name": tablename, "schema": view_schema}
-
-        for op, template in ops:
-            fn_name = _resolve_name(
-                metadata,
-                "append_only_function",
-                {**subs, "op": op},
-            )
-            trigger_name = _resolve_name(
-                metadata,
-                "append_only_trigger",
-                {**subs, "op": op},
-            )
-
-            register_function(
-                metadata,
-                Function(
-                    fn_name,
-                    template.render(**template_vars),
-                    returns="trigger",
-                    language="plpgsql",
-                    schema=view_schema,
-                    security=FunctionSecurity.definer,
-                ),
-            )
-
-            register_trigger(
-                metadata,
-                Trigger.instead_of(
-                    op,
-                    on=view_fullname,
-                    execute=f"{view_schema}.{fn_name}",
-                    name=trigger_name,
-                ).for_each_row(),
-            )
+    for view_schema, view_fullname in [
+        (schemaname, f"{schemaname}.{tablename}"),
+        (
+            config.api_schema_name,
+            f"{config.api_schema_name}.{tablename}",
+        ),
+    ]:
+        register_view_triggers(
+            metadata=metadata,
+            view_schema=view_schema,
+            view_fullname=view_fullname,
+            tablename=tablename,
+            template_vars=template_vars,
+            ops=ops,
+            naming_defaults=_NAMING_DEFAULTS,
+            function_key="append_only_function",
+            trigger_key="append_only_trigger",
+        )
 
 
 def append_only_log_dimension_factory(

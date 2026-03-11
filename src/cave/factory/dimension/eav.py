@@ -9,10 +9,7 @@ row per entity.
 """
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import cast
 
-from mako.template import Template
 from sqlalchemy import (
     CheckConstraint,
     Column,
@@ -33,61 +30,25 @@ from sqlalchemy import cast as sa_cast
 from sqlalchemy import (
     types as sa_types,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.schema import SchemaItem
 from sqlalchemy_declarative_extensions import (
     View,
-    register_function,
-    register_trigger,
     register_view,
-)
-from sqlalchemy_declarative_extensions.dialects.postgresql import (
-    Function,
-    FunctionSecurity,
-    Trigger,
 )
 
 from cave.factory.dimension.types import DimensionConfiguration
-from cave.factory.dimension.utils import CaveValidationError
 from cave.factory.dimension.validator import validate_schema_items
 from cave.resource import APIResource, register_api_resource
+from cave.utils.naming import resolve_name
 from cave.utils.query import compile_query
+from cave.utils.template import load_template
+from cave.utils.trigger import register_view_triggers
 
 _NAMING_DEFAULTS = {
     "eav_entity": "%(table_name)s_entity",
     "eav_attribute": "%(table_name)s_attribute",
     "eav_function": "%(schema)s_%(table_name)s_%(op)s",
     "eav_trigger": "%(schema)s_%(table_name)s_%(op)s",
-}
-
-_TEMPLATE_DIR = Path(__file__).parent / "templates"
-
-# Maps SQLAlchemy type classes to (value_column_name, column_type).
-_TYPE_MAP: dict[type, tuple[str, sa_types.TypeEngine]] = {
-    sa_types.Integer: ("integer_value", sa_types.Integer()),
-    sa_types.SmallInteger: ("integer_value", sa_types.Integer()),
-    sa_types.BigInteger: (
-        "integer_value",
-        sa_types.BigInteger(),
-    ),
-    sa_types.String: ("text_value", sa_types.Text()),
-    sa_types.Text: ("text_value", sa_types.Text()),
-    sa_types.Boolean: (
-        "boolean_value",
-        sa_types.Boolean(),
-    ),
-    sa_types.Float: ("float_value", sa_types.Float()),
-    sa_types.Double: ("float_value", sa_types.Float()),
-    sa_types.Numeric: (
-        "float_value",
-        sa_types.Numeric(),
-    ),
-    sa_types.Date: ("date_value", sa_types.Date()),
-    sa_types.DateTime: (
-        "timestamp_value",
-        sa_types.DateTime(timezone=True),
-    ),
-    JSONB: ("jsonb_value", JSONB()),
 }
 
 
@@ -100,43 +61,18 @@ class _EAVMapping:
     column_type: sa_types.TypeEngine
 
 
-def _load_template(name: str) -> Template:
-    """Load a Mako template from the templates directory."""
-    return Template(  # noqa: S702
-        filename=str(_TEMPLATE_DIR / name)
-    )
-
-
-def _resolve_name(
-    metadata: MetaData,
-    key: str,
-    substitutions: dict[str, str],
-) -> str:
-    """Resolve a name using the naming convention or default."""
-    template = cast(
-        "str",
-        metadata.naming_convention.get(key, _NAMING_DEFAULTS[key]),
-    )
-    return template % substitutions
-
-
 def _resolve_value_column(
     col: Column,
 ) -> tuple[str, sa_types.TypeEngine]:
-    """Map a Column's type to its EAV value column.
+    """Derive the EAV value column from a Column's type.
 
-    Walks the MRO of the column's type class so that
-    subclasses (e.g. ``SmallInteger``) resolve without
-    explicit entries for every variant.
-
-    :raises CaveValidationError: If no mapping exists.
+    The column name is ``{type_class_name.lower()}_value``
+    and the storage type is the column's own type instance.
+    Any SQLAlchemy type is supported automatically.
     """
     col_type = type(col.type)
-    for cls in col_type.__mro__:
-        if cls in _TYPE_MAP:
-            return _TYPE_MAP[cls]
-    msg = f"No EAV value column mapping for type {col_type.__name__}"
-    raise CaveValidationError(msg)
+    col_name = f"{col_type.__name__.lower()}_value"
+    return col_name, col.type
 
 
 def _build_eav_mappings(
@@ -175,10 +111,11 @@ def _construct_entity_table(
     config: DimensionConfiguration,
 ) -> Table:
     """Create the ``{tablename}_entity`` table."""
-    entity_tablename = _resolve_name(
+    entity_tablename = resolve_name(
         metadata,
         "eav_entity",
         {"table_name": tablename, "schema": schemaname},
+        _NAMING_DEFAULTS,
     )
     return Table(
         entity_tablename,
@@ -208,10 +145,11 @@ def _construct_attribute_table(  # noqa: PLR0913
     No unique constraint -- multiple rows per
     ``(entity_id, attribute_name)`` provide full audit history.
     """
-    attr_tablename = _resolve_name(
+    attr_tablename = resolve_name(
         metadata,
         "eav_attribute",
         {"table_name": tablename, "schema": schemaname},
+        _NAMING_DEFAULTS,
     )
 
     value_cols = _needed_value_columns(mappings)
@@ -389,59 +327,30 @@ def _register_triggers(  # noqa: PLR0913
         "mappings": mapping_tuples,
     }
 
-    views_to_trigger = [
+    ops = [
+        ("insert", load_template("eav_insert.mako")),
+        ("update", load_template("eav_update.mako")),
+        ("delete", load_template("eav_delete.mako")),
+    ]
+
+    for view_schema, view_fullname in [
         (schemaname, f"{schemaname}.{tablename}"),
         (
             config.api_schema_name,
             f"{config.api_schema_name}.{tablename}",
         ),
-    ]
-
-    ops = [
-        ("insert", _load_template("eav_insert.mako")),
-        ("update", _load_template("eav_update.mako")),
-        ("delete", _load_template("eav_delete.mako")),
-    ]
-
-    for view_schema, view_fullname in views_to_trigger:
-        subs = {
-            "table_name": tablename,
-            "schema": view_schema,
-        }
-
-        for op, template in ops:
-            fn_name = _resolve_name(
-                metadata,
-                "eav_function",
-                {**subs, "op": op},
-            )
-            trigger_name = _resolve_name(
-                metadata,
-                "eav_trigger",
-                {**subs, "op": op},
-            )
-
-            register_function(
-                metadata,
-                Function(
-                    fn_name,
-                    template.render(**template_vars),
-                    returns="trigger",
-                    language="plpgsql",
-                    schema=view_schema,
-                    security=FunctionSecurity.definer,
-                ),
-            )
-
-            register_trigger(
-                metadata,
-                Trigger.instead_of(
-                    op,
-                    on=view_fullname,
-                    execute=f"{view_schema}.{fn_name}",
-                    name=trigger_name,
-                ).for_each_row(),
-            )
+    ]:
+        register_view_triggers(
+            metadata=metadata,
+            view_schema=view_schema,
+            view_fullname=view_fullname,
+            tablename=tablename,
+            template_vars=template_vars,
+            ops=ops,
+            naming_defaults=_NAMING_DEFAULTS,
+            function_key="eav_function",
+            trigger_key="eav_trigger",
+        )
 
 
 def eav_dimension_factory(
