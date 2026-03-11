@@ -48,8 +48,8 @@ wipe-migrations:
     #!/usr/bin/env bash
     rm -f migrations/versions/*.py
 
-# Wipe migrations, apply, and generate a new one: just fresh-revision "add users table"
-fresh-revision msg: wipe-migrations migrate
+# Reset and generate a fresh revision: just fresh-revision "add users table"
+fresh-revision msg: reset migrate
     just revision "{{msg}}"
 
 # Wipe migrations and drop the database
