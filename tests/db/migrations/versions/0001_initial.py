@@ -5,6 +5,8 @@ Revises:
 Create Date: 2026-03-10
 """
 
+import os
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -15,6 +17,15 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.execute("""
+        CREATE ROLE "anon" WITH NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT
+        NOLOGIN NOREPLICATION NOBYPASSRLS;
+    """)
+    op.execute(f"""
+        CREATE ROLE "authenticator" WITH NOSUPERUSER NOCREATEDB NOCREATEROLE
+        INHERIT LOGIN NOREPLICATION NOBYPASSRLS PASSWORD
+        '{os.environ.get("PGRST_DB_PASSWORD", "changeme")}' IN ROLE "anon";
+    """)
     op.create_table(
         "users",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -26,3 +37,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("users")
+    op.execute("""DROP ROLE "authenticator";""")
+    op.execute("""DROP ROLE "anon";""")
