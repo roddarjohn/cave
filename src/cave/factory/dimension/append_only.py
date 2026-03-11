@@ -8,16 +8,12 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.schema import SchemaItem
-from sqlalchemy_declarative_extensions import View, Views
+from sqlalchemy_declarative_extensions import View, register_view
 
 from cave.factory.dimension.types import DimensionConfiguration
 from cave.factory.dimension.validator import validate_schema_items
+from cave.resource import APIResource, register_api_resource
 from cave.utils.query import compile_query
-
-
-def _register_view(metadata: MetaData, view: View) -> None:
-    """Append a view to the metadata's view registry."""
-    metadata.info.setdefault("views", Views()).views.append(view)
 
 
 def _construct_attribute_table(
@@ -96,7 +92,7 @@ def _construct_view(  # noqa: PLR0913
         )
     )
 
-    _register_view(
+    register_view(
         metadata,
         View(
             tablename,
@@ -208,4 +204,8 @@ def append_only_log_dimension_factory(
         view_table=view_table,
     )
 
-    _register_view(metadata, api_view)
+    register_view(metadata, api_view)
+    register_api_resource(
+        metadata,
+        APIResource(name=tablename, schema=config.api_schema_name),
+    )

@@ -29,7 +29,20 @@ from sqlalchemy_declarative_extensions.alembic.view import (
     DropViewOp,
     UpdateViewOp,
 )
+from sqlalchemy_declarative_extensions.dialects.postgresql.grant import (
+    DefaultGrantStatement,
+    GrantStatement,
+)
+from sqlalchemy_declarative_extensions.grant.compare import (
+    GrantPrivilegesOp,
+    RevokePrivilegesOp,
+)
 from sqlalchemy_declarative_extensions.op import MigrateOp
+from sqlalchemy_declarative_extensions.role.compare import (
+    CreateRoleOp,
+    DropRoleOp,
+)
+from sqlalchemy_declarative_extensions.role.generic import Role
 from sqlglot.expressions import Table as SqlglotTable
 
 logger = logging.getLogger(__name__)
@@ -42,20 +55,24 @@ Phase = Literal["drop", "create"]
 
 # Op types grouped by direction.
 _CREATE_OPS = (
+    CreateRoleOp,
     CreateSchemaOp,
     alembic_ops.CreateTableOp,
     CreateViewOp,
     CreateFunctionOp,
     CreateProcedureOp,
     CreateTriggerOp,
+    GrantPrivilegesOp,
 )
 _DROP_OPS = (
+    DropRoleOp,
     DropSchemaOp,
     alembic_ops.DropTableOp,
     DropViewOp,
     DropFunctionOp,
     DropProcedureOp,
     DropTriggerOp,
+    RevokePrivilegesOp,
 )
 _UPDATE_OPS = (
     UpdateViewOp,
@@ -134,7 +151,30 @@ def _entity_definition(op: AnyOp) -> str | None:
     return None
 
 
-def _entity_identifier(
+def _role_name(member: Role | str) -> str:
+    """Extract a role name from a Role object or string."""
+    if isinstance(member, Role):
+        return member.name
+    return member
+
+
+def _id_for_declarative_op(
+    op: AnyOp,
+    phase: Phase | None,
+) -> EntityIdentifier | None:
+    """Return identifier for view/function/procedure/trigger ops."""
+    name = _entity_name(op)
+    if name is not None:
+        schema = _entity_schema(op) or "public"
+        return EntityIdentifier(
+            schema=schema.lower(),
+            name=name.lower(),
+            phase=phase,
+        )
+    return None
+
+
+def _entity_identifier(  # noqa: PLR0911
     op: AnyOp,
 ) -> EntityIdentifier | None:
     """Return the identifier for the entity this op acts on.
@@ -162,21 +202,142 @@ def _entity_identifier(
             name=op.table_name.lower(),
         )
 
-    # Declarative-extensions entity ops (views, functions, etc.)
-    name = _entity_name(op)
-    if name is not None:
-        schema = _entity_schema(op) or "public"
+    if isinstance(op, (CreateRoleOp, DropRoleOp)):
         return EntityIdentifier(
-            schema=schema.lower(),
-            name=name.lower(),
+            schema="__roles__",
+            name=op.role.name.lower(),
             phase=phase,
         )
+
+    if isinstance(op, (GrantPrivilegesOp, RevokePrivilegesOp)):
+        return EntityIdentifier(
+            schema="__grants__",
+            name=str(op.to_sql()).lower(),
+            phase=phase,
+        )
+
+    result = _id_for_declarative_op(op, phase)
+    if result is not None:
+        return result
 
     logger.warning(
         "Unhandled op type %s; ordering is unconstrained",
         type(op).__name__,
     )
     return None
+
+
+def _refs_for_role(
+    op: CreateRoleOp | DropRoleOp,
+    phase: Phase | None,
+) -> set[EntityIdentifier]:
+    """Return references for a role op (member roles via in_roles)."""
+    if not op.role.in_roles:
+        return set()
+    return {
+        EntityIdentifier(
+            schema="__roles__",
+            name=_role_name(member).lower(),
+            phase=phase,
+        )
+        for member in op.role.in_roles
+    }
+
+
+def _refs_for_grant(
+    op: GrantPrivilegesOp | RevokePrivilegesOp,
+    phase: Phase | None,
+) -> set[EntityIdentifier]:
+    """Return references for a grant/revoke op (target role + schemas)."""
+    grant_obj = op.grant
+    refs: set[EntityIdentifier] = set()
+
+    # Depend on the target role.
+    refs.add(
+        EntityIdentifier(
+            schema="__roles__",
+            name=grant_obj.grant.target_role.lower(),
+            phase=phase,
+        )
+    )
+
+    # Depend on referenced schemas.
+    if isinstance(grant_obj, GrantStatement):
+        for target_name in grant_obj.targets:
+            schema_part, _, _ = target_name.partition(".")
+            if schema_part:
+                refs.add(
+                    EntityIdentifier(
+                        schema=schema_part.lower(),
+                        phase=phase,
+                    )
+                )
+    elif isinstance(grant_obj, DefaultGrantStatement):
+        for schema_name in grant_obj.default_grant.in_schemas:
+            refs.add(
+                EntityIdentifier(
+                    schema=schema_name.lower(),
+                    phase=phase,
+                )
+            )
+
+    return refs
+
+
+def _refs_for_declarative_op(
+    op: AnyOp,
+    phase: Phase | None,
+) -> set[EntityIdentifier]:
+    """Return references for view/function/procedure/trigger ops."""
+    name = _entity_name(op)
+    if name is None:
+        return set()
+
+    schema = (_entity_schema(op) or "public").lower()
+    self_id = EntityIdentifier(
+        schema=schema,
+        name=name.lower(),
+        phase=phase,
+    )
+
+    refs: set[EntityIdentifier] = set()
+
+    if phase == "create":
+        refs.add(
+            EntityIdentifier(
+                schema=schema,
+                name=name.lower(),
+                phase="drop",
+            )
+        )
+
+    if phase != "drop":
+        refs.add(EntityIdentifier(schema=schema, phase=phase))
+
+    definition = _entity_definition(op)
+    if definition is not None:
+        ast = sqlglot.parse_one(definition, dialect="postgres")
+        for table_ref in ast.find_all(SqlglotTable):
+            if table_ref.db:
+                ref_schema = table_ref.db.lower()
+                ref_name = table_ref.name.lower()
+                refs.add(
+                    EntityIdentifier(
+                        schema=ref_schema,
+                        name=ref_name,
+                        phase=phase,
+                    )
+                )
+                if phase is not None:
+                    refs.add(
+                        EntityIdentifier(
+                            schema=ref_schema,
+                            name=ref_name,
+                        )
+                    )
+
+    refs.discard(self_id)
+    return refs
 
 
 def _entity_references(
@@ -202,68 +363,13 @@ def _entity_references(
             )
         }
 
-    # Declarative-extensions entity ops.
-    name = _entity_name(op)
-    if name is not None:
-        schema = (_entity_schema(op) or "public").lower()
-        self_id = EntityIdentifier(
-            schema=schema,
-            name=name.lower(),
-            phase=phase,
-        )
+    if isinstance(op, (CreateRoleOp, DropRoleOp)):
+        return _refs_for_role(op, phase)
 
-        refs: set[EntityIdentifier] = set()
+    if isinstance(op, (GrantPrivilegesOp, RevokePrivilegesOp)):
+        return _refs_for_grant(op, phase)
 
-        if phase == "create":
-            # Must drop ourselves before recreating.
-            refs.add(
-                EntityIdentifier(
-                    schema=schema,
-                    name=name.lower(),
-                    phase="drop",
-                )
-            )
-
-        # Schema reference.
-        if phase != "drop":
-            refs.add(
-                EntityIdentifier(
-                    schema=schema,
-                    phase=phase,
-                )
-            )
-
-        # SQL-level references to tables and views.
-        definition = _entity_definition(op)
-        if definition is not None:
-            ast = sqlglot.parse_one(definition, dialect="postgres")
-            for table_ref in ast.find_all(SqlglotTable):
-                if table_ref.db:
-                    ref_schema = table_ref.db.lower()
-                    ref_name = table_ref.name.lower()
-                    refs.add(
-                        EntityIdentifier(
-                            schema=ref_schema,
-                            name=ref_name,
-                            phase=phase,
-                        )
-                    )
-                    # Also reference any ModifyTableOps (phase=None)
-                    # for the same table, so column changes are
-                    # ordered correctly relative to view
-                    # drops/creates.
-                    if phase is not None:
-                        refs.add(
-                            EntityIdentifier(
-                                schema=ref_schema,
-                                name=ref_name,
-                            )
-                        )
-
-        refs.discard(self_id)
-        return refs
-
-    return set()
+    return _refs_for_declarative_op(op, phase)
 
 
 def _op_label(op: AnyOp) -> str:

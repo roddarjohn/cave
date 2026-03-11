@@ -12,10 +12,19 @@ from sqlalchemy_declarative_extensions.function.compare import (
     DropFunctionOp,
     UpdateFunctionOp,
 )
+from sqlalchemy_declarative_extensions.grant.compare import (
+    GrantPrivilegesOp,
+    RevokePrivilegesOp,
+)
 from sqlalchemy_declarative_extensions.procedure.compare import (
     CreateProcedureOp,
     DropProcedureOp,
     UpdateProcedureOp,
+)
+from sqlalchemy_declarative_extensions.role.compare import (
+    CreateRoleOp,
+    DropRoleOp,
+    UpdateRoleOp,
 )
 from sqlalchemy_declarative_extensions.schema.compare import (
     CreateSchemaOp,
@@ -33,60 +42,77 @@ from sqlalchemy_declarative_extensions.view.compare import (
     UpdateViewOp,
 )
 
+# Maximum line width for inline SQL before forcing multi-line.
+_MAX_LINE = 80
+# Width budget for SQL content inside an indented triple-quoted block.
+_WRAP_WIDTH = 68
+
+
+# ---------------------------------------------------------------------------
+# SQL formatting
+# ---------------------------------------------------------------------------
+
 
 def _format_sql(sql: str) -> str:
-    """Format a SQL string using sqlglot."""
+    """Format a SQL query using sqlglot (SELECT, CREATE VIEW, etc.)."""
     return sqlglot.transpile(
         sql, read="postgres", write="postgres", pretty=True
     )[0]
 
 
-def _render_command(command: str) -> str:
-    """Render a single SQL command as an ``op.execute(...)`` call."""
-    formatted = _format_sql(command)
-    if "\n" in formatted:
-        indented = indent(formatted, "    ")
-        return f'op.execute("""\n{indented}\n""")'
-    return f'op.execute("""{formatted}""")'
+def _wrap_sql(sql: str) -> str:
+    """Word-wrap SQL that sqlglot can't parse (GRANT, CREATE ROLE, etc.)."""
+    if "\n" in sql or len(sql) <= _WRAP_WIDTH:
+        return sql
+    words = sql.split()
+    lines: list[str] = [words[0]]
+    for word in words[1:]:
+        if len(lines[-1]) + 1 + len(word) <= _WRAP_WIDTH:
+            lines[-1] += " " + word
+        else:
+            lines.append(word)
+    return "\n".join(lines)
 
 
-def _render_view(
+# ---------------------------------------------------------------------------
+# Code generation helpers
+# ---------------------------------------------------------------------------
+
+
+def _render_execute(sql: str) -> str:
+    """Render ``op.execute(\"\"\"...\"\"\")``, going multi-line when needed."""
+    inline = f'op.execute("""{sql}""")'
+    if "\n" in sql or sql.endswith('"') or len(inline) > _MAX_LINE:
+        return f'op.execute("""\n{indent(sql, "    ")}\n""")'
+    return inline
+
+
+def _render_execute_text(sql: str) -> str:
+    """Render ``op.execute(sa.text(\"\"\"...\"\"\"))``, always multi-line."""
+    return (
+        f'op.execute(\n    sa.text("""\n{indent(sql, "        ")}\n    """)\n)'
+    )
+
+
+# ---------------------------------------------------------------------------
+# Per-op-type renderers
+# ---------------------------------------------------------------------------
+
+
+def _render_sql_op(
     autogen_context: AutogenContext,
     op: Any,  # noqa: ANN401
 ) -> list[str]:
-    """Render a view op with sqlglot-formatted SQL."""
-    assert autogen_context.connection  # noqa: S101
-    dialect = autogen_context.connection.dialect
-    commands = op.to_sql(dialect)
-    return [_render_command(command) for command in commands]
-
-
-def _render_function(
-    _autogen_context: AutogenContext,
-    op: Any,  # noqa: ANN401
-) -> list[str]:
-    """Render a function op with sqlglot-formatted SQL."""
-    commands = op.to_sql()
-    return [_render_command(command) for command in commands]
-
-
-def _render_procedure(
-    _autogen_context: AutogenContext,
-    op: Any,  # noqa: ANN401
-) -> list[str]:
-    """Render a procedure op with sqlglot-formatted SQL."""
-    commands = op.to_sql()
-    return [_render_command(command) for command in commands]
-
-
-def _render_trigger(
-    autogen_context: AutogenContext,
-    op: Any,  # noqa: ANN401
-) -> list[str]:
-    """Render a trigger op with sqlglot-formatted SQL."""
-    assert autogen_context.connection  # noqa: S101
-    commands = op.to_sql(autogen_context.connection)
-    return [_render_command(command) for command in commands]
+    """Render ops whose SQL sqlglot can format (views, functions, etc.)."""
+    if isinstance(op, (CreateViewOp, DropViewOp, UpdateViewOp)):
+        assert autogen_context.connection  # noqa: S101
+        commands = op.to_sql(autogen_context.connection.dialect)
+    elif isinstance(op, (CreateTriggerOp, DropTriggerOp, UpdateTriggerOp)):
+        assert autogen_context.connection  # noqa: S101
+        commands = op.to_sql(autogen_context.connection)
+    else:
+        commands = op.to_sql()
+    return [_render_execute(_format_sql(cmd)) for cmd in commands]
 
 
 def _render_schema(
@@ -100,35 +126,56 @@ def _render_schema(
         for s in statements
         if isinstance(s, (CreateSchema, DropSchema))
     }
-
     if cls_names:
         autogen_context.imports.add(
             f"from sqlalchemy.sql.ddl import {', '.join(cls_names)}"
         )
-
     return [
-        (f'op.execute({command.__class__.__name__}("{command.element}"))')
-        if isinstance(command, (CreateSchema, DropSchema))
-        else _render_command(str(command))
-        for command in statements
+        f'op.execute({cmd.__class__.__name__}("{cmd.element}"))'
+        if isinstance(cmd, (CreateSchema, DropSchema))
+        else _render_execute(_format_sql(str(cmd)))
+        for cmd in statements
     ]
 
 
+def _render_role(
+    autogen_context: AutogenContext,
+    op: Any,  # noqa: ANN401
+) -> list[str]:
+    """Render a role op with word-wrapped SQL (sqlglot can't parse these)."""
+    if op.role.is_dynamic:
+        autogen_context.imports.add("import os")
+    return [_render_execute(_wrap_sql(cmd)) for cmd in op.to_sql(raw=False)]
+
+
+def _render_grant(
+    _autogen_context: AutogenContext,
+    op: Any,  # noqa: ANN401
+) -> str:
+    """Render a grant/revoke with word-wrapped SQL."""
+    return _render_execute_text(_wrap_sql(str(op.to_sql())))
+
+
 _RENDERER_MAP: dict[type, Any] = {
-    CreateViewOp: _render_view,
-    UpdateViewOp: _render_view,
-    DropViewOp: _render_view,
-    CreateFunctionOp: _render_function,
-    UpdateFunctionOp: _render_function,
-    DropFunctionOp: _render_function,
-    CreateProcedureOp: _render_procedure,
-    UpdateProcedureOp: _render_procedure,
-    DropProcedureOp: _render_procedure,
-    CreateTriggerOp: _render_trigger,
-    UpdateTriggerOp: _render_trigger,
-    DropTriggerOp: _render_trigger,
+    CreateViewOp: _render_sql_op,
+    UpdateViewOp: _render_sql_op,
+    DropViewOp: _render_sql_op,
+    CreateFunctionOp: _render_sql_op,
+    UpdateFunctionOp: _render_sql_op,
+    DropFunctionOp: _render_sql_op,
+    CreateProcedureOp: _render_sql_op,
+    UpdateProcedureOp: _render_sql_op,
+    DropProcedureOp: _render_sql_op,
+    CreateTriggerOp: _render_sql_op,
+    UpdateTriggerOp: _render_sql_op,
+    DropTriggerOp: _render_sql_op,
     CreateSchemaOp: _render_schema,
     DropSchemaOp: _render_schema,
+    CreateRoleOp: _render_role,
+    UpdateRoleOp: _render_role,
+    DropRoleOp: _render_role,
+    GrantPrivilegesOp: _render_grant,
+    RevokePrivilegesOp: _render_grant,
 }
 
 

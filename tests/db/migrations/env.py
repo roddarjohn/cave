@@ -6,7 +6,11 @@ from pathlib import Path
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from cave.alembic.register import cave_alembic_hook, cave_process_revision_directives
+from cave.alembic.register import (
+    cave_alembic_hook,
+    cave_configure_metadata,
+    cave_process_revision_directives,
+)
 
 cave_alembic_hook()
 
@@ -21,6 +25,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+cave_configure_metadata(target_metadata)
 
 
 def run_migrations_offline() -> None:

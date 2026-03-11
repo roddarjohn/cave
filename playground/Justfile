@@ -55,11 +55,15 @@ fresh-revision msg: reset migrate
 # Wipe migrations and drop the database
 reset: wipe-migrations wipe-db
 
-# Drop and recreate the database
+# Drop and recreate the database, cleaning up non-system roles
 wipe-db:
     #!/usr/bin/env bash
     db=$(echo $DATABASE_URL | grep -oP '[^/]+$')
     dropdb --if-exists "$db" && echo "Dropped database: $db"
+    roles=$(psql -d postgres -tAc "SELECT rolname FROM pg_roles WHERE rolname NOT LIKE 'pg_%' AND rolname NOT IN ('$USER', 'postgres')")
+    for role in $roles; do
+        psql -d postgres -c "DROP ROLE IF EXISTS \"$role\";" && echo "Dropped role: $role"
+    done
     createdb "$db" && echo "Created database: $db"
 
 # Open a psql shell using DATABASE_URL

@@ -37,17 +37,25 @@ Make two cave-specific additions to ``migrations/env.py``:
 1. Call :func:`cave.alembic.register.cave_alembic_hook` before importing
    your models. This applies cave's patches and registers its Alembic
    extensions.
-2. Pass ``cave_process_revision_directives`` to both ``context.configure()``
+2. Call :func:`cave.alembic.register.cave_configure_metadata` after loading
+   your models/metadata. This registers schemas, roles, and grants.
+3. Pass ``cave_process_revision_directives`` to both ``context.configure()``
    calls. This enables cave's autogenerate extensions, including dependency
    ordering of operations within each generated migration.
 
 .. code-block:: python
 
-   from cave.alembic.register import cave_alembic_hook, cave_process_revision_directives
+   from cave.alembic.register import (
+       cave_alembic_hook,
+       cave_configure_metadata,
+       cave_process_revision_directives,
+   )
 
    cave_alembic_hook()
 
    # ... your existing env.py setup (loading config, metadata, etc.) ...
+
+   cave_configure_metadata(target_metadata)
 
    def run_migrations_offline() -> None:
        context.configure(
