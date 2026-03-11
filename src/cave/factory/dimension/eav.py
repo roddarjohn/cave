@@ -98,9 +98,9 @@ def _needed_value_columns(
 ) -> dict[str, sa_types.TypeEngine]:
     """Return deduplicated value columns required by *mappings*."""
     cols: dict[str, sa_types.TypeEngine] = {}
-    for m in mappings:
-        if m.value_column not in cols:
-            cols[m.value_column] = m.column_type
+    for mapping in mappings:
+        if mapping.value_column not in cols:
+            cols[mapping.value_column] = mapping.column_type
     return cols
 
 
@@ -189,21 +189,21 @@ def _construct_attribute_table(  # noqa: PLR0913
 
 def _pivot_aggregate(
     subquery: FromClause,
-    m: _EAVMapping,
+    mapping: _EAVMapping,
 ) -> Label:
     """Build a MAX(...) FILTER (...) pivot expression.
 
     PostgreSQL lacks ``MAX(boolean)``, so boolean columns are
     cast to integer for aggregation, then back to boolean.
     """
-    col = subquery.c[m.value_column]
-    condition = subquery.c.attribute_name == literal(m.attribute_name)
-    if isinstance(m.column_type, sa_types.Boolean):
+    col = subquery.c[mapping.value_column]
+    condition = subquery.c.attribute_name == literal(mapping.attribute_name)
+    if isinstance(mapping.column_type, sa_types.Boolean):
         return sa_cast(
             func.max(sa_cast(col, Integer)).filter(condition),
             sa_types.Boolean(),
-        ).label(m.attribute_name)
-    return func.max(col).filter(condition).label(m.attribute_name)
+        ).label(mapping.attribute_name)
+    return func.max(col).filter(condition).label(mapping.attribute_name)
 
 
 def _build_pivot_query(
@@ -218,23 +218,35 @@ def _build_pivot_query(
     table once.  The outer query joins the entity table to the
     CTE and pivots via ``MAX(...) FILTER (WHERE ...)``.
     """
-    a = attribute_table
-    rn = (
+    attr = attribute_table
+    row_num = (
         func.row_number()
         .over(
-            partition_by=[a.c.entity_id, a.c.attribute_name],
-            order_by=[a.c.created_at.desc(), a.c.id.desc()],
+            partition_by=[
+                attr.c.entity_id,
+                attr.c.attribute_name,
+            ],
+            order_by=[
+                attr.c.created_at.desc(),
+                attr.c.id.desc(),
+            ],
         )
         .label("rn")
     )
     latest = (
-        select(a, rn)
-        .where(a.c.attribute_name.in_([m.attribute_name for m in mappings]))
+        select(attr, row_num)
+        .where(
+            attr.c.attribute_name.in_(
+                [mapping.attribute_name for mapping in mappings]
+            )
+        )
         .cte("latest")
     )
     latest_current = select(latest).where(latest.c.rn == 1).subquery("cur")
 
-    pivot_cols = [_pivot_aggregate(latest_current, m) for m in mappings]
+    pivot_cols = [
+        _pivot_aggregate(latest_current, mapping) for mapping in mappings
+    ]
 
     return (
         select(
@@ -279,7 +291,10 @@ def _construct_view(  # noqa: PLR0913
         MetaData(),
         Column("id", Integer, primary_key=True),
         Column("created_at", DateTime(timezone=True)),
-        *[Column(m.attribute_name, m.column_type) for m in mappings],
+        *[
+            Column(mapping.attribute_name, mapping.column_type)
+            for mapping in mappings
+        ],
         schema=schemaname,
     )
 
@@ -295,8 +310,10 @@ def _construct_api_view(
         view_table.c["id"].label("id"),
         view_table.c["created_at"].label("created_at"),
         *[
-            getattr(view_table.c, m.attribute_name).label(m.attribute_name)
-            for m in mappings
+            getattr(view_table.c, mapping.attribute_name).label(
+                mapping.attribute_name
+            )
+            for mapping in mappings
         ],
     ).select_from(view_table)
 
@@ -320,7 +337,9 @@ def _register_triggers(  # noqa: PLR0913
     entity_fullname = f"{schemaname}.{entity_table.name}"
     attr_fullname = f"{schemaname}.{attribute_table.name}"
 
-    mapping_tuples = [(m.attribute_name, m.value_column) for m in mappings]
+    mapping_tuples = [
+        (mapping.attribute_name, mapping.value_column) for mapping in mappings
+    ]
     template_vars = {
         "entity_table": entity_fullname,
         "attr_table": attr_fullname,

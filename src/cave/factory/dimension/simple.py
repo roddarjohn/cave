@@ -23,7 +23,9 @@ _NAMING_DEFAULTS = {
 def _dim_columns(dimensions: list[SchemaItem]) -> list[str]:
     """Extract non-PK column names from the dimension list."""
     return [
-        c.key for c in dimensions if isinstance(c, Column) and not c.primary_key
+        col.key
+        for col in dimensions
+        if isinstance(col, Column) and not col.primary_key
     ]
 
 
@@ -105,9 +107,9 @@ def simple_dimension_factory(  # noqa: PLR0913
         **kwargs,
     )
 
-    api_query = select(*[c.label(c.key) for c in table.columns]).select_from(
-        table
-    )
+    api_query = select(
+        *[col.label(col.key) for col in table.columns]
+    ).select_from(table)
     register_view(
         metadata,
         View(

@@ -172,7 +172,7 @@ def _construct_api_view(
 
 def _dim_columns(dimensions: list[SchemaItem]) -> list[str]:
     """Extract column names from the dimension list."""
-    return [c.key for c in dimensions if isinstance(c, Column)]
+    return [col.key for col in dimensions if isinstance(col, Column)]
 
 
 def _register_triggers(  # noqa: PLR0913
