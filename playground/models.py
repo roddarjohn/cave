@@ -1,10 +1,21 @@
-from cave.utils.naming_convention import build_naming_convention
-from cave.factory.dimension.append_only import append_only_log_dimension_factory
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Float,
+    ForeignKey,
+    Integer,
+    MetaData,
+    String,
+)
+
+from cave.factory.dimension.append_only import (
+    append_only_log_dimension_factory,
+)
+from cave.factory.dimension.eav import eav_dimension_factory
 from cave.factory.dimension.simple import (
     simple_dimension_factory,
 )
-from sqlalchemy import Integer, String, MetaData, Column, Date, ForeignKey
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from cave.utils.naming_convention import build_naming_convention
 
 metadata = MetaData(
     naming_convention=build_naming_convention(),
@@ -27,5 +38,17 @@ append_only_log_dimension_factory(
     dimensions=[
         Column("name", String),
         Column("user_id", ForeignKey("public.users.id")),
+    ],
+)
+
+eav_dimension_factory(
+    tablename="products",
+    schemaname="private",
+    metadata=metadata,
+    dimensions=[
+        Column("color", String),
+        Column("weight", Float),
+        Column("is_active", Boolean),
+        Column("price", Integer),
     ],
 )

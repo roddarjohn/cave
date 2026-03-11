@@ -9,6 +9,7 @@ import pglast
 import pglast.parser
 from alembic.operations import ops as alembic_ops
 from pglast.visitors import Visitor
+from sqlalchemy import MetaData  # noqa: TC002
 from sqlalchemy_declarative_extensions.alembic.function import (
     CreateFunctionOp,
     DropFunctionOp,
@@ -547,6 +548,37 @@ def _refs_for_declarative_op(
     return refs
 
 
+def build_fk_graph_from_metadata(
+    metadata: MetaData,
+) -> dict[tuple[str, str], set[tuple[str, str]]]:
+    """Build a table FK dependency map from SQLAlchemy metadata.
+
+    Uses the metadata's knowledge of foreign key relationships
+    rather than parsing column objects from migration ops.
+    """
+    graph: dict[tuple[str, str], set[tuple[str, str]]] = {}
+
+    for table in metadata.tables.values():
+        key = (
+            (table.schema or "public").lower(),
+            table.name.lower(),
+        )
+        targets: set[tuple[str, str]] = set()
+        for fk in table.foreign_keys:
+            ref = fk.column.table
+            targets.add(
+                (
+                    (ref.schema or "public").lower(),
+                    ref.name.lower(),
+                )
+            )
+        # Exclude self-references.
+        targets.discard(key)
+        if targets:
+            graph[key] = targets
+    return graph
+
+
 def _entity_references(
     op: AnyOp,
 ) -> set[EntityIdentifier]:
@@ -636,12 +668,15 @@ def expand_update_ops(
 
 def sort_migration_ops(
     migration_ops: list[AnyOp],
+    *,
+    fk_graph: (dict[tuple[str, str], set[tuple[str, str]]] | None) = None,
 ) -> list[AnyOp]:
     """Return *migration_ops* topologically sorted by entity dependencies.
 
     Dependency edges are derived from the ops themselves:
 
     - A table depends on its schema.
+    - A table depends on tables it references via foreign keys.
     - A replaceable entity (view, function, ...) depends on its schema
       and on every schema-qualified table or view referenced in its SQL
       definition.
@@ -654,6 +689,8 @@ def sort_migration_ops(
     direction (dependencies created first).
 
     :param migration_ops: Operations from a single migration script.
+    :param fk_graph: FK dependency map (table -> referenced tables),
+        built from :func:`build_fk_graph_from_metadata`.
     :returns: A new list containing the same ops in dependency order.
     """
     logger.debug(
@@ -676,11 +713,39 @@ def sort_migration_ops(
     # Use EntityIdentifier (frozen dataclass, hashable) as graph nodes.
     sorter: TopologicalSorter[EntityIdentifier] = TopologicalSorter()
 
+    if fk_graph is None:
+        fk_graph = {}
+
     for current_id, current_op in op_by_entity.items():
         sorter.add(current_id)
         phase = _op_phase(current_op)
 
-        for ref_id in _entity_references(current_op):
+        refs = _entity_references(current_op)
+
+        # Add FK-based refs for table ops.  For DropTableOp the
+        # op itself has no column info, so we consult the FK
+        # graph built from CreateTableOps.
+        if isinstance(
+            current_op,
+            (
+                alembic_ops.CreateTableOp,
+                alembic_ops.DropTableOp,
+            ),
+        ):
+            table_key = (
+                (current_op.schema or "public").lower(),
+                current_op.table_name.lower(),
+            )
+            for ref_schema, ref_table in fk_graph.get(table_key, set()):
+                refs.add(
+                    EntityIdentifier(
+                        schema=ref_schema,
+                        name=ref_table,
+                        phase=phase,
+                    )
+                )
+
+        for ref_id in refs:
             # Only add edges for references that resolve to an op in
             # this migration.  Unresolved references point to entities
             # that already exist in the database.

@@ -82,4 +82,9 @@ Source of truth tables should be very very clear.
 
 # TODOs
 
-- Figure out some way of formatting the SQL in the definition in migration files well.
+- Figure out auth / OPA w/ RLS
+- Figure out approvals?
+- Figure out ledgers
+- Permit / encourage declarative format of tables
+- Rework the configurations
+- Build plugin system that has hooks and customizes behavior
