@@ -171,7 +171,7 @@ def _plpgsql_queries(obj: object) -> list[str]:
     queries: list[str] = []
     if isinstance(obj, dict):
         if "PLpgSQL_expr" in obj:
-            query = obj["PLpgSQL_expr"].get("query", "")
+            query = obj["PLpgSQL_expr"].get("query", "")  # ty: ignore[invalid-argument-type, unresolved-attribute]
             # Skip trivial expressions like NEW/OLD.
             if query and query.upper() not in ("NEW", "OLD"):
                 queries.append(query)
@@ -213,7 +213,7 @@ def _plpgsql_table_refs(
 
     try:
         tree = pglast.parse_plpgsql(wrapper)
-    except pglast.parser.ParseError:
+    except pglast.parser.ParseError:  # ty: ignore[possibly-missing-attribute]
         logger.debug(
             "Could not parse PL/pgSQL body for %s",
             func.name,
@@ -235,9 +235,9 @@ def _plpgsql_table_refs(
                     if schema and name:
                         refs.add((schema.lower(), name.lower()))
 
-            parsed = pglast.parse_sql(query)
+            parsed = pglast.parse_sql(query)  # ty: ignore[possibly-missing-attribute]
             _TableFinder()(parsed)
-        except pglast.parser.ParseError:
+        except pglast.parser.ParseError:  # ty: ignore[possibly-missing-attribute]
             logger.debug(
                 "Could not parse embedded SQL in %s: %s",
                 func.name,
@@ -466,7 +466,7 @@ def _view_table_refs(definition: str) -> set[tuple[str, str]]:
     """Extract ``(schema, table)`` pairs from a view SQL definition."""
     refs: set[tuple[str, str]] = set()
     try:
-        parsed = pglast.parse_sql(definition)
+        parsed = pglast.parse_sql(definition)  # ty: ignore[possibly-missing-attribute]
 
         class _TableFinder(Visitor):
             def visit_RangeVar(  # noqa: N802
@@ -480,7 +480,7 @@ def _view_table_refs(definition: str) -> set[tuple[str, str]]:
                     refs.add((schema.lower(), name.lower()))
 
         _TableFinder()(parsed)
-    except pglast.parser.ParseError:
+    except pglast.parser.ParseError:  # ty: ignore[possibly-missing-attribute]
         logger.debug(
             "Could not parse view definition: %s",
             definition[:80],
