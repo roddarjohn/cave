@@ -2,16 +2,16 @@ import hashlib
 from collections.abc import Callable
 
 from sqlalchemy import Table
-from sqlalchemy.schema import Constraint, ForeignKeyConstraint
+from sqlalchemy.schema import ColumnCollectionConstraint, ForeignKeyConstraint
 
 
 def _make_token(
     prefix: str,
-    get_cols: Callable[[Constraint, Table], str],
-    get_ref: Callable[[Constraint, Table], str] | None = None,
+    get_cols: Callable[[ColumnCollectionConstraint, Table], str],
+    get_ref: Callable[[ColumnCollectionConstraint, Table], str] | None = None,
     max_length: int = 63,
-) -> Callable[[Constraint, Table], str]:
-    def token(constraint: Constraint, table: Table) -> str:
+) -> Callable[[ColumnCollectionConstraint, Table], str]:
+    def token(constraint: ColumnCollectionConstraint, table: Table) -> str:
         cols = get_cols(constraint, table)
         ref = f"__{get_ref(constraint, table)}" if get_ref else ""
         full = f"{prefix}__{table.name}__{cols}{ref}".strip("_")
@@ -27,17 +27,18 @@ def _make_token(
     return token
 
 
-def _cols(constraint: Constraint, _table: Table) -> str:
+def _cols(constraint: ColumnCollectionConstraint, _table: Table) -> str:
     return "_".join(c.name for c in constraint.columns)
 
 
-def _ref(constraint: ForeignKeyConstraint, _table: Table) -> str:
+def _ref(constraint: ColumnCollectionConstraint, _table: Table) -> str:
+    assert isinstance(constraint, ForeignKeyConstraint)  # noqa: S101
     return "_".join(f.column.table.name for f in constraint.elements)
 
 
 def build_naming_convention(
     max_length: int = 63,
-) -> dict[str, str | Callable[[Constraint, Table], str]]:
+) -> dict[str, str | Callable[[ColumnCollectionConstraint, Table], str]]:
     """Build a SQLAlchemy naming convention dict with length-safe names."""
     return {
         # Custom token callables
