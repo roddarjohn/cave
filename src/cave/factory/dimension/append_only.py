@@ -1,5 +1,3 @@
-from alembic_utils.pg_view import PGView
-from alembic_utils.replaceable_entity import registry
 from sqlalchemy import (
     Column,
     DateTime,
@@ -10,9 +8,11 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.schema import SchemaItem
+from sqlalchemy_declarative_extensions import View, register_view
 
 from cave.factory.dimension.types import DimensionConfiguration
 from cave.factory.dimension.validator import validate_schema_items
+from cave.resource import APIResource, register_api_resource
 from cave.utils.query import compile_query
 
 
@@ -68,6 +68,7 @@ def _construct_root_table(
 def _construct_view(  # noqa: PLR0913
     tablename: str,
     schemaname: str,
+    metadata: MetaData,
     dimensions: list[SchemaItem],
     config: DimensionConfiguration,
     root_table: Table,
@@ -91,14 +92,13 @@ def _construct_view(  # noqa: PLR0913
         )
     )
 
-    registry.register(
-        [
-            PGView(
-                schema=schemaname,
-                signature=tablename,
-                definition=compile_query(view_query),
-            )
-        ]
+    register_view(
+        metadata,
+        View(
+            tablename,
+            compile_query(view_query),
+            schema=schemaname,
+        ),
     )
 
     return Table(
@@ -124,7 +124,7 @@ def _construct_api_view(
     dimensions: list[SchemaItem],
     config: DimensionConfiguration,
     view_table: Table,
-) -> PGView:
+) -> View:
     view_query = select(
         view_table.c["id"].label("id"),
         view_table.c["created_at"].label("created_at"),
@@ -138,10 +138,10 @@ def _construct_api_view(
         ],
     ).select_from(view_table)
 
-    return PGView(
+    return View(
+        tablename,
+        compile_query(view_query),
         schema=config.api_schema_name,
-        signature=tablename,
-        definition=compile_query(view_query),
     )
 
 
@@ -165,7 +165,6 @@ def append_only_log_dimension_factory(
         not include a primary key column.
     :param config: Factory configuration; defaults to
         ``DimensionConfiguration()``.
-    :param kwargs: Extra keyword arguments forwarded to ``Table()``.
     :raises CaveValidationError: If any item in *dimensions* fails validation.
     """
     config = config or DimensionConfiguration()
@@ -191,6 +190,7 @@ def append_only_log_dimension_factory(
     view_table = _construct_view(
         tablename=tablename,
         schemaname=schemaname,
+        metadata=metadata,
         dimensions=dimensions,
         config=config,
         root_table=root_table,
@@ -204,4 +204,8 @@ def append_only_log_dimension_factory(
         view_table=view_table,
     )
 
-    registry.register([api_view])
+    register_view(metadata, api_view)
+    register_api_resource(
+        metadata,
+        APIResource(name=tablename, schema=config.api_schema_name),
+    )

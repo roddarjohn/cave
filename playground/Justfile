@@ -55,14 +55,27 @@ fresh-revision msg: reset migrate
 # Wipe migrations and drop the database
 reset: wipe-migrations wipe-db
 
-# Drop and recreate the database
+# Drop and recreate the database, cleaning up non-system roles
 wipe-db:
     #!/usr/bin/env bash
     db=$(echo $DATABASE_URL | grep -oP '[^/]+$')
-    dropdb --if-exists "$db" && echo "Dropped database: $db"
+    psql -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$db' AND pid <> pg_backend_pid();" > /dev/null 2>&1
+    dropdb --if-exists --force "$db" && echo "Dropped database: $db"
+    roles=$(psql -d postgres -tAc "SELECT rolname FROM pg_roles WHERE rolname NOT LIKE 'pg_%' AND rolname NOT IN ('$USER', 'postgres')")
+    for role in $roles; do
+        psql -d postgres -c "DROP ROLE IF EXISTS \"$role\";" && echo "Dropped role: $role"
+    done
     createdb "$db" && echo "Created database: $db"
 
 # Open a psql shell using DATABASE_URL
 db-shell:
     #!/usr/bin/env bash
     psql "${DATABASE_URL/+psycopg/}"
+
+# Start PostgREST
+serve:
+    postgrest postgrest.conf
+
+# Query the API root: just api
+api *path:
+    curl -s "http://localhost:3000/{{path}}" | python3 -m json.tool

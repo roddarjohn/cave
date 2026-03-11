@@ -1,34 +1,45 @@
-from cave.alembic import renderer as _renderer
-from cave.alembic import schema as _schema  # noqa: F401
-from cave.alembic.rewriter import cave_process_revision_directives
-from cave.patches import apply_all as _apply_all
+from sqlalchemy import MetaData
+from sqlalchemy_declarative_extensions.alembic import register_alembic_events
 
-__all__ = ["cave_alembic_hook", "cave_process_revision_directives"]
+from cave.alembic.renderer import register_renderers
+from cave.alembic.rewriter import cave_process_revision_directives
+from cave.alembic.schema import register_schemas
+from cave.models.roles import register_roles
+from cave.patches import apply_all
+
+__all__ = [
+    "cave_alembic_hook",
+    "cave_configure_metadata",
+    "cave_process_revision_directives",
+]
 
 
 def cave_alembic_hook() -> None:
-    """Register cave's alembic extensions.
+    """Register cave's alembic extensions (call before importing models).
 
-    Call this at the top of ``env.py`` and pass
-    ``cave_process_revision_directives`` to ``process_revision_directives``::
+    Usage in ``env.py``::
 
-        from cave.alembic import (
+        from cave.alembic.register import (
             cave_alembic_hook,
+            cave_configure_metadata,
             cave_process_revision_directives,
         )
 
         cave_alembic_hook()
 
-        def run_migrations_online() -> None:
-            ...
-            context.configure(
-                ...,
-                process_revision_directives=cave_process_revision_directives,
-            )
+        # ... import models / build metadata ...
 
-    To chain with another rewriter::
+        cave_configure_metadata(target_metadata)
 
-        process_revision_directives=cave_process_revision_directives.chain(other),
+    Then pass ``cave_process_revision_directives`` to
+    ``context.configure(process_revision_directives=...)``.
     """
-    _apply_all()
-    _renderer.apply()
+    register_alembic_events()
+    register_renderers()
+    apply_all()
+
+
+def cave_configure_metadata(metadata: MetaData) -> None:
+    """Register schemas, roles, and grants on *metadata* (call after models)."""
+    register_schemas(metadata)
+    register_roles(metadata)

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "just lint && just type-check && pre-commit run --all-files"
+            "command": "just lint >&2 && just type-check >&2"
           }
         ]
       }

@@ -121,18 +121,86 @@ Typical workflow
 Adding models
 -------------
 
-Define new models in ``playground/models.py`` by extending ``Base``::
+Define new models in ``playground/models.py`` using the cave factory
+functions::
 
-    class Post(Base):
-        __tablename__ = "posts"
-
-        id: Mapped[int] = mapped_column(Integer, primary_key=True)
-        title: Mapped[str] = mapped_column(String, nullable=False)
+    simple_dimension_factory(
+        tablename="users",
+        schemaname="public",
+        metadata=metadata,
+        dimensions=[
+            Column("name", Integer),
+        ],
+    )
 
 Then generate and apply a migration::
 
-    just revision "add posts table"
+    just revision "add users table"
     just migrate
 
 Alembic autogenerate compares your models against the live database schema, so
 it will pick up additions, removals, and column changes automatically.
+
+PostgREST
+---------
+
+The playground includes a `PostgREST <https://postgrest.org>`_ configuration
+for testing the generated API. Cave automatically creates API views and grants
+for each factory-created table.
+
+**Prerequisites**
+
+Install PostgREST from the `official releases
+<https://github.com/PostgREST/postgrest/releases>`_ and ensure it is on
+your ``PATH``.
+
+**Configuration**
+
+The playground includes a ``postgrest.conf`` that connects as the
+``authenticator`` role. The password is read from ``PGRST_DB_PASSWORD`` in
+``.env``.
+
+**Starting the server**
+
+.. code-block:: bash
+
+    just serve
+
+**Querying the API**
+
+.. code-block:: bash
+
+    # List all resources
+    just api
+
+    # Get all students
+    just api students
+
+    # Filter students
+    just api "students?name=eq.Alice"
+
+    # Embed related resources (e.g. user for each student)
+    just api "students?select=*,users(*)"
+
+    # Or with curl directly
+    curl -s "http://localhost:3000/students?select=*,users(*)" | python3 -m json.tool
+
+**Resource embedding**
+
+PostgREST automatically detects foreign key relationships through views.
+The ``db-extra-search-path`` setting in ``postgrest.conf`` includes the
+``public`` and ``private`` schemas so that PostgREST can trace FK
+relationships from the API views back to their base tables.
+
+The embedding name matches the **view/table name**, not the column name.
+Use an alias to rename the embedded resource::
+
+    # Column is "user_id", but the resource is called "users"
+    just api "students?select=*,users(*)"
+
+    # Rename to "user" with an alias
+    just api "students?select=*,user:users(*)"
+
+See the `PostgREST resource embedding docs
+<https://docs.postgrest.org/en/stable/references/api/resource_embedding.html>`_
+for the full query syntax.

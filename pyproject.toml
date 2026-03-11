@@ -9,8 +9,8 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "alembic-utils>=0.8.8",
     "pydantic>=2.12.5",
+    "sqlalchemy-declarative-extensions>=0.16.8",
     "sqlglot>=26",
     "typer>=0.24.1",
 ]
