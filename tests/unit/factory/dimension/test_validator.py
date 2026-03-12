@@ -1,10 +1,10 @@
-"""Unit tests for cave.factory.dimension.validator."""
+"""Unit tests for cave.validator."""
 
 import pytest
 from sqlalchemy import Column, Integer, String
 
-from cave.factory.dimension.utils import CaveValidationError
-from cave.factory.dimension.validator import (
+from cave.errors import CaveValidationError
+from cave.validator import (
     is_schema_item_not_primary_key,
     validate_schema_items,
 )
@@ -37,13 +37,12 @@ class TestIsSchemaItemNotPrimaryKey:
 
 
 class TestValidateSchemaItems:
-    def test_valid_items_returns_true(self):
+    def test_valid_items_does_not_raise(self):
         items = [Column("name", String), Column("value", Integer)]
-        result = validate_schema_items(items)
-        assert result is True
+        validate_schema_items(items)  # should not raise
 
-    def test_empty_list_returns_true(self):
-        assert validate_schema_items([]) is True
+    def test_empty_list_does_not_raise(self):
+        validate_schema_items([])
 
     def test_pk_column_raises_validation_error(self):
         items = [
@@ -75,5 +74,4 @@ class TestValidateSchemaItems:
             return True
 
         items = [Column("id", Integer, primary_key=True)]
-        result = validate_schema_items(items, validators=[always_true])
-        assert result is True
+        validate_schema_items(items, validators=[always_true])

@@ -6,12 +6,11 @@ from sqlalchemy_declarative_extensions.dialects.postgresql.trigger import (
     TriggerTimes,
 )
 
+from cave.errors import CaveValidationError
 from cave.factory.dimension.simple import SimpleDimensionFactory
-from cave.factory.dimension.types import (
-    APIResourceConfiguration,
-    DimensionConfiguration,
-)
-from cave.factory.dimension.utils import CaveValidationError
+from cave.plugins.api import APIPlugin
+from cave.plugins.pk import SerialPKPlugin
+from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 
 _CRUD_OPS = ("insert", "update", "delete")
 
@@ -35,13 +34,17 @@ class TestSimpleDimensionFactoryTables:
 
     def test_base_table_pk_column_is_auto_id(self):
         metadata = MetaData()
-        config = DimensionConfiguration(id_field_name="my_id")
         SimpleDimensionFactory(
             "product",
             "dim",
             metadata,
             [Column("name", String)],
-            config=config,
+            plugins=[
+                SerialPKPlugin(column_name="my_id"),
+                SimpleTablePlugin(),
+                APIPlugin(),
+                SimpleTriggerPlugin(),
+            ],
         )
         table = metadata.tables["dim.product"]
         pk_col = next(c for c in table.columns if c.primary_key)
@@ -105,13 +108,17 @@ class TestSimpleDimensionFactoryViews:
 
     def test_api_view_schema_respects_configuration(self):
         metadata = MetaData()
-        api_config = APIResourceConfiguration(schema_name="public_api")
         SimpleDimensionFactory(
             "product",
             "dim",
             metadata,
             [Column("name", String)],
-            api_configuration=api_config,
+            plugins=[
+                SerialPKPlugin(),
+                SimpleTablePlugin(),
+                APIPlugin(schema="public_api"),
+                SimpleTriggerPlugin(),
+            ],
         )
         views = metadata.info["views"]
         api_view = next(v for v in views.views if v.name == "product")

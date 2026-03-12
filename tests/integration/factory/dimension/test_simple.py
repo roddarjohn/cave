@@ -4,16 +4,27 @@ Creates real database objects and verifies CRUD operations through
 the API view and its INSTEAD OF triggers.
 """
 
+from pathlib import Path
+
 import pytest
 from sqlalchemy import text
 
 from cave.utils.template import load_template
 
+_SIMPLE_TEMPLATES = (
+    Path(__file__).resolve().parents[4]
+    / "src"
+    / "cave"
+    / "plugins"
+    / "templates"
+    / "simple"
+)
+
 
 def _render_simple_insert(
     base_table: str, cols: str, new_cols: str, set_clause: str
 ) -> str:
-    tpl = load_template("simple_insert.mako")
+    tpl = load_template(_SIMPLE_TEMPLATES / "insert.mako")
     return tpl.render(
         base_table=base_table,
         cols=cols,
@@ -25,7 +36,7 @@ def _render_simple_insert(
 def _render_simple_update(
     base_table: str, cols: str, new_cols: str, set_clause: str
 ) -> str:
-    tpl = load_template("simple_update.mako")
+    tpl = load_template(_SIMPLE_TEMPLATES / "update.mako")
     return tpl.render(
         base_table=base_table,
         cols=cols,
@@ -37,7 +48,7 @@ def _render_simple_update(
 def _render_simple_delete(
     base_table: str, cols: str, new_cols: str, set_clause: str
 ) -> str:
-    tpl = load_template("simple_delete.mako")
+    tpl = load_template(_SIMPLE_TEMPLATES / "delete.mako")
     return tpl.render(
         base_table=base_table,
         cols=cols,

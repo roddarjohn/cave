@@ -10,15 +10,26 @@ install them against a live PostgreSQL instance, and verify that:
 - Updates that do not change a value write no new attribute row.
 """
 
+from pathlib import Path
+
 import pytest
 from sqlalchemy import String, text
 
-from cave.factory.dimension.eav import _EAVMapping
+from cave.plugins.eav import _EAVMapping
 from cave.utils.template import load_template
+
+_EAV_TEMPLATES = (
+    Path(__file__).resolve().parents[4]
+    / "src"
+    / "cave"
+    / "plugins"
+    / "templates"
+    / "eav"
+)
 
 
 def _render_insert(mappings: list[_EAVMapping], schema: str) -> str:
-    tpl = load_template("eav_insert.mako")
+    tpl = load_template(_EAV_TEMPLATES / "insert.mako")
     return tpl.render(
         entity_table=f"{schema}.things_entity",
         attr_table=f"{schema}.things_attribute",
@@ -29,7 +40,7 @@ def _render_insert(mappings: list[_EAVMapping], schema: str) -> str:
 
 
 def _render_update(mappings: list[_EAVMapping], schema: str) -> str:
-    tpl = load_template("eav_update.mako")
+    tpl = load_template(_EAV_TEMPLATES / "update.mako")
     return tpl.render(
         attr_table=f"{schema}.things_attribute",
         mappings=[
