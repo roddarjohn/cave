@@ -79,26 +79,127 @@ Make two cave-specific additions to ``migrations/env.py``:
 -------------
 
 Pass your ``MetaData`` instance to a cave dimension factory so that
-generated tables are registered for autogenerate detection. See the
-:doc:`api` reference for the available factory classes.
+generated tables are registered for autogenerate detection.
+
+Simple dimension (single table)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A simple dimension stores each row in one table and exposes it through an
+``api`` schema view with INSTEAD OF triggers:
 
 .. code-block:: python
 
-   from sqlalchemy import MetaData
-
-   from cave.factory.dimension import (
-       APIResourceConfiguration,
-       SimpleDimensionFactory,
-   )
+   from sqlalchemy import Column, MetaData, String, Text
+   from cave.factory.dimension.simple import SimpleDimensionFactory
 
    metadata = MetaData()
 
    SimpleDimensionFactory(
-       tablename="users",
-       schemaname="app",
+       tablename="products",
+       schemaname="dim",
        metadata=metadata,
-       dimensions=[...],
-       api_configuration=APIResourceConfiguration(
-           grants=["select", "insert"],
-       ),
+       dimensions=[
+           Column("name", String, nullable=False),
+           Column("description", Text),
+       ],
+   )
+
+Append-only dimension (SCD Type 2)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An append-only dimension keeps a full history of attribute changes.  The
+current state is always the most recent row in the attributes log:
+
+.. code-block:: python
+
+   from sqlalchemy import Column, MetaData, Numeric, String
+   from cave.factory.dimension.append_only import AppendOnlyDimensionFactory
+
+   AppendOnlyDimensionFactory(
+       tablename="prices",
+       schemaname="dim",
+       metadata=metadata,
+       dimensions=[
+           Column("sku", String, nullable=False),
+           Column("amount", Numeric(10, 2), nullable=False),
+           Column("currency", String(3), nullable=False),
+       ],
+   )
+
+EAV dimension (sparse / dynamic attributes)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An EAV dimension stores each attribute as a separate row, making it
+efficient when rows have many nullable fields or when attributes are added
+frequently:
+
+.. code-block:: python
+
+   from sqlalchemy import Boolean, Column, Integer, MetaData, String
+   from cave.factory.dimension.eav import EAVDimensionFactory
+
+   EAVDimensionFactory(
+       tablename="features",
+       schemaname="dim",
+       metadata=metadata,
+       dimensions=[
+           Column("name", String, nullable=False),
+           Column("enabled", Boolean),
+           Column("max_seats", Integer),
+       ],
+   )
+
+Customising factory behaviour
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Any factory argument can be changed by passing a custom plugin list.
+See :doc:`plugins` for a full explanation.
+
+Custom PK column name:
+
+.. code-block:: python
+
+   from cave.factory.dimension.simple import SimpleDimensionFactory
+   from cave.plugins.pk import SerialPKPlugin
+   from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+   from cave.plugins.api import APIPlugin
+
+   SimpleDimensionFactory(
+       "products", "dim", metadata, dimensions,
+       plugins=[
+           SerialPKPlugin(column_name="product_id"),
+           SimpleTablePlugin(),
+           APIPlugin(),
+           SimpleTriggerPlugin(),
+       ],
+   )
+
+Custom API schema:
+
+.. code-block:: python
+
+   SimpleDimensionFactory(
+       "products", "dim", metadata, dimensions,
+       plugins=[
+           SerialPKPlugin(),
+           SimpleTablePlugin(),
+           APIPlugin(schema="reporting"),
+           SimpleTriggerPlugin(),
+       ],
+   )
+
+Apply a custom plugin to every factory via :class:`~cave.config.CaveConfig`:
+
+.. code-block:: python
+
+   from cave.config import CaveConfig
+
+   cave_cfg = CaveConfig()
+   cave_cfg.register(TimestampPlugin(), TenantPlugin())
+
+   SimpleDimensionFactory(
+       "products", "dim", metadata, dimensions, cave=cave_cfg
+   )
+   AppendOnlyDimensionFactory(
+       "orders", "dim", metadata, dimensions, cave=cave_cfg
    )

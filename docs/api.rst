@@ -1,6 +1,57 @@
 API reference
 =============
 
+Plugin system
+-------------
+
+.. automodule:: cave.plugin
+   :members:
+
+.. automodule:: cave.factory.base
+   :members:
+
+.. automodule:: cave.factory.context
+   :members:
+
+.. automodule:: cave.config
+   :members:
+
+.. automodule:: cave.errors
+   :members:
+
+.. automodule:: cave.validator
+   :members:
+
+Dimension factories
+-------------------
+
+.. automodule:: cave.factory.dimension.simple
+   :members:
+
+.. automodule:: cave.factory.dimension.append_only
+   :members:
+
+.. automodule:: cave.factory.dimension.eav
+   :members:
+
+Built-in plugins
+----------------
+
+.. automodule:: cave.plugins.pk
+   :members:
+
+.. automodule:: cave.plugins.simple
+   :members:
+
+.. automodule:: cave.plugins.api
+   :members:
+
+.. automodule:: cave.plugins.append_only
+   :members:
+
+.. automodule:: cave.plugins.eav
+   :members:
+
 Alembic integration
 -------------------
 
@@ -19,26 +70,11 @@ Alembic integration
 .. automodule:: cave.alembic.rewriter
    :members:
 
-Dimension factories
--------------------
+PostgREST / API
+---------------
 
-.. automodule:: cave.factory.dimension.base
+.. automodule:: cave.resource
    :members:
 
-.. automodule:: cave.factory.dimension.simple
-   :members:
-
-.. automodule:: cave.factory.dimension.append_only
-   :members:
-
-.. automodule:: cave.factory.dimension.eav
-   :members:
-
-.. automodule:: cave.factory.dimension.types
-   :members:
-
-.. automodule:: cave.factory.dimension.validator
-   :members:
-
-.. automodule:: cave.factory.dimension.utils
+.. automodule:: cave.models.roles
    :members:

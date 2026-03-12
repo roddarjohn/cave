@@ -18,6 +18,8 @@ nitpick_ignore = [
     # alembic does not publish an intersphinx inventory
     ("py:class", "alembic.operations.ops.MigrateOperation"),
     ("py:class", "alembic.autogenerate.rewriter.Rewriter"),
+    # private Protocol used only for internal type checking
+    ("py:class", "cave.validator._SchemaItemValidator"),
 ]
 
 intersphinx_mapping = {
