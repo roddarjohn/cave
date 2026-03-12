@@ -56,6 +56,7 @@ def _patched_render_definition(
                 view = get_view(conn, random_name)
                 definition2 = view.definition
                 return escape_params(definition2)
+
             except SQLAlchemyError:
                 logger.debug(
                     "DB normalization failed for view %r;"
@@ -63,6 +64,7 @@ def _patched_render_definition(
                     self.name,
                     exc_info=True,
                 )
+
             finally:
                 trans.rollback()
 

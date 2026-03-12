@@ -72,6 +72,7 @@ def _format_function_body(sql: str) -> str:
     body = m.group(2)
     lines = body.strip().splitlines()
     indented: list[str] = []
+
     for line in lines:
         stripped = line.strip()
         if stripped in ("BEGIN", "END;"):
@@ -80,7 +81,9 @@ def _format_function_body(sql: str) -> str:
             # Preserve relative indentation within the body.
             leading = len(line) - len(line.lstrip())
             indented.append("    " + " " * leading + stripped)
+
     new_body = "\n".join(indented)
+
     return (
         formatted[: m.start()]
         + "AS $$\n"
@@ -99,8 +102,10 @@ def _render_execute(sql: str, *, fstring: bool = False) -> str:
     """Render ``op.execute(\"\"\"...\"\"\")``, going multi-line when needed."""
     prefix = "f" if fstring else ""
     inline = f'op.execute({prefix}"""{sql}""")'
+
     if "\n" in sql or sql.endswith('"') or len(inline) > _MAX_LINE:
         return f'op.execute({prefix}"""\n{indent(sql, "    ")}\n""")'
+
     return inline
 
 
@@ -122,7 +127,9 @@ def _render_sql_op(
 ) -> list[str]:
     """Render ops whose SQL pglast can format (views, etc.)."""
     assert autogen_context.connection  # noqa: S101
+
     commands = op.to_sql(autogen_context.connection.dialect)
+
     return [_render_execute(_prettify(cmd)) for cmd in commands]
 
 
@@ -132,6 +139,7 @@ def _render_ddl_op(
 ) -> list[str]:
     """Render function/procedure ops with formatted bodies."""
     commands = op.to_sql()
+
     return [_render_execute(_format_function_body(cmd)) for cmd in commands]
 
 
@@ -141,7 +149,9 @@ def _render_trigger(
 ) -> list[str]:
     """Render trigger ops."""
     assert autogen_context.connection  # noqa: S101
+
     commands = op.to_sql(autogen_context.connection)
+
     return [_render_execute(_prettify(cmd)) for cmd in commands]
 
 
@@ -151,15 +161,18 @@ def _render_schema(
 ) -> list[str]:
     """Render a schema op, using DDL objects where possible."""
     statements = op.to_sql()
+
     cls_names = {
         s.__class__.__name__
         for s in statements
         if isinstance(s, (CreateSchema, DropSchema))
     }
+
     if cls_names:
         autogen_context.imports.add(
             f"from sqlalchemy.sql.ddl import {', '.join(cls_names)}"
         )
+
     return [
         f'op.execute({cmd.__class__.__name__}("{cmd.element}"))'
         if isinstance(cmd, (CreateSchema, DropSchema))
@@ -174,8 +187,10 @@ def _render_role(
 ) -> list[str]:
     """Render a role op with pglast-formatted SQL."""
     is_dynamic = op.role.is_dynamic
+
     if is_dynamic:
         autogen_context.imports.add("import os")
+
     return [
         _render_execute(_prettify(cmd), fstring=is_dynamic)
         for cmd in op.to_sql(raw=False)

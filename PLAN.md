@@ -1,5 +1,23 @@
 # Philosophy
 
+SQLAlchemy and related tooling is excellent at modeling various SQL shapes and queries in Python. The vast majority of the community material is focused on simple use cases that don't make sense in production.
+
+Using a database in production often involves an application server between the database and the consumer, be that a true third party or a front end. SQLAlchemy and related tooling is incredibly unopinionated about how that application layer should work. This is a feature: these libraries do one thing well.
+
+The same can be said about Postgres itself. Postgres is incredibly powerful; it can replace message queues, vector databases, caching solutions, and more.
+
+This library is intended to serve as the intermediate layer between the database and the consumer. It orchestrates Postgres in order to encourage more mature database / application patterns.
+
+This is a space often occupied by blog posts, various gists, and other miscellany. It is the space many companies spend years bikeshedding in.
+
+Obviously, careful engineers will learn much by implementing each provided solution themselves. This library exposes minimum viable examples of each tool in the raw postgres so that it is hopefully easier to understand what each solution does under the hood.
+
+The library is somewhat agnostic as to how it should be used. At minimum, it could be used as a set of cookbooks for production-ready database based applications. At maximum, it could be used to declare models and manage migrations for such a system.
+
+Because it happens to be implemented in SQLAlchemy, it can itself be used as a library that exposes additional functionality to SQLAlchemy, alembic, and sqlalchemy-declarative-extensions.
+
+Put differently, most engineers will implement business logic or storage logic in the application layer. Things like add an event to an audit table, or authentication itself, may be in application code. This violates innumerable principles in the interest of speed.
+
 There are two types of things in the world: an event (something happened), and then objects that define what happened.
 
 The object that define what happened can be called a dimension.
@@ -102,3 +120,5 @@ Source of truth tables should be very very clear.
 
 - Figure out how to benchmark / do performance analysis on this
 - Allow loading a dynamic configuration and dynamic migrations
+
+- Is a transaction simply a dimensional object, that has some declarative configuration from it?
