@@ -57,6 +57,7 @@ class _EAVMapping:
     attribute_name: str
     value_column: str
     column_type: sa_types.TypeEngine
+    nullable: bool = True
 
 
 def _resolve_value_column(
@@ -86,6 +87,10 @@ def _build_eav_mappings(
                     attribute_name=dim.key,
                     value_column=value_col,
                     column_type=col_type,
+                    # dim.nullable is Optional[bool]; None means the
+                    # Column was declared without an explicit nullable
+                    # argument, which SQLAlchemy treats as nullable=True.
+                    nullable=dim.nullable is not False,
                 )
             )
     return mappings
@@ -156,9 +161,9 @@ def _construct_attribute_table(  # noqa: PLR0913
         for name, col_type in value_cols.items()
     ]
 
-    check_expr = " + ".join(f"({vc} IS NOT NULL)::int" for vc in value_cols)
+    value_col_names = ", ".join(value_cols)
     check = CheckConstraint(
-        f"{check_expr} = 1",
+        f"num_nonnulls({value_col_names}) = 1",
         name=f"{attr_tablename}_one_value_ck",
     )
 
@@ -386,7 +391,7 @@ class EAVDimensionFactory(DimensionFactory):
         attr_fullname = f"{ctx.schemaname}.{attribute_table.name}"
 
         mapping_tuples = [
-            (mapping.attribute_name, mapping.value_column)
+            (mapping.attribute_name, mapping.value_column, mapping.nullable)
             for mapping in mappings
         ]
         template_vars = {
