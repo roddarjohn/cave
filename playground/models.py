@@ -9,11 +9,13 @@ from sqlalchemy import (
 )
 
 from cave.factory.dimension import (
-    APIResourceConfiguration,
     AppendOnlyDimensionFactory,
     EAVDimensionFactory,
     SimpleDimensionFactory,
 )
+from cave.plugins.api import APIPlugin
+from cave.plugins.pk import SerialPKPlugin
+from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 from cave.utils.naming_convention import build_naming_convention
 
 metadata = MetaData(
@@ -27,9 +29,12 @@ SimpleDimensionFactory(
     dimensions=[
         Column("name", Integer),
     ],
-    api_configuration=APIResourceConfiguration(
-        grants=["select", "insert", "update", "delete"],
-    ),
+    plugins=[
+        SerialPKPlugin(),
+        SimpleTablePlugin(),
+        APIPlugin(grants=["select", "insert", "update", "delete"]),
+        SimpleTriggerPlugin(),
+    ],
 )
 
 AppendOnlyDimensionFactory(
