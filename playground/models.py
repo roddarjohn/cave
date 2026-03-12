@@ -8,12 +8,11 @@ from sqlalchemy import (
     String,
 )
 
-from cave.factory.dimension.append_only import (
-    append_only_log_dimension_factory,
-)
-from cave.factory.dimension.eav import eav_dimension_factory
-from cave.factory.dimension.simple import (
-    simple_dimension_factory,
+from cave.factory.dimension import (
+    APIResourceConfiguration,
+    AppendOnlyDimensionFactory,
+    EAVDimensionFactory,
+    SimpleDimensionFactory,
 )
 from cave.utils.naming_convention import build_naming_convention
 
@@ -21,17 +20,19 @@ metadata = MetaData(
     naming_convention=build_naming_convention(),
 )
 
-simple_dimension_factory(
+SimpleDimensionFactory(
     tablename="users",
     schemaname="public",
     metadata=metadata,
     dimensions=[
         Column("name", Integer),
     ],
-    grants=["select", "insert", "update", "delete"],
+    api_configuration=APIResourceConfiguration(
+        grants=["select", "insert", "update", "delete"],
+    ),
 )
 
-append_only_log_dimension_factory(
+AppendOnlyDimensionFactory(
     tablename="students",
     schemaname="private",
     metadata=metadata,
@@ -41,7 +42,7 @@ append_only_log_dimension_factory(
     ],
 )
 
-eav_dimension_factory(
+EAVDimensionFactory(
     tablename="products",
     schemaname="private",
     metadata=metadata,

@@ -78,21 +78,27 @@ Make two cave-specific additions to ``migrations/env.py``:
 ``models.py``
 -------------
 
-Pass your ``MetaData`` instance to the cave factory functions so that
+Pass your ``MetaData`` instance to a cave dimension factory so that
 generated tables are registered for autogenerate detection. See the
-:doc:`api` reference for the available factory functions.
+:doc:`api` reference for the available factory classes.
 
 .. code-block:: python
 
    from sqlalchemy import MetaData
 
-   from cave.factory.dimension.simple import simple_dimension_factory
+   from cave.factory.dimension import (
+       APIResourceConfiguration,
+       SimpleDimensionFactory,
+   )
 
    metadata = MetaData()
 
-   simple_dimension_factory(
+   SimpleDimensionFactory(
        tablename="users",
        schemaname="app",
        metadata=metadata,
        dimensions=[...],
+       api_configuration=APIResourceConfiguration(
+           grants=["select", "insert"],
+       ),
    )

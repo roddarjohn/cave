@@ -121,10 +121,10 @@ Typical workflow
 Adding models
 -------------
 
-Define new models in ``playground/models.py`` using the cave factory
-functions::
+Define new models in ``playground/models.py`` using the cave dimension
+factory classes::
 
-    simple_dimension_factory(
+    SimpleDimensionFactory(
         tablename="users",
         schemaname="public",
         metadata=metadata,

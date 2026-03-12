@@ -22,10 +22,16 @@ Alembic integration
 Dimension factories
 -------------------
 
+.. automodule:: cave.factory.dimension.base
+   :members:
+
 .. automodule:: cave.factory.dimension.simple
    :members:
 
 .. automodule:: cave.factory.dimension.append_only
+   :members:
+
+.. automodule:: cave.factory.dimension.eav
    :members:
 
 .. automodule:: cave.factory.dimension.types

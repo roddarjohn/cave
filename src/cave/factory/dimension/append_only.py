@@ -1,3 +1,9 @@
+"""Append-only log dimension factory.
+
+Creates a root table, an append-only attributes table, a join
+view, an API view, and INSTEAD OF triggers for full CRUD.
+"""
+
 from sqlalchemy import (
     Column,
     DateTime,
@@ -13,9 +19,7 @@ from sqlalchemy_declarative_extensions import (
     register_view,
 )
 
-from cave.factory.dimension.types import DimensionConfiguration
-from cave.factory.dimension.validator import validate_schema_items
-from cave.resource import APIResource, register_api_resource
+from cave.factory.dimension.base import DimensionFactory, FactoryContext
 from cave.utils.naming import resolve_name
 from cave.utils.query import compile_query
 from cave.utils.template import load_template
@@ -35,8 +39,9 @@ def _construct_attribute_table(
     schemaname: str,
     metadata: MetaData,
     dimensions: list[SchemaItem],
-    config: DimensionConfiguration,
+    config_id: str,
 ) -> Table:
+    """Create the attributes table."""
     attributes_tablename = resolve_name(
         metadata,
         "append_only_attributes",
@@ -45,8 +50,12 @@ def _construct_attribute_table(
     )
 
     attributes_columns = [
-        Column(config.id_field_name, Integer, primary_key=True),
-        Column("created_at", DateTime(timezone=True), server_default="now()"),
+        Column(config_id, Integer, primary_key=True),
+        Column(
+            "created_at",
+            DateTime(timezone=True),
+            server_default="now()",
+        ),
         *dimensions,
     ]
 
@@ -62,9 +71,10 @@ def _construct_root_table(
     tablename: str,
     schemaname: str,
     metadata: MetaData,
-    config: DimensionConfiguration,
+    config_id: str,
     attributes_table: Table,
 ) -> Table:
+    """Create the root table."""
     root_tablename = resolve_name(
         metadata,
         "append_only_root",
@@ -73,8 +83,12 @@ def _construct_root_table(
     )
 
     root_columns = [
-        Column(config.id_field_name, Integer, primary_key=True),
-        Column("created_at", DateTime(timezone=True), server_default="now()"),
+        Column(config_id, Integer, primary_key=True),
+        Column(
+            "created_at",
+            DateTime(timezone=True),
+            server_default="now()",
+        ),
         Column(
             f"{attributes_table.name}_id",
             ForeignKey(f"{schemaname}.{attributes_table.name}.id"),
@@ -94,10 +108,11 @@ def _construct_view(  # noqa: PLR0913
     schemaname: str,
     metadata: MetaData,
     dimensions: list[SchemaItem],
-    config: DimensionConfiguration,
+    config_id: str,
     root_table: Table,
     attribute_table: Table,
 ) -> Table:
+    """Register the join view and return a Table proxy."""
     view_query = (
         select(
             root_table.c["id"].label("id"),
@@ -112,7 +127,7 @@ def _construct_view(  # noqa: PLR0913
         .select_from(root_table)
         .join(
             attribute_table,
-            attribute_table.c[config.id_field_name]
+            attribute_table.c[config_id]
             == root_table.c[f"{attribute_table.name}_id"],
         )
     )
@@ -147,9 +162,10 @@ def _construct_view(  # noqa: PLR0913
 def _construct_api_view(
     tablename: str,
     dimensions: list[SchemaItem],
-    config: DimensionConfiguration,
+    api_schema: str,
     view_table: Table,
 ) -> View:
+    """Build the API view selecting from the join view."""
     view_query = select(
         view_table.c["id"].label("id"),
         view_table.c["created_at"].label("created_at"),
@@ -166,7 +182,7 @@ def _construct_api_view(
     return View(
         tablename,
         compile_query(view_query),
-        schema=config.api_schema_name,
+        schema=api_schema,
     )
 
 
@@ -175,132 +191,104 @@ def _dim_columns(dimensions: list[SchemaItem]) -> list[str]:
     return [col.key for col in dimensions if isinstance(col, Column)]
 
 
-def _register_triggers(  # noqa: PLR0913
-    tablename: str,
-    schemaname: str,
-    metadata: MetaData,
-    dimensions: list[SchemaItem],
-    config: DimensionConfiguration,
-    root_table: Table,
-    attribute_table: Table,
-) -> None:
-    """Register INSTEAD OF triggers on both the private and API views."""
-    root_fullname = f"{schemaname}.{root_table.name}"
-    attr_fullname = f"{schemaname}.{attribute_table.name}"
+class AppendOnlyDimensionFactory(DimensionFactory):
+    """Create an append-only log dimension.
 
-    dim_cols = _dim_columns(dimensions)
-    template_vars = {
-        "attr_table": attr_fullname,
-        "root_table": root_fullname,
-        "attr_cols": ", ".join(dim_cols),
-        "new_cols": ", ".join(f"NEW.{c}" for c in dim_cols),
-        "attr_fk_col": f"{attribute_table.name}_id",
-    }
+    Produces ``<tablename>_attributes`` (the append-only log),
+    ``<tablename>_root`` (the entity root with a FK to the
+    latest attributes row), and a ``<tablename>`` join view.
+    Also registers an API view and INSTEAD OF triggers.
+    """
 
-    ops = [
-        ("insert", load_template("append_only_insert.mako")),
-        ("update", load_template("append_only_update.mako")),
-        ("delete", load_template("append_only_delete.mako")),
-    ]
-
-    for view_schema, view_fullname in [
-        (schemaname, f"{schemaname}.{tablename}"),
-        (
-            config.api_schema_name,
-            f"{config.api_schema_name}.{tablename}",
-        ),
-    ]:
-        register_view_triggers(
-            metadata=metadata,
-            view_schema=view_schema,
-            view_fullname=view_fullname,
-            tablename=tablename,
-            template_vars=template_vars,
-            ops=ops,
-            naming_defaults=_NAMING_DEFAULTS,
-            function_key="append_only_function",
-            trigger_key="append_only_trigger",
+    def create_tables(self, ctx: FactoryContext) -> None:
+        """Create the root and attributes tables."""
+        ctx.tables["attributes"] = _construct_attribute_table(
+            tablename=ctx.tablename,
+            schemaname=ctx.schemaname,
+            metadata=ctx.metadata,
+            dimensions=ctx.dimensions,
+            config_id=ctx.config.id_field_name,
         )
 
+        ctx.tables["root"] = _construct_root_table(
+            tablename=ctx.tablename,
+            schemaname=ctx.schemaname,
+            metadata=ctx.metadata,
+            config_id=ctx.config.id_field_name,
+            attributes_table=ctx.tables["attributes"],
+        )
 
-def append_only_log_dimension_factory(
-    tablename: str,
-    schemaname: str,
-    metadata: MetaData,
-    dimensions: list[SchemaItem],
-    config: DimensionConfiguration | None = None,
-) -> None:
-    """Create an append-only log dimension table and its root table.
+    def create_views(self, ctx: FactoryContext) -> None:
+        """Create the private join view and API view."""
+        view_table = _construct_view(
+            tablename=ctx.tablename,
+            schemaname=ctx.schemaname,
+            metadata=ctx.metadata,
+            dimensions=ctx.dimensions,
+            config_id=ctx.config.id_field_name,
+            root_table=ctx.tables["root"],
+            attribute_table=ctx.tables["attributes"],
+        )
+        ctx.tables["view"] = view_table
 
-    Creates three objects: ``<tablename>_attributes`` (the append-only log),
-    ``<tablename>_root`` (the entity root with a FK to the latest attributes
-    row), and a ``<tablename>`` view joining them.
+        api_view = _construct_api_view(
+            tablename=ctx.tablename,
+            dimensions=ctx.dimensions,
+            api_schema=ctx.api_configuration.schema_name,
+            view_table=view_table,
+        )
+        register_view(ctx.metadata, api_view)
+        ctx.views["api"] = api_view
 
-    Also registers INSTEAD OF trigger functions on both the private and API
-    views to support INSERT, UPDATE, and DELETE.
+    def create_triggers(self, ctx: FactoryContext) -> None:
+        """Register INSTEAD OF triggers on both views."""
+        root_table = ctx.tables["root"]
+        attribute_table = ctx.tables["attributes"]
+        root_fullname = f"{ctx.schemaname}.{root_table.name}"
+        attr_fullname = f"{ctx.schemaname}.{attribute_table.name}"
 
-    :param tablename: Base name for the generated tables and view.
-    :param schemaname: PostgreSQL schema for all generated objects.
-    :param metadata: SQLAlchemy ``MetaData`` the tables are bound to.
-    :param dimensions: Column definitions for the attribute columns.  Must
-        not include a primary key column.
-    :param config: Factory configuration; defaults to
-        ``DimensionConfiguration()``.
-    :raises CaveValidationError: If any item in *dimensions* fails validation.
-    """
-    config = config or DimensionConfiguration()
+        dim_cols = _dim_columns(ctx.dimensions)
+        template_vars = {
+            "attr_table": attr_fullname,
+            "root_table": root_fullname,
+            "attr_cols": ", ".join(dim_cols),
+            "new_cols": ", ".join(f"NEW.{c}" for c in dim_cols),
+            "attr_fk_col": f"{attribute_table.name}_id",
+        }
 
-    validate_schema_items(dimensions)
+        ops = [
+            (
+                "insert",
+                load_template("append_only_insert.mako"),
+            ),
+            (
+                "update",
+                load_template("append_only_update.mako"),
+            ),
+            (
+                "delete",
+                load_template("append_only_delete.mako"),
+            ),
+        ]
 
-    attributes_table = _construct_attribute_table(
-        tablename=tablename,
-        schemaname=schemaname,
-        metadata=metadata,
-        dimensions=dimensions,
-        config=config,
-    )
-
-    root_table = _construct_root_table(
-        tablename=tablename,
-        schemaname=schemaname,
-        metadata=metadata,
-        config=config,
-        attributes_table=attributes_table,
-    )
-
-    view_table = _construct_view(
-        tablename=tablename,
-        schemaname=schemaname,
-        metadata=metadata,
-        dimensions=dimensions,
-        config=config,
-        root_table=root_table,
-        attribute_table=attributes_table,
-    )
-
-    api_view = _construct_api_view(
-        tablename=tablename,
-        dimensions=dimensions,
-        config=config,
-        view_table=view_table,
-    )
-
-    register_view(metadata, api_view)
-    register_api_resource(
-        metadata,
-        APIResource(
-            name=tablename,
-            schema=config.api_schema_name,
-            grants=["select", "insert", "update", "delete"],
-        ),
-    )
-
-    _register_triggers(
-        tablename=tablename,
-        schemaname=schemaname,
-        metadata=metadata,
-        dimensions=dimensions,
-        config=config,
-        root_table=root_table,
-        attribute_table=attributes_table,
-    )
+        for view_schema, view_fullname in [
+            (
+                ctx.schemaname,
+                f"{ctx.schemaname}.{ctx.tablename}",
+            ),
+            (
+                ctx.api_configuration.schema_name,
+                f"{ctx.api_configuration.schema_name}.{ctx.tablename}",
+            ),
+        ]:
+            register_view_triggers(
+                metadata=ctx.metadata,
+                view_schema=view_schema,
+                view_fullname=view_fullname,
+                tablename=ctx.tablename,
+                template_vars=template_vars,
+                ops=ops,
+                naming_defaults=_NAMING_DEFAULTS,
+                function_key="append_only_function",
+                trigger_key="append_only_trigger",
+            )

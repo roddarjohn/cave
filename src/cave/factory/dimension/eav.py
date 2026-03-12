@@ -36,9 +36,7 @@ from sqlalchemy_declarative_extensions import (
     register_view,
 )
 
-from cave.factory.dimension.types import DimensionConfiguration
-from cave.factory.dimension.validator import validate_schema_items
-from cave.resource import APIResource, register_api_resource
+from cave.factory.dimension.base import DimensionFactory, FactoryContext
 from cave.utils.naming import resolve_name
 from cave.utils.query import compile_query
 from cave.utils.template import load_template
@@ -108,7 +106,7 @@ def _construct_entity_table(
     tablename: str,
     schemaname: str,
     metadata: MetaData,
-    config: DimensionConfiguration,
+    config_id: str,
 ) -> Table:
     """Create the ``{tablename}_entity`` table."""
     entity_tablename = resolve_name(
@@ -120,7 +118,7 @@ def _construct_entity_table(
     return Table(
         entity_tablename,
         metadata,
-        Column(config.id_field_name, Integer, primary_key=True),
+        Column(config_id, Integer, primary_key=True),
         Column(
             "created_at",
             DateTime(timezone=True),
@@ -134,7 +132,7 @@ def _construct_attribute_table(  # noqa: PLR0913
     tablename: str,
     schemaname: str,
     metadata: MetaData,
-    config: DimensionConfiguration,
+    config_id: str,
     entity_table: Table,
     mappings: list[_EAVMapping],
 ) -> Table:
@@ -164,12 +162,12 @@ def _construct_attribute_table(  # noqa: PLR0913
         name=f"{attr_tablename}_one_value_ck",
     )
 
-    entity_fq = f"{schemaname}.{entity_table.name}.{config.id_field_name}"
+    entity_fq = f"{schemaname}.{entity_table.name}.{config_id}"
 
     return Table(
         attr_tablename,
         metadata,
-        Column(config.id_field_name, Integer, primary_key=True),
+        Column(config_id, Integer, primary_key=True),
         Column(
             "entity_id",
             ForeignKey(entity_fq, ondelete="CASCADE"),
@@ -302,7 +300,7 @@ def _construct_view(  # noqa: PLR0913
 def _construct_api_view(
     tablename: str,
     mappings: list[_EAVMapping],
-    config: DimensionConfiguration,
+    api_schema: str,
     view_table: Table,
 ) -> View:
     """Build the API view that selects from the pivot view."""
@@ -320,146 +318,107 @@ def _construct_api_view(
     return View(
         tablename,
         compile_query(view_query),
-        schema=config.api_schema_name,
+        schema=api_schema,
     )
 
 
-def _register_triggers(  # noqa: PLR0913
-    tablename: str,
-    schemaname: str,
-    metadata: MetaData,
-    mappings: list[_EAVMapping],
-    config: DimensionConfiguration,
-    entity_table: Table,
-    attribute_table: Table,
-) -> None:
-    """Register INSTEAD OF triggers on the pivot and API views."""
-    entity_fullname = f"{schemaname}.{entity_table.name}"
-    attr_fullname = f"{schemaname}.{attribute_table.name}"
-
-    mapping_tuples = [
-        (mapping.attribute_name, mapping.value_column) for mapping in mappings
-    ]
-    template_vars = {
-        "entity_table": entity_fullname,
-        "attr_table": attr_fullname,
-        "mappings": mapping_tuples,
-    }
-
-    ops = [
-        ("insert", load_template("eav_insert.mako")),
-        ("update", load_template("eav_update.mako")),
-        ("delete", load_template("eav_delete.mako")),
-    ]
-
-    for view_schema, view_fullname in [
-        (schemaname, f"{schemaname}.{tablename}"),
-        (
-            config.api_schema_name,
-            f"{config.api_schema_name}.{tablename}",
-        ),
-    ]:
-        register_view_triggers(
-            metadata=metadata,
-            view_schema=view_schema,
-            view_fullname=view_fullname,
-            tablename=tablename,
-            template_vars=template_vars,
-            ops=ops,
-            naming_defaults=_NAMING_DEFAULTS,
-            function_key="eav_function",
-            trigger_key="eav_trigger",
-        )
-
-
-def eav_dimension_factory(
-    tablename: str,
-    schemaname: str,
-    metadata: MetaData,
-    dimensions: list[SchemaItem],
-    config: DimensionConfiguration | None = None,
-) -> None:
+class EAVDimensionFactory(DimensionFactory):
     """Create an EAV dimension with entity and attribute tables.
 
-    Creates ``<tablename>_entity`` (entity root),
+    Produces ``<tablename>_entity`` (entity root),
     ``<tablename>_attribute`` (typed attribute rows with a CHECK
     constraint ensuring exactly one value column is populated),
     and a ``<tablename>`` pivot view that reconstructs the
-    columnar form.
-
-    Also registers an API view, PostgREST grants, and INSTEAD OF
-    triggers for INSERT, UPDATE, and DELETE.
-
-    :param tablename: Base name for the generated objects.
-    :param schemaname: PostgreSQL schema for all generated objects.
-    :param metadata: SQLAlchemy ``MetaData`` bound to.
-    :param dimensions: Column definitions for the EAV attributes.
-        Each column's SQLAlchemy type is mapped to a value column.
-        Must not include a primary key column.
-    :param config: Factory configuration; defaults to
-        ``DimensionConfiguration()``.
-    :raises CaveValidationError: If any dimension fails validation
-        or has an unmappable type.
+    columnar form.  Also registers an API view and INSTEAD OF
+    triggers.
     """
-    config = config or DimensionConfiguration()
 
-    validate_schema_items(dimensions)
+    def create_tables(self, ctx: FactoryContext) -> None:
+        """Create the entity and attribute tables."""
+        mappings = _build_eav_mappings(ctx.dimensions)
+        ctx.kwargs["_eav_mappings"] = mappings
 
-    mappings = _build_eav_mappings(dimensions)
+        ctx.tables["entity"] = _construct_entity_table(
+            tablename=ctx.tablename,
+            schemaname=ctx.schemaname,
+            metadata=ctx.metadata,
+            config_id=ctx.config.id_field_name,
+        )
 
-    entity_table = _construct_entity_table(
-        tablename=tablename,
-        schemaname=schemaname,
-        metadata=metadata,
-        config=config,
-    )
+        ctx.tables["attribute"] = _construct_attribute_table(
+            tablename=ctx.tablename,
+            schemaname=ctx.schemaname,
+            metadata=ctx.metadata,
+            config_id=ctx.config.id_field_name,
+            entity_table=ctx.tables["entity"],
+            mappings=mappings,
+        )
 
-    attribute_table = _construct_attribute_table(
-        tablename=tablename,
-        schemaname=schemaname,
-        metadata=metadata,
-        config=config,
-        entity_table=entity_table,
-        mappings=mappings,
-    )
+    def create_views(self, ctx: FactoryContext) -> None:
+        """Create the pivot view and API view."""
+        mappings: list[_EAVMapping] = ctx.kwargs["_eav_mappings"]
 
-    view_table = _construct_view(
-        tablename=tablename,
-        schemaname=schemaname,
-        metadata=metadata,
-        mappings=mappings,
-        entity_table=entity_table,
-        attribute_table=attribute_table,
-    )
+        view_table = _construct_view(
+            tablename=ctx.tablename,
+            schemaname=ctx.schemaname,
+            metadata=ctx.metadata,
+            mappings=mappings,
+            entity_table=ctx.tables["entity"],
+            attribute_table=ctx.tables["attribute"],
+        )
+        ctx.tables["view"] = view_table
 
-    api_view = _construct_api_view(
-        tablename=tablename,
-        mappings=mappings,
-        config=config,
-        view_table=view_table,
-    )
+        api_view = _construct_api_view(
+            tablename=ctx.tablename,
+            mappings=mappings,
+            api_schema=ctx.api_configuration.schema_name,
+            view_table=view_table,
+        )
+        register_view(ctx.metadata, api_view)
+        ctx.views["api"] = api_view
 
-    register_view(metadata, api_view)
-    register_api_resource(
-        metadata,
-        APIResource(
-            name=tablename,
-            schema=config.api_schema_name,
-            grants=[
-                "select",
-                "insert",
-                "update",
-                "delete",
-            ],
-        ),
-    )
+    def create_triggers(self, ctx: FactoryContext) -> None:
+        """Register INSTEAD OF triggers on both views."""
+        mappings: list[_EAVMapping] = ctx.kwargs["_eav_mappings"]
+        entity_table = ctx.tables["entity"]
+        attribute_table = ctx.tables["attribute"]
+        entity_fullname = f"{ctx.schemaname}.{entity_table.name}"
+        attr_fullname = f"{ctx.schemaname}.{attribute_table.name}"
 
-    _register_triggers(
-        tablename=tablename,
-        schemaname=schemaname,
-        metadata=metadata,
-        mappings=mappings,
-        config=config,
-        entity_table=entity_table,
-        attribute_table=attribute_table,
-    )
+        mapping_tuples = [
+            (mapping.attribute_name, mapping.value_column)
+            for mapping in mappings
+        ]
+        template_vars = {
+            "entity_table": entity_fullname,
+            "attr_table": attr_fullname,
+            "mappings": mapping_tuples,
+        }
+
+        ops = [
+            ("insert", load_template("eav_insert.mako")),
+            ("update", load_template("eav_update.mako")),
+            ("delete", load_template("eav_delete.mako")),
+        ]
+
+        for view_schema, view_fullname in [
+            (
+                ctx.schemaname,
+                f"{ctx.schemaname}.{ctx.tablename}",
+            ),
+            (
+                ctx.api_configuration.schema_name,
+                f"{ctx.api_configuration.schema_name}.{ctx.tablename}",
+            ),
+        ]:
+            register_view_triggers(
+                metadata=ctx.metadata,
+                view_schema=view_schema,
+                view_fullname=view_fullname,
+                tablename=ctx.tablename,
+                template_vars=template_vars,
+                ops=ops,
+                naming_defaults=_NAMING_DEFAULTS,
+                function_key="eav_function",
+                trigger_key="eav_trigger",
+            )

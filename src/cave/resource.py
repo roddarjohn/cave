@@ -1,8 +1,11 @@
 """API resource registration for PostgREST grant generation."""
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 from sqlalchemy import MetaData
+
+Grant = Literal["select", "insert", "update", "delete"]
 
 
 @dataclass
@@ -11,7 +14,7 @@ class APIResource:
 
     name: str
     schema: str = "api"
-    grants: list[str] = field(default_factory=lambda: ["select"])
+    grants: list[Grant] = field(default_factory=lambda: ["select"])
 
     @property
     def qualified_name(self) -> str:
