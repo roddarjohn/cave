@@ -85,6 +85,20 @@ Source of truth tables should be very very clear.
 - Figure out auth / OPA w/ RLS
 - Figure out approvals?
 - Figure out ledgers
+  - Should be declarative + diff!!
 - Permit / encourage declarative format of tables
 - Rework the configurations
 - Build plugin system that has hooks and customizes behavior
+- Figure out how to implement e.g. check constraints or nullable
+  constraints on all the types of dimensional tables
+- In theory this could be used within e.g. FastAPI or Flask
+
+- Try and upstream some stuff?
+
+- For EAV
+  - How do null values work?
+  - Check constraint should be num_nonnulls
+  - Only need to insert if it's a change
+
+- Figure out how to benchmark / do performance analysis on this
+- Allow loading a dynamic configuration and dynamic migrations
