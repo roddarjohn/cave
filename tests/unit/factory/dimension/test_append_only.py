@@ -3,11 +3,15 @@
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 
+from cave.errors import CaveValidationError
 from cave.factory.dimension.append_only import AppendOnlyDimensionFactory
-from cave.factory.dimension.types import (
-    APIResourceConfiguration,
+from cave.plugins.api import APIPlugin
+from cave.plugins.append_only import (
+    AppendOnlyTablePlugin,
+    AppendOnlyTriggerPlugin,
+    AppendOnlyViewPlugin,
 )
-from cave.factory.dimension.utils import CaveValidationError
+from cave.plugins.pk import SerialPKPlugin
 
 
 class TestAppendOnlyDimensionFactoryTables:
@@ -122,13 +126,18 @@ class TestAppendOnlyDimensionFactoryViews:
 
     def test_api_view_schema_respects_configuration(self):
         metadata = MetaData()
-        api_config = APIResourceConfiguration(schema_name="custom_api")
         AppendOnlyDimensionFactory(
             "product",
             "dim",
             metadata,
             [Column("name", String)],
-            api_configuration=api_config,
+            plugins=[
+                SerialPKPlugin(),
+                AppendOnlyTablePlugin(),
+                AppendOnlyViewPlugin(),
+                APIPlugin(schema="custom_api"),
+                AppendOnlyTriggerPlugin(),
+            ],
         )
         views = metadata.info["views"].views
         api_views = [v for v in views if v.schema == "custom_api"]

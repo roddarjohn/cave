@@ -15,15 +15,19 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql.expression import Label
 
-from cave.factory.dimension.eav import (
-    EAVDimensionFactory,
+from cave.errors import CaveValidationError
+from cave.factory.dimension.eav import EAVDimensionFactory
+from cave.plugins.api import APIPlugin
+from cave.plugins.eav import (
+    EAVTablePlugin,
+    EAVTriggerPlugin,
+    EAVViewPlugin,
     _EAVMapping,
     _needed_value_columns,
     _pivot_aggregate,
     _resolve_value_column,
 )
-from cave.factory.dimension.types import APIResourceConfiguration
-from cave.factory.dimension.utils import CaveValidationError
+from cave.plugins.pk import SerialPKPlugin
 
 # ---------------------------------------------------------------------------
 # _resolve_value_column
@@ -299,13 +303,18 @@ class TestEAVDimensionFactoryViews:
 
     def test_api_view_schema_respects_configuration(self):
         metadata = MetaData()
-        api_config = APIResourceConfiguration(schema_name="custom_api")
         EAVDimensionFactory(
             "product",
             "dim",
             metadata,
             [Column("name", String)],
-            api_configuration=api_config,
+            plugins=[
+                SerialPKPlugin(),
+                EAVTablePlugin(),
+                EAVViewPlugin(),
+                APIPlugin(schema="custom_api"),
+                EAVTriggerPlugin(),
+            ],
         )
         views = metadata.info["views"].views
         assert any(v.schema == "custom_api" for v in views)
