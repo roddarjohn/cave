@@ -126,3 +126,6 @@ Source of truth tables should be very very clear.
 - Allow loading a dynamic configuration and dynamic migrations
 
 - Is a transaction simply a dimensional object, that has some declarative configuration from it?
+
+- I don't think I need the different phases because ALEMBIC will take care of the ordering if needed
+  - And the PK needs to be taken care of by the singleton fw
