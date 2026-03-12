@@ -7,11 +7,6 @@ list.  All behaviour — primary keys, table layout, views, triggers, API
 exposure — is provided by plugins, so every part of it can be replaced,
 extended, or recomposed without touching the core.
 
-.. contents:: On this page
-   :local:
-   :depth: 2
-
-
 Core concepts
 -------------
 
