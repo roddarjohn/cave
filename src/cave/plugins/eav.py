@@ -327,7 +327,9 @@ class EAVTriggerPlugin(Plugin):
         template_vars = {
             "entity_table": entity_fullname,
             "attr_table": attr_fullname,
-            "mappings": [(m.attribute_name, m.value_column) for m in mappings],
+            "mappings": [
+                (m.attribute_name, m.value_column, m.nullable) for m in mappings
+            ],
         }
 
         ops = [
