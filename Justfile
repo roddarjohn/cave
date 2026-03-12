@@ -22,6 +22,11 @@ dev-test *args:
 coverage *args:
     uv run python -m slipcover --branch --source src/cave -m pytest {{args}}
 
+# Run coverage and write XML output (used by CI)
+coverage-ci *args:
+    uv run python -m slipcover --branch --xml --out coverage.xml \
+        --source src/cave -m pytest {{args}}
+
 # Build HTML docs (output in docs/_build/html)
 docs: _docs-setup
     uv run --group docs sphinx-build -b html docs docs/_build/html

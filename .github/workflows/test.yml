@@ -32,16 +32,34 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
-      - run: uv run tox
+      - uses: extractions/setup-just@v3
+      - run: just test
 
-      - name: Collect coverage (pg17 only)
-        if: matrix.postgres == '17'
-        run: |
-          uv run python -m slipcover --branch --xml --out coverage.xml \
-            --source src/cave -m pytest
-
+  coverage:
+    runs-on: ubuntu-latest
+    name: coverage
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: cave
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres@localhost/cave
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - uses: extractions/setup-just@v3
+      - run: uv sync --all-groups
+      - run: just coverage-ci
       - name: Upload coverage to Codecov
-        if: matrix.postgres == '17'
         uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
