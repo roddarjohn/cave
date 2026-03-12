@@ -66,6 +66,21 @@ Tests require a running PostgreSQL instance with `DATABASE_URL` set
 - All changes MUST be tested. If a behavior changed, a test should cover it.
 - Use `pytest-alembic` for migration testing.
 - Run `just dev-test` for fast feedback, `just test` before submitting.
+- Run `just coverage` to get per-file coverage figures via slipcover.
+
+**Using coverage to avoid regressions:** Before starting a change, run
+`just coverage` and note the coverage for the files you are about to
+modify. After making your change, run it again. If coverage on those
+files has dropped, you have likely introduced untested code paths and
+should add tests before submitting. Coverage is a signal, not a target
+— a line being covered does not mean it is correctly tested, but an
+uncovered line is a clear gap.
+
+Tests live in three directories that mirror `src/cave/`:
+- `tests/unit/` — pure Python, no DB fixtures available
+- `tests/integration/` — live DB tests; each test runs in a rolled-back
+  transaction so nothing persists after the suite
+- `tests/migrations/` — pytest-alembic migration round-trip tests
 
 ### Contribution checklist
 

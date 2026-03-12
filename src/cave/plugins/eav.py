@@ -54,6 +54,7 @@ class _EAVMapping:
     attribute_name: str
     value_column: str
     column_type: sa_types.TypeEngine
+    nullable: bool = True
 
 
 def _resolve_value_column(col: Column) -> tuple[str, sa_types.TypeEngine]:
@@ -72,6 +73,10 @@ def _build_eav_mappings(dimensions: list) -> list[_EAVMapping]:
                     attribute_name=dim.key,
                     value_column=value_col,
                     column_type=col_type,
+                    # dim.nullable is Optional[bool]; None means the Column
+                    # was declared without an explicit nullable argument,
+                    # which SQLAlchemy treats as nullable=True.
+                    nullable=dim.nullable is not False,
                 )
             )
     return mappings
