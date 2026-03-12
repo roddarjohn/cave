@@ -29,7 +29,7 @@ from sqlalchemy_declarative_extensions import View, register_view
 if TYPE_CHECKING:
     from cave.factory.context import FactoryContext
 
-from cave.plugin import Plugin
+from cave.plugin import Plugin, singleton
 from cave.utils.naming import resolve_name
 from cave.utils.query import compile_query
 from cave.utils.template import load_template
@@ -45,7 +45,6 @@ _NAMING_DEFAULTS = {
 }
 
 _PK_COL = "id"
-_STATE_MAPPINGS = "eav_mappings"
 
 
 @dataclass
@@ -137,20 +136,37 @@ def _build_pivot_query(
     )
 
 
+@singleton("__table__")
 class EAVTablePlugin(Plugin):
     """Create the entity and attribute tables for an EAV dimension.
 
-    Sets:
-        - ``ctx.tables["entity"]`` -- the entity root table.
-        - ``ctx.tables["attribute"]`` -- the typed attribute table.
-        - ``ctx.state["eav_mappings"]`` -- list of ``_EAVMapping``.
+    Args:
+        entity_key: Key in ``ctx.tables`` for the entity root table
+            (default ``"entity"``).
+        attribute_key: Key in ``ctx.tables`` for the attribute log
+            (default ``"attribute"``).
+        mappings_key: Key in ``ctx.state`` for the EAV mappings list,
+            shared with the view and trigger plugins
+            (default ``"eav_mappings"``).
+
     """
+
+    def __init__(
+        self,
+        entity_key: str = "entity",
+        attribute_key: str = "attribute",
+        mappings_key: str = "eav_mappings",
+    ) -> None:
+        """Store the context keys."""
+        self.entity_key = entity_key
+        self.attribute_key = attribute_key
+        self.mappings_key = mappings_key
 
     def create_tables(self, ctx: FactoryContext) -> None:
         """Create entity and attribute tables."""
         pk_col_name = ctx.pk_columns[0].key if ctx.pk_columns else _PK_COL
         mappings = _build_eav_mappings(ctx.dimensions)
-        ctx.state[_STATE_MAPPINGS] = mappings
+        ctx[self.mappings_key] = mappings
 
         entity_name = resolve_name(
             ctx.metadata,
@@ -169,7 +185,7 @@ class EAVTablePlugin(Plugin):
             ),
             schema=ctx.schemaname,
         )
-        ctx.tables["entity"] = entity_table
+        ctx[self.entity_key] = entity_table
 
         attr_name = resolve_name(
             ctx.metadata,
@@ -207,22 +223,42 @@ class EAVTablePlugin(Plugin):
             check,
             schema=ctx.schemaname,
         )
-        ctx.tables["attribute"] = attribute_table
+        ctx[self.attribute_key] = attribute_table
 
 
 class EAVViewPlugin(Plugin):
     """Create the pivot view for an EAV dimension.
 
-    Reads ``ctx.tables["entity"]``, ``ctx.tables["attribute"]``, and
-    ``ctx.state["eav_mappings"]``.  Sets ``ctx.tables["primary"]`` to
-    a view proxy for use by :class:`~cave.plugins.api.APIPlugin`.
+    Args:
+        entity_key: Key in ``ctx.tables`` for the entity root table
+            (default ``"entity"``).
+        attribute_key: Key in ``ctx.tables`` for the attribute log
+            (default ``"attribute"``).
+        mappings_key: Key in ``ctx.state`` for the EAV mappings list
+            (default ``"eav_mappings"``).
+        primary_key: Key in ``ctx.tables`` to store the view proxy
+            under (default ``"primary"``).
+
     """
 
+    def __init__(
+        self,
+        entity_key: str = "entity",
+        attribute_key: str = "attribute",
+        mappings_key: str = "eav_mappings",
+        primary_key: str = "primary",
+    ) -> None:
+        """Store the context keys."""
+        self.entity_key = entity_key
+        self.attribute_key = attribute_key
+        self.mappings_key = mappings_key
+        self.primary_key = primary_key
+
     def create_views(self, ctx: FactoryContext) -> None:
-        """Register the pivot view and set ctx.tables["primary"]."""
-        mappings: list[_EAVMapping] = ctx.state[_STATE_MAPPINGS]
-        entity_table = ctx.tables["entity"]
-        attribute_table = ctx.tables["attribute"]
+        """Register the pivot view and store the proxy in ctx.tables."""
+        mappings: list[_EAVMapping] = ctx[self.mappings_key]
+        entity_table = ctx[self.entity_key]
+        attribute_table = ctx[self.attribute_key]
         pk_col_name = ctx.pk_columns[0].key if ctx.pk_columns else _PK_COL
 
         view_sql = compile_query(
@@ -241,20 +277,45 @@ class EAVViewPlugin(Plugin):
             *[Column(m.attribute_name, m.column_type) for m in mappings],
             schema=ctx.schemaname,
         )
-        ctx.tables["primary"] = proxy
+        ctx[self.primary_key] = proxy
 
 
 class EAVTriggerPlugin(Plugin):
     """Register INSTEAD OF triggers for an EAV dimension.
 
-    Registers on the private pivot view and, if present, the API view.
+    Registers on the private pivot view and, if present, the view at
+    ``view_key``.
+
+    Args:
+        entity_key: Key in ``ctx.tables`` for the entity root table
+            (default ``"entity"``).
+        attribute_key: Key in ``ctx.tables`` for the attribute log
+            (default ``"attribute"``).
+        mappings_key: Key in ``ctx.state`` for the EAV mappings list
+            (default ``"eav_mappings"``).
+        view_key: Key in ``ctx.views`` for the additional trigger
+            target (default ``"api"``).  Skipped if absent.
+
     """
 
+    def __init__(
+        self,
+        entity_key: str = "entity",
+        attribute_key: str = "attribute",
+        mappings_key: str = "eav_mappings",
+        view_key: str = "api",
+    ) -> None:
+        """Store the context keys."""
+        self.entity_key = entity_key
+        self.attribute_key = attribute_key
+        self.mappings_key = mappings_key
+        self.view_key = view_key
+
     def create_triggers(self, ctx: FactoryContext) -> None:
-        """Register INSTEAD OF triggers on both views."""
-        mappings: list[_EAVMapping] = ctx.state[_STATE_MAPPINGS]
-        entity_table = ctx.tables["entity"]
-        attribute_table = ctx.tables["attribute"]
+        """Register INSTEAD OF triggers on the pivot view and API view."""
+        mappings: list[_EAVMapping] = ctx[self.mappings_key]
+        entity_table = ctx[self.entity_key]
+        attribute_table = ctx[self.attribute_key]
         entity_fullname = f"{ctx.schemaname}.{entity_table.name}"
         attr_fullname = f"{ctx.schemaname}.{attribute_table.name}"
 
@@ -273,8 +334,8 @@ class EAVTriggerPlugin(Plugin):
         views_to_trigger = [
             (ctx.schemaname, f"{ctx.schemaname}.{ctx.tablename}"),
         ]
-        if "api" in ctx.views:
-            api_view = ctx.views["api"]
+        if self.view_key in ctx:
+            api_view = ctx[self.view_key]
             api_schema = api_view.schema or "api"
             views_to_trigger.append(
                 (api_schema, f"{api_schema}.{ctx.tablename}")

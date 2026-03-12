@@ -9,9 +9,10 @@ from sqlalchemy import Column, Integer
 if TYPE_CHECKING:
     from cave.factory.context import FactoryContext
 
-from cave.plugin import Plugin
+from cave.plugin import Plugin, singleton
 
 
+@singleton("__pk__")
 class SerialPKPlugin(Plugin):
     """Provide an auto-increment integer primary key column.
 

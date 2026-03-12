@@ -10,7 +10,7 @@ from sqlalchemy import Column, Table
 if TYPE_CHECKING:
     from cave.factory.context import FactoryContext
 
-from cave.plugin import Plugin
+from cave.plugin import Plugin, singleton
 from cave.utils.template import load_template
 from cave.utils.trigger import register_view_triggers
 
@@ -31,16 +31,25 @@ def _dim_column_names(ctx: FactoryContext) -> list[str]:
     ]
 
 
+@singleton("__table__")
 class SimpleTablePlugin(Plugin):
     """Create a single backing table for a simple dimension.
 
     Combines ``ctx.pk_columns``, ``ctx.extra_columns``, and
-    ``ctx.dimensions`` into one table.  Sets
-    ``ctx.tables["primary"]`` to the created table.
+    ``ctx.dimensions`` into one table.
+
+    Args:
+        table_key: Key in ``ctx.tables`` to store the created table
+            under (default ``"primary"``).
+
     """
 
+    def __init__(self, table_key: str = "primary") -> None:
+        """Store the context key."""
+        self.table_key = table_key
+
     def create_tables(self, ctx: FactoryContext) -> None:
-        """Create the dimension table and set it as primary."""
+        """Create the dimension table."""
         table = Table(
             ctx.tablename,
             ctx.metadata,
@@ -49,20 +58,31 @@ class SimpleTablePlugin(Plugin):
             *ctx.dimensions,
             schema=ctx.schemaname,
         )
-        ctx.tables["primary"] = table
+        ctx[self.table_key] = table
 
 
 class SimpleTriggerPlugin(Plugin):
-    """Register INSERT/UPDATE/DELETE INSTEAD OF triggers on the API view.
+    """Register INSERT/UPDATE/DELETE INSTEAD OF triggers on a view.
 
-    Reads ``ctx.views["api"]`` for the target view and
-    ``ctx.tables["primary"]`` for the backing table.
+    Args:
+        table_key: Key in ``ctx.tables`` for the backing table
+            (default ``"primary"``).
+        view_key: Key in ``ctx.views`` for the trigger target
+            (default ``"api"``).
+
     """
 
+    def __init__(
+        self, table_key: str = "primary", view_key: str = "api"
+    ) -> None:
+        """Store the context keys."""
+        self.table_key = table_key
+        self.view_key = view_key
+
     def create_triggers(self, ctx: FactoryContext) -> None:
-        """Register INSTEAD OF triggers on the API view."""
-        api_view = ctx.views["api"]
-        primary = ctx.tables["primary"]
+        """Register INSTEAD OF triggers on the target view."""
+        api_view = ctx[self.view_key]
+        primary = ctx[self.table_key]
         base_fullname = f"{ctx.schemaname}.{primary.name}"
         dim_cols = _dim_column_names(ctx)
 

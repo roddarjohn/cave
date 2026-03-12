@@ -19,7 +19,7 @@ from sqlalchemy_declarative_extensions import View, register_view
 if TYPE_CHECKING:
     from cave.factory.context import FactoryContext
 
-from cave.plugin import Plugin
+from cave.plugin import Plugin, singleton
 from cave.utils.naming import resolve_name
 from cave.utils.query import compile_query
 from cave.utils.template import load_template
@@ -59,13 +59,26 @@ def _dim_column_names(ctx: FactoryContext) -> list[str]:
     return [col.key for col in ctx.dimensions if isinstance(col, Column)]
 
 
+@singleton("__table__")
 class AppendOnlyTablePlugin(Plugin):
     """Create the root and attributes tables for an append-only dimension.
 
-    Sets:
-        - ``ctx.tables["root_table"]`` -- the entity root table.
-        - ``ctx.tables["attributes"]`` -- the append-only attributes log.
+    Args:
+        root_key: Key in ``ctx.tables`` for the entity root table
+            (default ``"root_table"``).
+        attributes_key: Key in ``ctx.tables`` for the append-only
+            attributes log (default ``"attributes"``).
+
     """
+
+    def __init__(
+        self,
+        root_key: str = "root_table",
+        attributes_key: str = "attributes",
+    ) -> None:
+        """Store the context keys."""
+        self.root_key = root_key
+        self.attributes_key = attributes_key
 
     def create_tables(self, ctx: FactoryContext) -> None:
         """Create root and attributes tables."""
@@ -84,7 +97,7 @@ class AppendOnlyTablePlugin(Plugin):
             *ctx.dimensions,
             schema=ctx.schemaname,
         )
-        ctx.tables["attributes"] = attributes_table
+        ctx[self.attributes_key] = attributes_table
 
         root_name = _resolve_root_name(ctx)
         root_fk = f"{ctx.schemaname}.{attr_name}.{pk_col_name}"
@@ -103,24 +116,40 @@ class AppendOnlyTablePlugin(Plugin):
             ),
             schema=ctx.schemaname,
         )
-        ctx.tables["root_table"] = root_table
+        ctx[self.root_key] = root_table
 
 
 class AppendOnlyViewPlugin(Plugin):
     """Create the join view for an append-only dimension.
 
-    Reads ``ctx.tables["root_table"]`` and ``ctx.tables["attributes"]``
-    (set by :class:`AppendOnlyTablePlugin`).
+    Args:
+        root_key: Key in ``ctx.tables`` for the entity root table
+            (default ``"root_table"``).
+        attributes_key: Key in ``ctx.tables`` for the attributes log
+            (default ``"attributes"``).
+        primary_key: Key in ``ctx.tables`` to store the view proxy
+            under, for downstream plugins such as
+            :class:`~cave.plugins.api.APIPlugin` (default
+            ``"primary"``).
 
-    Sets ``ctx.tables["primary"]`` to a view proxy table so that
-    :class:`~cave.plugins.api.APIPlugin` can build the API SELECT.
     """
 
+    def __init__(
+        self,
+        root_key: str = "root_table",
+        attributes_key: str = "attributes",
+        primary_key: str = "primary",
+    ) -> None:
+        """Store the context keys."""
+        self.root_key = root_key
+        self.attributes_key = attributes_key
+        self.primary_key = primary_key
+
     def create_views(self, ctx: FactoryContext) -> None:
-        """Register the join view and set ctx.tables["primary"]."""
+        """Register the join view and store the proxy in ctx.tables."""
         pk_col_name = ctx.pk_columns[0].key if ctx.pk_columns else _PK_COL
-        root_table = ctx.tables["root_table"]
-        attribute_table = ctx.tables["attributes"]
+        root_table = ctx[self.root_key]
+        attribute_table = ctx[self.attributes_key]
 
         view_query = (
             select(
@@ -164,21 +193,42 @@ class AppendOnlyViewPlugin(Plugin):
             ],
             schema=ctx.schemaname,
         )
-        ctx.tables["primary"] = proxy
+        ctx[self.primary_key] = proxy
 
 
 class AppendOnlyTriggerPlugin(Plugin):
     """Register INSTEAD OF triggers for an append-only dimension.
 
-    Registers identical trigger logic on both the private join view
-    (``{schemaname}.{tablename}``) and the API view
-    (``ctx.views["api"]``), if the API view exists.
+    Registers identical trigger logic on the private join view and,
+    if present, the view stored at ``view_key``.
+
+    Args:
+        root_key: Key in ``ctx.tables`` for the entity root table
+            (default ``"root_table"``).
+        attributes_key: Key in ``ctx.tables`` for the attributes log
+            (default ``"attributes"``).
+        view_key: Key in ``ctx.views`` for the additional trigger
+            target, e.g. the API view (default ``"api"``).  If the
+            key is absent from ``ctx.views`` no second trigger is
+            registered.
+
     """
 
+    def __init__(
+        self,
+        root_key: str = "root_table",
+        attributes_key: str = "attributes",
+        view_key: str = "api",
+    ) -> None:
+        """Store the context keys."""
+        self.root_key = root_key
+        self.attributes_key = attributes_key
+        self.view_key = view_key
+
     def create_triggers(self, ctx: FactoryContext) -> None:
-        """Register INSTEAD OF triggers on both views."""
-        root_table = ctx.tables["root_table"]
-        attribute_table = ctx.tables["attributes"]
+        """Register INSTEAD OF triggers on the join view and API view."""
+        root_table = ctx[self.root_key]
+        attribute_table = ctx[self.attributes_key]
         root_fullname = f"{ctx.schemaname}.{root_table.name}"
         attr_fullname = f"{ctx.schemaname}.{attribute_table.name}"
 
@@ -200,8 +250,8 @@ class AppendOnlyTriggerPlugin(Plugin):
         views_to_trigger = [
             (ctx.schemaname, f"{ctx.schemaname}.{ctx.tablename}"),
         ]
-        if "api" in ctx.views:
-            api_view = ctx.views["api"]
+        if self.view_key in ctx:
+            api_view = ctx[self.view_key]
             api_schema = api_view.schema or "api"
             views_to_trigger.append(
                 (api_schema, f"{api_schema}.{ctx.tablename}")

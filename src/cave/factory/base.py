@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
+from cave.errors import CaveValidationError
 from cave.factory.context import FactoryContext
 from cave.validator import validate_schema_items
 
@@ -38,6 +39,33 @@ def _resolve_plugins(
     factory_plugins = plugins if plugins is not None else list(defaults)
     local = extra_plugins or []
     return global_plugins + factory_plugins + local
+
+
+def _validate_singleton_groups(plugins: list[Plugin]) -> None:
+    """Raise if two plugins share the same singleton group.
+
+    Args:
+        plugins: Resolved plugin list to inspect.
+
+    Raises:
+        CaveValidationError: When two plugins declare the same
+            non-None ``singleton_group``.
+
+    """
+    seen: dict[str, str] = {}
+    for plugin in plugins:
+        group = plugin.singleton_group
+        if group is None:
+            continue
+        name = type(plugin).__name__
+        if group in seen:
+            msg = (
+                f"Plugin group {group!r} allows only one plugin, "
+                f"but found both {seen[group]} and {name}. "
+                f"Remove one from the plugin list."
+            )
+            raise CaveValidationError(msg)
+        seen[group] = name
 
 
 class DimensionFactory:
@@ -91,6 +119,7 @@ class DimensionFactory:
         resolved = _resolve_plugins(
             cave, plugins, extra_plugins, self.DEFAULT_PLUGINS
         )
+        _validate_singleton_groups(resolved)
 
         ctx = FactoryContext(
             tablename=tablename,
