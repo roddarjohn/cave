@@ -24,7 +24,7 @@ anon = Role("anon")
 def register_roles(metadata: MetaData) -> None:
     """Register PostgREST roles and grants on *metadata*.
 
-    Reads :class:`~cave.models.api.APIResource` objects from the metadata
+    Reads :class:`~cave.resource.APIResource` objects from the metadata
     and generates per-resource grants.
     """
     metadata.info["roles"] = Roles(ignore_unspecified=True).are(

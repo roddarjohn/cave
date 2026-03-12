@@ -13,6 +13,7 @@ class EAVDimensionFactory(DimensionFactory):
     """Create an EAV (Entity-Attribute-Value) dimension.
 
     Default plugins:
+
     1. :class:`~cave.plugins.pk.SerialPKPlugin` -- auto-increment PK.
     2. :class:`~cave.plugins.eav.EAVTablePlugin` -- entity + attribute tables.
     3. :class:`~cave.plugins.eav.EAVViewPlugin` -- pivot view.

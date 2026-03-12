@@ -13,6 +13,7 @@ class SimpleDimensionFactory(DimensionFactory):
     """Create a simple dimension: one table, one API view, CRUD triggers.
 
     Default plugins:
+
     1. :class:`~cave.plugins.pk.SerialPKPlugin` -- auto-increment PK.
     2. :class:`~cave.plugins.simple.SimpleTablePlugin` -- backing table.
     3. :class:`~cave.plugins.api.APIPlugin` -- API view + resource.
