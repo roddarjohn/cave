@@ -1,0 +1,229 @@
+"""Unit tests for EAV{Table,View,Trigger}Plugin in isolation."""
+
+from sqlalchemy import Boolean, Column, Integer, String, Table
+
+from cave.plugins.eav import (
+    EAVTablePlugin,
+    EAVTriggerPlugin,
+    EAVViewPlugin,
+)
+from tests.unit.plugins.conftest import make_ctx, make_view
+
+
+class TestEAVTablePlugin:
+    def test_entity_table_stored_under_default_key(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx()
+        plugin.create_tables(ctx)
+        assert isinstance(ctx["entity"], Table)
+
+    def test_attribute_table_stored_under_default_key(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx()
+        plugin.create_tables(ctx)
+        assert isinstance(ctx["attribute"], Table)
+
+    def test_mappings_stored_under_default_key(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx()
+        plugin.create_tables(ctx)
+        mappings = ctx["eav_mappings"]
+        assert isinstance(mappings, list)
+        assert len(mappings) == 1  # one dimension column ("name")
+
+    def test_entity_table_name(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx()
+        plugin.create_tables(ctx)
+        assert ctx["entity"].name == "product_entity"
+
+    def test_attribute_table_name(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx()
+        plugin.create_tables(ctx)
+        assert ctx["attribute"].name == "product_attribute"
+
+    def test_entity_table_has_pk(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx()
+        plugin.create_tables(ctx)
+        entity = ctx["entity"]
+        assert any(c.primary_key for c in entity.columns)
+
+    def test_attribute_table_has_entity_fk(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx()
+        plugin.create_tables(ctx)
+        attr = ctx["attribute"]
+        fk_targets = {fk.column.table.name for fk in attr.foreign_keys}
+        assert "product_entity" in fk_targets
+
+    def test_attribute_table_has_value_column_for_string(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx(dimensions=[Column("label", String)])
+        plugin.create_tables(ctx)
+        attr = ctx["attribute"]
+        assert "string_value" in {c.name for c in attr.columns}
+
+    def test_attribute_table_has_value_column_for_integer(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx(dimensions=[Column("count", Integer)])
+        plugin.create_tables(ctx)
+        attr = ctx["attribute"]
+        assert "integer_value" in {c.name for c in attr.columns}
+
+    def test_mapping_nullable_defaults_true(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx(dimensions=[Column("name", String)])
+        plugin.create_tables(ctx)
+        mapping = ctx["eav_mappings"][0]
+        assert mapping.nullable is True
+
+    def test_mapping_nullable_false_when_column_not_nullable(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx(dimensions=[Column("name", String, nullable=False)])
+        plugin.create_tables(ctx)
+        mapping = ctx["eav_mappings"][0]
+        assert mapping.nullable is False
+
+    def test_custom_keys(self):
+        plugin = EAVTablePlugin(
+            entity_key="e", attribute_key="a", mappings_key="m"
+        )
+        ctx = make_ctx()
+        plugin.create_tables(ctx)
+        assert "e" in ctx
+        assert "a" in ctx
+        assert "m" in ctx
+
+    def test_singleton_group_is_table(self):
+        assert EAVTablePlugin.singleton_group == "__table__"
+
+
+class TestEAVViewPlugin:
+    def _ctx_with_tables(self):
+        plugin = EAVTablePlugin()
+        ctx = make_ctx()
+        plugin.create_tables(ctx)
+        return ctx
+
+    def test_pivot_view_registered(self):
+        plugin = EAVViewPlugin()
+        ctx = self._ctx_with_tables()
+        plugin.create_views(ctx)
+        views = ctx.metadata.info.get("views")
+        assert views is not None
+
+    def test_pivot_view_in_dim_schema(self):
+        plugin = EAVViewPlugin()
+        ctx = self._ctx_with_tables()
+        plugin.create_views(ctx)
+        views = ctx.metadata.info["views"].views
+        assert any(v.schema == "dim" and v.name == "product" for v in views)
+
+    def test_proxy_stored_under_primary_key(self):
+        plugin = EAVViewPlugin()
+        ctx = self._ctx_with_tables()
+        plugin.create_views(ctx)
+        assert isinstance(ctx["primary"], Table)
+
+    def test_proxy_has_mapped_columns(self):
+        plugin = EAVViewPlugin()
+        ctx = make_ctx(
+            dimensions=[Column("name", String), Column("age", Integer)]
+        )
+        EAVTablePlugin().create_tables(ctx)
+        plugin.create_views(ctx)
+        proxy = ctx["primary"]
+        col_names = {c.name for c in proxy.columns}
+        assert "name" in col_names
+        assert "age" in col_names
+
+    def test_boolean_column_appears_in_proxy(self):
+        plugin = EAVViewPlugin()
+        ctx = make_ctx(dimensions=[Column("active", Boolean)])
+        EAVTablePlugin().create_tables(ctx)
+        plugin.create_views(ctx)
+        proxy = ctx["primary"]
+        assert "active" in {c.name for c in proxy.columns}
+
+    def test_pivot_view_definition_references_entity_table(self):
+        plugin = EAVViewPlugin()
+        ctx = self._ctx_with_tables()
+        plugin.create_views(ctx)
+        views = ctx.metadata.info["views"].views
+        view = next(v for v in views if v.schema == "dim")
+        assert "product_entity" in view.definition
+
+    def test_custom_keys(self):
+        table_plugin = EAVTablePlugin(
+            entity_key="e", attribute_key="a", mappings_key="m"
+        )
+        ctx = make_ctx()
+        table_plugin.create_tables(ctx)
+        view_plugin = EAVViewPlugin(
+            entity_key="e", attribute_key="a", mappings_key="m", primary_key="p"
+        )
+        view_plugin.create_views(ctx)
+        assert "p" in ctx
+
+
+class TestEAVTriggerPlugin:
+    def _ctx_with_tables_and_view(self, view_key: str = "api"):
+        ctx = make_ctx()
+        EAVTablePlugin().create_tables(ctx)
+        EAVViewPlugin().create_views(ctx)
+        ctx[view_key] = make_view("product", "api")
+        return ctx
+
+    def test_registers_functions_for_both_views(self):
+        plugin = EAVTriggerPlugin()
+        ctx = self._ctx_with_tables_and_view()
+        plugin.create_triggers(ctx)
+        functions = ctx.metadata.info.get("functions")
+        assert functions is not None
+        assert len(functions.functions) == 6  # dim + api views × 3 ops
+
+    def test_registers_triggers_for_both_views(self):
+        plugin = EAVTriggerPlugin()
+        ctx = self._ctx_with_tables_and_view()
+        plugin.create_triggers(ctx)
+        assert len(ctx.metadata.info["triggers"].triggers) == 6
+
+    def test_skips_api_view_when_key_absent(self):
+        plugin = EAVTriggerPlugin(view_key="nonexistent")
+        ctx = make_ctx()
+        EAVTablePlugin().create_tables(ctx)
+        EAVViewPlugin().create_views(ctx)
+        plugin.create_triggers(ctx)
+        assert len(ctx.metadata.info["functions"].functions) == 3
+
+    def test_nullable_false_mapping_rendered_in_function(self):
+        """Insert function body should raise for non-nullable attributes."""
+        plugin = EAVTriggerPlugin()
+        ctx = make_ctx(dimensions=[Column("sku", String, nullable=False)])
+        EAVTablePlugin().create_tables(ctx)
+        EAVViewPlugin().create_views(ctx)
+        ctx["api"] = make_view("product", "api")
+        plugin.create_triggers(ctx)
+        fns = ctx.metadata.info["functions"].functions
+        insert_fn = next(
+            f for f in fns if "insert" in f.name and "dim" in f.name
+        )
+        assert "RAISE EXCEPTION" in insert_fn.definition
+
+    def test_custom_keys(self):
+        table_plugin = EAVTablePlugin(
+            entity_key="e", attribute_key="a", mappings_key="m"
+        )
+        ctx = make_ctx()
+        table_plugin.create_tables(ctx)
+        EAVViewPlugin(
+            entity_key="e", attribute_key="a", mappings_key="m"
+        ).create_views(ctx)
+        ctx["api"] = make_view("product", "api")
+        trigger_plugin = EAVTriggerPlugin(
+            entity_key="e", attribute_key="a", mappings_key="m"
+        )
+        trigger_plugin.create_triggers(ctx)
+        assert len(ctx.metadata.info["functions"].functions) == 6
