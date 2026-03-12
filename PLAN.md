@@ -114,9 +114,13 @@ Source of truth tables should be very very clear.
 - Try and upstream some stuff?
 
 - For EAV
-  - How do null values work?
-  - Check constraint should be num_nonnulls
-  - Only need to insert if it's a change
+  - [fixing] How do null values work?
+  - [fixing] Check constraint should be num_nonnulls
+  - [fixing] Only need to insert if it's a change
+
+- Tests
+
+- Indices??
 
 - Figure out how to benchmark / do performance analysis on this
 - Allow loading a dynamic configuration and dynamic migrations

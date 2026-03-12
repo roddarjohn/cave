@@ -44,6 +44,26 @@ Running tests
 
 cave uses `pytest <https://docs.pytest.org>`_ for testing.
 
+Tests are organised into three directories that mirror the source tree under
+``src/cave/``:
+
+``tests/unit/``
+    Pure Python tests with no database dependency.  These run instantly and
+    cover things like factory configuration logic and template rendering.
+    Fixtures that require a live database are intentionally unavailable here —
+    pytest will error if a unit test accidentally references one.
+
+``tests/integration/``
+    Tests that exercise real PL/pgSQL behaviour against a live PostgreSQL
+    instance.  Each test runs inside a transaction that is rolled back on
+    teardown, so **nothing is left in the database** after the suite finishes.
+    These tests require ``DATABASE_URL`` to be set; they skip automatically
+    when it is absent.
+
+``tests/migrations/``
+    `pytest-alembic <https://pytest-alembic.readthedocs.io>`_ tests that
+    verify the migration history is consistent and round-trips cleanly.
+
 For fast feedback during development, run pytest directly::
 
     just dev-test
@@ -55,9 +75,32 @@ matching what CI does)::
 
 Both commands pass arguments through to pytest::
 
-    just dev-test tests/test_cli.py
+    just dev-test tests/unit
+    just dev-test tests/integration
     just dev-test -k test_shoot
-    just test tests/test_cli.py
+    just test tests/unit
+
+.. note::
+
+   Integration tests require a PostgreSQL instance.  Set ``DATABASE_URL``
+   before running them, for example::
+
+       DATABASE_URL=postgresql+psycopg://postgres@localhost/cave just dev-test tests/integration
+
+Coverage
+--------
+
+cave uses `slipcover <https://github.com/plasma-umass/slipcover>`_ for
+coverage reporting::
+
+    just coverage
+
+This runs the full pytest suite under slipcover and prints a per-file
+coverage table to the terminal.  Pass any pytest arguments to narrow the
+scope::
+
+    just coverage tests/unit
+    just coverage tests/integration
 
 Linting and formatting
 -----------------------

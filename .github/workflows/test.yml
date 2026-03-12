@@ -33,3 +33,16 @@ jobs:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
       - run: uv run tox
+
+      - name: Collect coverage (pg17 only)
+        if: matrix.postgres == '17'
+        run: |
+          uv run python -m slipcover --branch --xml --out coverage.xml \
+            --source src/cave -m pytest
+
+      - name: Upload coverage to Codecov
+        if: matrix.postgres == '17'
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}

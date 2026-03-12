@@ -28,6 +28,7 @@ dev = [
   "pytest>=8",
   "pytest-alembic>=0.12.1",
   "python-dotenv>=1.2.2",
+  "slipcover>=1.0.17",
   "sqlalchemy>=2.0.48",
   "tox>=4.49.1",
   "tox-uv>=1.33.2",
@@ -75,6 +76,7 @@ ignore = [
 ]
 "tests/**" = [
   "S101", # assert is fine in tests
+  "S608", # f-string SQL in tests uses controlled schema names, not user input
   "ANN",  # no annotations required in tests
   "D",    # no docstrings required in tests
 ]

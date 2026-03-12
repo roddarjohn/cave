@@ -18,6 +18,10 @@ test *args:
 dev-test *args:
     uv run pytest {{args}}
 
+# Run tests with slipcover coverage report (branch + line coverage)
+coverage *args:
+    uv run python -m slipcover --branch --source src/cave -m pytest {{args}}
+
 # Build HTML docs (output in docs/_build/html)
 docs: _docs-setup
     uv run --group docs sphinx-build -b html docs docs/_build/html

@@ -117,6 +117,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-alembic" },
     { name = "python-dotenv" },
+    { name = "slipcover" },
     { name = "sqlalchemy" },
     { name = "tox" },
     { name = "tox-uv" },
@@ -148,6 +149,7 @@ dev = [
     { name = "pytest", specifier = ">=8" },
     { name = "pytest-alembic", specifier = ">=0.12.1" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "slipcover", specifier = ">=1.0.17" },
     { name = "sqlalchemy", specifier = ">=2.0.48" },
     { name = "tox", specifier = ">=4.49.1" },
     { name = "tox-uv", specifier = ">=1.33.2" },
@@ -833,6 +835,22 @@ wheels = [
 ]
 
 [[package]]
+name = "slipcover"
+version = "1.0.17"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tabulate" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/87/bd/e53b1cd649299f3bcfb77674942331de5f8a3e1de54266c04a0298d0ff55/slipcover-1.0.17.tar.gz", hash = "sha256:c94fb8f587e010773b0977e19aaca03767200d44a17ad48424638e93022582ca", size = 58664, upload-time = "2025-07-23T17:25:06.412Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/26/4e/8361d79ec30e2f05da25aedb297e0d8d5fbb7ff0b376c7765bd9f0ef138c/slipcover-1.0.17-cp310-abi3-macosx_13_0_universal2.whl", hash = "sha256:7ad17d58f9ee843471d2fa0a8e5f104a6f6d861f77ecac977d45c411c4297814", size = 46593, upload-time = "2025-07-23T17:27:29.969Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/e0/5bb5e0c2325fc45a2fef42ea74509d980e09463be4071855db441238b5db/slipcover-1.0.17-cp310-abi3-macosx_14_0_universal2.whl", hash = "sha256:9ac11a3fab59aa93ab011d5865fb63cfb3965c908cb67cc4189678151189ce7d", size = 46069, upload-time = "2025-07-23T17:26:57.098Z" },
+    { url = "https://files.pythonhosted.org/packages/60/01/3e3bc8381fc24f97df4443557a0dc1f0c2349eb17d98d1c5148606dc0019/slipcover-1.0.17-cp310-abi3-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:a76466654d26e916e425d31f35773426ef25dd1c4ea13d12f51ec58ca36c5246", size = 52999, upload-time = "2025-07-23T17:25:28.263Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/dc/340d871a312630a1d54e8602310df4214f7726635ad9c097c0631271666f/slipcover-1.0.17-cp310-abi3-win_amd64.whl", hash = "sha256:ccd60c6be5eb9d77b170b405cebe267b793a0001e558147d7aeb8550efabd784", size = 89606, upload-time = "2025-07-23T17:25:53.065Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/32/8635acbd422643d0b646a73aa77df8eaf2d7de0998b3e0de36fc34f4fca0/slipcover-1.0.17-py312-none-any.whl", hash = "sha256:d7b8924c44870dfdb5137f115a62494283116ff5ab16f6c375a26d78aabf5e4f", size = 35701, upload-time = "2025-07-23T17:25:05.271Z" },
+]
+
+[[package]]
 name = "snowballstemmer"
 version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1054,6 +1072,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c4/68/79977123bb7be889ad680d79a40f339082c1978b5cfcf62c2d8d196873ac/starlette-0.52.1.tar.gz", hash = "sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933", size = 2653702, upload-time = "2026-01-18T13:34:11.062Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74", size = 74272, upload-time = "2026-01-18T13:34:09.188Z" },
+]
+
+[[package]]
+name = "tabulate"
+version = "0.10.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/46/58/8c37dea7bbf769b20d58e7ace7e5edfe65b849442b00ffcdd56be88697c6/tabulate-0.10.0.tar.gz", hash = "sha256:e2cfde8f79420f6deeffdeda9aaec3b6bc5abce947655d17ac662b126e48a60d", size = 91754, upload-time = "2026-03-04T18:55:34.402Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl", hash = "sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3", size = 39814, upload-time = "2026-03-04T18:55:31.284Z" },
 ]
 
 [[package]]
