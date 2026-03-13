@@ -134,27 +134,27 @@ class TestLedgerTriggerPlugin:
         ctx[view_key] = make_view("product", "api")
         return ctx
 
-    def test_registers_one_function(self):
+    def test_registers_three_functions(self):
         plugin = LedgerTriggerPlugin()
         ctx = self._ctx_with_table_and_view()
         plugin.run(ctx)
         functions = ctx.metadata.info.get("functions")
         assert functions is not None
-        assert len(functions.functions) == 1
+        assert len(functions.functions) == 3
 
-    def test_registers_one_trigger(self):
+    def test_registers_three_triggers(self):
         plugin = LedgerTriggerPlugin()
         ctx = self._ctx_with_table_and_view()
         plugin.run(ctx)
         triggers = ctx.metadata.info.get("triggers")
         assert triggers is not None
-        assert len(triggers.triggers) == 1
+        assert len(triggers.triggers) == 3
 
     def test_custom_table_key_and_view_key(self):
         plugin = LedgerTriggerPlugin(table_key="t", view_key="v")
         ctx = self._ctx_with_table_and_view(table_key="t", view_key="v")
         plugin.run(ctx)
-        assert len(ctx.metadata.info["functions"].functions) == 1
+        assert len(ctx.metadata.info["functions"].functions) == 3
 
     def test_missing_view_key_raises(self):
         plugin = LedgerTriggerPlugin(view_key="nonexistent")

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import InternalError, ProgrammingError
+from sqlalchemy.exc import ProgrammingError
 
 from pgcraft.utils.template import load_template
 
@@ -72,7 +72,13 @@ def _setup_ledger(
     if extra_cols:
         trigger_cols.extend(c.strip().split()[0] for c in extra_cols.split(","))
     cols_str = ", ".join(trigger_cols)
-    new_cols_str = ", ".join(f"NEW.{c}" for c in trigger_cols)
+    new_col_exprs = []
+    for c in trigger_cols:
+        if c == "entry_id":
+            new_col_exprs.append(f"COALESCE(NEW.{c}, gen_random_uuid())")
+        else:
+            new_col_exprs.append(f"NEW.{c}")
+    new_cols_str = ", ".join(new_col_exprs)
 
     insert_body = _render_ledger_insert(
         base_table=base_table,
@@ -94,6 +100,26 @@ def _setup_ledger(
         EXECUTE FUNCTION {schema}.{tablename}_insert()
     """)
     )
+
+    # Block UPDATE and DELETE to enforce immutability.
+    for op in ("update", "delete"):
+        conn.execute(
+            text(f"""
+            CREATE FUNCTION {schema}.{tablename}_{op}()
+            RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+            RAISE EXCEPTION 'cannot {op} immutable ledger entries';
+            END; $$
+        """)
+        )
+        conn.execute(
+            text(f"""
+            CREATE TRIGGER {tablename}_{op}
+            INSTEAD OF {op.upper()} ON {api_view}
+            FOR EACH ROW
+            EXECUTE FUNCTION {schema}.{tablename}_{op}()
+        """)
+        )
 
 
 @pytest.fixture
@@ -309,7 +335,10 @@ def _setup_double_entry_ledger(conn, schema, tablename):
     insert_body = _render_ledger_insert(
         base_table=base_table,
         cols="entry_id, value, direction, account",
-        new_cols="NEW.entry_id, NEW.value, NEW.direction, NEW.account",
+        new_cols=(
+            "COALESCE(NEW.entry_id, gen_random_uuid()),"
+            " NEW.value, NEW.direction, NEW.account"
+        ),
     )
     conn.execute(
         text(f"""
@@ -379,7 +408,7 @@ class TestDoubleEntryLedger:
     def test_unbalanced_entry_raises(self, double_entry_ledger):
         conn, schema = double_entry_ledger
         eid = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
-        with pytest.raises(InternalError, match="double-entry violation"):
+        with pytest.raises(ProgrammingError, match="double-entry violation"):
             conn.execute(
                 text(
                     f"INSERT INTO {schema}.journal"
@@ -393,7 +422,7 @@ class TestDoubleEntryLedger:
     def test_single_debit_without_credit_raises(self, double_entry_ledger):
         conn, schema = double_entry_ledger
         eid = "cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa"
-        with pytest.raises(InternalError, match="double-entry violation"):
+        with pytest.raises(ProgrammingError, match="double-entry violation"):
             conn.execute(
                 text(
                     f"INSERT INTO {schema}.journal"

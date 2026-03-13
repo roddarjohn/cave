@@ -141,7 +141,12 @@ class LedgerTriggerPlugin(Plugin):
         self.view_key = view_key
 
     def run(self, ctx: FactoryContext) -> None:
-        """Register INSTEAD OF INSERT trigger on the API view."""
+        """Register INSTEAD OF triggers on the API view.
+
+        Registers INSERT (routes to backing table), UPDATE
+        (raises error), and DELETE (raises error) triggers to
+        enforce append-only semantics.
+        """
         api_view = ctx[self.view_key]
         primary = ctx[self.table_key]
         base_fullname = f"{ctx.schemaname}.{primary.name}"
@@ -150,23 +155,41 @@ class LedgerTriggerPlugin(Plugin):
 
         # Include entry_id and value alongside dimension columns.
         all_cols = [entry_id_col.name, "value", *dim_cols]
+        new_col_exprs = []
+        for c in all_cols:
+            if c == entry_id_col.name:
+                default = entry_id_col.server_default.arg.text
+                new_col_exprs.append(f"COALESCE(NEW.{c}, {default})")
+            else:
+                new_col_exprs.append(f"NEW.{c}")
+
+        api_schema = api_view.schema or "api"
+        view_fullname = f"{api_schema}.{ctx.tablename}"
         template_vars = {
             "base_table": base_fullname,
             "cols": ", ".join(all_cols),
-            "new_cols": ", ".join(f"NEW.{c}" for c in all_cols),
+            "new_cols": ", ".join(new_col_exprs),
+            "view": view_fullname,
         }
 
-        api_schema = api_view.schema or "api"
         register_view_triggers(
             metadata=ctx.metadata,
             view_schema=api_schema,
-            view_fullname=f"{api_schema}.{ctx.tablename}",
+            view_fullname=view_fullname,
             tablename=ctx.tablename,
             template_vars=template_vars,
             ops=[
                 (
                     "insert",
                     load_template(_TEMPLATES / "insert.mako"),
+                ),
+                (
+                    "update",
+                    load_template(_TEMPLATES / "reject_update.mako"),
+                ),
+                (
+                    "delete",
+                    load_template(_TEMPLATES / "reject_delete.mako"),
                 ),
             ],
             naming_defaults=_NAMING_DEFAULTS,
