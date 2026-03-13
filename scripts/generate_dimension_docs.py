@@ -235,8 +235,8 @@ def _schema_lines(url: str, tables: list[dict]) -> list[str]:
     """RST lines showing ``\\d`` output for each table."""  # noqa: D301
     parts: list[str] = []
     for t in tables:
-        output = _psql(url, rf"\d {t['fullname']}")
-        block = rf"=# \d {t['fullname']}" + "\n" + output
+        output = _psql(url, f"\\d {t['fullname']}")
+        block = f"=# \\d {t['fullname']}\n{output}"
         parts.append(_directive("code-block", block, argument="text"))
         parts.append("")
     return parts
