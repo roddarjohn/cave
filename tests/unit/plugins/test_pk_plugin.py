@@ -1,10 +1,11 @@
-"""Unit tests for SerialPKPlugin in isolation."""
+"""Unit tests for PK plugins in isolation."""
 
 from sqlalchemy import Integer, MetaData
+from sqlalchemy.dialects.postgresql import UUID
 
 from pgcraft.columns import PrimaryKeyColumns
 from pgcraft.factory.context import FactoryContext
-from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.pk import SerialPKPlugin, UUIDV4PKPlugin
 
 
 def _bare_ctx() -> FactoryContext:
@@ -60,6 +61,60 @@ class TestSerialPKPlugin:
 
     def test_len_is_one(self):
         plugin = SerialPKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        assert len(ctx["pk_columns"]) == 1
+
+
+class TestUUIDV4PKPlugin:
+    def test_run_stores_primary_key_columns(self):
+        plugin = UUIDV4PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        assert isinstance(ctx["pk_columns"], PrimaryKeyColumns)
+
+    def test_default_column_name_is_id(self):
+        plugin = UUIDV4PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        assert ctx["pk_columns"].first_key == "id"
+
+    def test_custom_column_name(self):
+        plugin = UUIDV4PKPlugin(column_name="entity_id")
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        assert ctx["pk_columns"].first_key == "entity_id"
+
+    def test_column_type_is_uuid(self):
+        plugin = UUIDV4PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        col = ctx["pk_columns"].first
+        assert isinstance(col.type, UUID)
+
+    def test_column_is_primary_key(self):
+        plugin = UUIDV4PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        col = ctx["pk_columns"].first
+        assert col.primary_key is True
+
+    def test_column_has_server_default(self):
+        plugin = UUIDV4PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        col = ctx["pk_columns"].first
+        assert col.server_default is not None
+
+    def test_singleton_group_is_pk(self):
+        assert UUIDV4PKPlugin.singleton_group == "__pk__"
+
+    def test_produces_pk_columns(self):
+        plugin = UUIDV4PKPlugin()
+        assert plugin.resolved_produces() == ["pk_columns"]
+
+    def test_len_is_one(self):
+        plugin = UUIDV4PKPlugin()
         ctx = _bare_ctx()
         plugin.run(ctx)
         assert len(ctx["pk_columns"]) == 1
