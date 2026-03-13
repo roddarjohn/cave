@@ -1,6 +1,7 @@
 from sqlalchemy import (
     Boolean,
     Column,
+    Computed,
     Float,
     ForeignKey,
     Integer,
@@ -8,6 +9,7 @@ from sqlalchemy import (
     String,
 )
 
+from cave.check import CaveCheck
 from cave.declarative import register
 from cave.factory.dimension import (
     AppendOnlyDimensionResourceFactory,
@@ -15,6 +17,7 @@ from cave.factory.dimension import (
     SimpleDimensionResourceFactory,
 )
 from cave.plugins.api import APIPlugin
+from cave.plugins.check import TableCheckPlugin, TriggerCheckPlugin
 from cave.plugins.pk import SerialPKPlugin
 from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 from cave.utils.naming_convention import build_naming_convention
@@ -30,11 +33,17 @@ SimpleDimensionResourceFactory(
     schemaname="public",
     metadata=metadata,
     schema_items=[
-        Column("name", Integer),
+        Column("name", String),
+        Column("price", Integer),
+        Column("qty", Integer),
+        Column("total", Integer, Computed("price * qty")),
+        CaveCheck("{price} > 0", name="positive_price"),
+        CaveCheck("{qty} >= 0", name="nonneg_qty"),
     ],
     plugins=[
         SerialPKPlugin(),
         SimpleTablePlugin(),
+        TableCheckPlugin(),
         APIPlugin(grants=["select", "insert", "update", "delete"]),
         SimpleTriggerPlugin(),
     ],
@@ -59,7 +68,9 @@ EAVDimensionResourceFactory(
         Column("weight", Float),
         Column("is_active", Boolean),
         Column("price", Integer),
+        CaveCheck("{price} > 0", name="positive_product_price"),
     ],
+    extra_plugins=[TriggerCheckPlugin()],
 )
 
 # -- Declarative models -------------------------------------------------
@@ -70,6 +81,7 @@ EAVDimensionResourceFactory(
     plugins=[
         SerialPKPlugin(),
         SimpleTablePlugin(),
+        TableCheckPlugin(),
         APIPlugin(grants=["select", "insert", "update"]),
         SimpleTriggerPlugin(),
     ],
@@ -81,3 +93,9 @@ class Locations:
     name = Column(String, nullable=False)
     city = Column(String)
     country = Column(String)
+    display = Column(
+        String, Computed("name || ', ' || city"), nullable=True
+    )
+    name_not_empty = CaveCheck(
+        "length({name}) > 0", name="locations_name_not_empty"
+    )
