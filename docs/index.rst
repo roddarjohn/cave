@@ -9,6 +9,7 @@ pgcraft
    :maxdepth: 2
 
    setup
+   naming_conventions
    dimensions
    ledgers
    builtin_plugins
