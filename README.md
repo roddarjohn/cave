@@ -1,6 +1,7 @@
 # pgcraft
 
-[Documentation](https://roddarjohn.github.io/pgcraft/)
+[![PyPI](https://img.shields.io/pypi/v/pgcraft)](https://pypi.org/project/pgcraft/)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://roddarjohn.github.io/pgcraft/)
 
 **Configuration-driven PostgreSQL dimension tables, migrations, and APIs.**
 

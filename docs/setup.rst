@@ -4,11 +4,27 @@ Setting up a new project
 This guide walks through integrating pgcraft into a new project that uses
 Alembic for database migrations and SQLAlchemy for models.
 
+Installation
+------------
+
+pgcraft is available on `PyPI <https://pypi.org/project/pgcraft/>`_:
+
+.. code-block:: bash
+
+   pip install pgcraft
+
+Or with `uv <https://docs.astral.sh/uv/>`_:
+
+.. code-block:: bash
+
+   uv add pgcraft
+
 Dependencies
 ------------
 
-Add ``pgcraft`` as a dependency alongside your existing Alembic and SQLAlchemy
-dependencies. See the `Alembic documentation`_ for a full project setup guide.
+pgcraft installs SQLAlchemy and its declarative extensions automatically.
+You will also need Alembic for migrations. See the `Alembic documentation`_
+for a full project setup guide.
 
 .. _Alembic documentation: https://alembic.sqlalchemy.org/en/latest/tutorial.html
 
