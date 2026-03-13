@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from sqlalchemy import MetaData
     from sqlalchemy.schema import SchemaItem
 
+    from cave.check import CaveCheck
     from cave.plugin import Plugin
 
 
@@ -173,7 +174,7 @@ class ResourceFactory:
         tablename: str,
         schemaname: str,
         metadata: MetaData,
-        schema_items: list[SchemaItem],
+        schema_items: list[SchemaItem | CaveCheck],
         *,
         cave: object | None = None,
         plugins: list[Plugin] | None = None,

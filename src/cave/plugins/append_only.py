@@ -54,7 +54,7 @@ def _resolve_attributes_name(ctx: FactoryContext) -> str:
 
 
 def _dim_column_names(ctx: FactoryContext) -> list[str]:
-    return [col.key for col in ctx.schema_items if isinstance(col, Column)]
+    return [col.key for col in ctx.columns]
 
 
 @produces(Dynamic("root_key"), Dynamic("attributes_key"))
@@ -94,7 +94,7 @@ class AppendOnlyTablePlugin(Plugin):
                 DateTime(timezone=True),
                 server_default="now()",
             ),
-            *ctx.schema_items,
+            *ctx.columns,
             schema=ctx.schemaname,
         )
         ctx[self.attributes_key] = attributes_table
@@ -162,11 +162,7 @@ class AppendOnlyViewPlugin(Plugin):
                 root_table.c[pk_col_name].label(pk_col_name),
                 root_table.c["created_at"].label("created_at"),
                 attribute_table.c["created_at"].label("updated_at"),
-                *[
-                    col.label(col.key)
-                    for col in ctx.schema_items
-                    if isinstance(col, Column)
-                ],
+                *[col.label(col.key) for col in ctx.columns],
             )
             .select_from(root_table)
             .join(
@@ -192,11 +188,7 @@ class AppendOnlyViewPlugin(Plugin):
             Column(pk_col_name, Integer, primary_key=True),
             Column("created_at", DateTime(timezone=True)),
             Column("updated_at", DateTime(timezone=True)),
-            *[
-                Column(col.key, col.type)
-                for col in ctx.schema_items
-                if isinstance(col, Column)
-            ],
+            *[Column(col.key, col.type) for col in ctx.columns],
             schema=ctx.schemaname,
         )
         ctx[self.primary_key] = proxy

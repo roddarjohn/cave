@@ -5,10 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from sqlalchemy import Column
+
 if TYPE_CHECKING:
     from sqlalchemy import MetaData
     from sqlalchemy.schema import SchemaItem
 
+    from cave.check import CaveCheck
     from cave.plugin import Plugin
 
 _MISSING = object()
@@ -48,10 +51,20 @@ class FactoryContext:
     tablename: str
     schemaname: str
     metadata: MetaData
-    schema_items: list[SchemaItem]
+    schema_items: list[SchemaItem | CaveCheck]
     plugins: list[Plugin]
 
     _store: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+
+    @property
+    def columns(self) -> list[Column]:
+        """Return only ``Column`` instances from schema_items.
+
+        This filters out non-column items such as
+        :class:`~cave.check.CaveCheck` so that table-creating
+        plugins never see them.
+        """
+        return [i for i in self.schema_items if isinstance(i, Column)]
 
     def __getitem__(self, key: str) -> Any:  # noqa: ANN401
         """Return the value stored under *key*.
