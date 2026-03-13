@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from cave.check import CaveCheck
 from cave.columns import PrimaryKeyColumns
 from cave.declarative import register
 from cave.errors import CaveValidationError
@@ -215,9 +216,32 @@ class TestRegisterDecorator:
             count = Column(Integer)
 
         items = _CapturePlugin.captured["schema_items"]
-        keys = [col.key for col in items]
+        keys = [col.key for col in items if isinstance(col, Column)]
         assert "label" in keys
         assert "count" in keys
+
+    def test_cave_check_collected_from_class_dict(self):
+        md = MetaData()
+
+        @register(
+            metadata=md,
+            plugins=[
+                SerialPKPlugin(),
+                SimpleTablePlugin(),
+                _CapturePlugin(),
+            ],
+        )
+        class Priced:
+            __tablename__ = "priced"
+            __table_args__ = {"schema": "dim"}
+
+            price = Column(Integer)
+            positive_price = CaveCheck("{price} > 0", name="pos")
+
+        items = _CapturePlugin.captured["schema_items"]
+        checks = [i for i in items if isinstance(i, CaveCheck)]
+        assert len(checks) == 1
+        assert checks[0].name == "pos"
 
 
 # -------------------------------------------------------------------

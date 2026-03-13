@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import Column
 
+from cave.check import CaveCheck
 from cave.errors import CaveValidationError
 from cave.factory.base import (
     _resolve_plugins,
@@ -72,6 +73,13 @@ def _collect_columns(cls: type) -> list[Column]:
                 value.key = attr_name
             columns.append(value)
     return columns
+
+
+def _collect_checks(cls: type) -> list[CaveCheck]:
+    """Read :class:`~cave.check.CaveCheck` objects from the class dict."""
+    return [
+        value for value in cls.__dict__.values() if isinstance(value, CaveCheck)
+    ]
 
 
 def _validate_class(
@@ -197,7 +205,10 @@ def register[T](  # noqa: PLR0913
             raise CaveValidationError(msg)
 
         # -- collect columns and run plugins --------------------------
-        schema_items: list[SchemaItem] = list(_collect_columns(cls))
+        schema_items: list[SchemaItem | CaveCheck] = [
+            *_collect_columns(cls),
+            *_collect_checks(cls),
+        ]
 
         resolved = _resolve_plugins(cave, plugins, extra_plugins, [])
         _run_plugin_validators(resolved)

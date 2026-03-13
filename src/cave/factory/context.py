@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from sqlalchemy import Column
+
+from cave.check import CaveCheck
+
 if TYPE_CHECKING:
     from sqlalchemy import MetaData
     from sqlalchemy.schema import SchemaItem
@@ -48,10 +52,30 @@ class FactoryContext:
     tablename: str
     schemaname: str
     metadata: MetaData
-    schema_items: list[SchemaItem]
+    schema_items: list[SchemaItem | CaveCheck]
     plugins: list[Plugin]
 
     _store: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+
+    @property
+    def columns(self) -> list[Column]:
+        """Return only ``Column`` instances from schema_items.
+
+        Useful when a plugin needs to iterate over column
+        definitions (e.g. to extract column names or types).
+        """
+        return [i for i in self.schema_items if isinstance(i, Column)]
+
+    @property
+    def table_items(self) -> list[SchemaItem]:
+        """Return schema items suitable for table creation.
+
+        Filters out :class:`~cave.check.CaveCheck` (which are
+        handled by dedicated check plugins) but keeps all real
+        SQLAlchemy ``SchemaItem`` objects: columns, constraints,
+        indexes, computed columns, etc.
+        """
+        return [i for i in self.schema_items if not isinstance(i, CaveCheck)]
 
     def __getitem__(self, key: str) -> Any:  # noqa: ANN401
         """Return the value stored under *key*.

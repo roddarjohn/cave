@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, Table
+from sqlalchemy import Table
 
 if TYPE_CHECKING:
     from cave.factory.context import FactoryContext
@@ -23,11 +23,11 @@ _NAMING_DEFAULTS = {
 
 
 def _dim_column_names(ctx: FactoryContext) -> list[str]:
-    """Extract non-PK column names from schema_items."""
+    """Extract writable (non-PK, non-computed) column names."""
     return [
         col.key
-        for col in ctx.schema_items
-        if isinstance(col, Column) and not col.primary_key
+        for col in ctx.columns
+        if not col.primary_key and not col.computed
     ]
 
 
@@ -57,7 +57,7 @@ class SimpleTablePlugin(Plugin):
             ctx.tablename,
             ctx.metadata,
             *pk_columns,
-            *ctx.schema_items,
+            *ctx.table_items,
             schema=ctx.schemaname,
         )
         ctx[self.table_key] = table

@@ -1,5 +1,7 @@
 # cave *(working name)*
 
+[Documentation](https://roddarjohn.github.io/cave/)
+
 **Configuration-driven PostgreSQL dimension tables, migrations, and APIs.**
 
 Cave generates SQLAlchemy models, Alembic migrations, and
@@ -75,25 +77,25 @@ Cave ships with three built-in dimension types:
 | **Append-Only** (SCD Type 2) | Track changes over time | Yes |
 | **EAV** | Flexible / sparse attributes with full audit trail | Yes |
 
-See the [dimensions documentation](https://cave.readthedocs.io/en/latest/dimensions.html) for ERD diagrams, schema details, and worked examples.
+See the [dimensions documentation](https://roddarjohn.github.io/cave/dimensions.html) for ERD diagrams, schema details, and worked examples.
 
 ## Documentation
 
 Full documentation is available at
-[cave.readthedocs.io](https://cave.readthedocs.io/en/latest/).
+[roddarjohn.github.io/cave](https://roddarjohn.github.io/cave/).
 
-- [Setup & installation](https://cave.readthedocs.io/en/latest/setup.html)
-- [Built-in dimensions](https://cave.readthedocs.io/en/latest/dimensions.html)
-- [Plugin system](https://cave.readthedocs.io/en/latest/plugins.html)
-- [API reference](https://cave.readthedocs.io/en/latest/api.html)
-- [Development guide](https://cave.readthedocs.io/en/latest/development.html)
-- [Playground](https://cave.readthedocs.io/en/latest/playground.html)
+- [Setup & installation](https://roddarjohn.github.io/cave/setup.html)
+- [Built-in dimensions](https://roddarjohn.github.io/cave/dimensions.html)
+- [Plugin system](https://roddarjohn.github.io/cave/plugins.html)
+- [API reference](https://roddarjohn.github.io/cave/api.html)
+- [Development guide](https://roddarjohn.github.io/cave/development.html)
+- [Playground](https://roddarjohn.github.io/cave/playground.html)
 
 ## Development
 
 ```bash
 # Clone and install
-git clone https://github.com/yourusername/cave.git
+git clone https://github.com/<username>/cave.git
 cd cave
 uv sync --all-groups
 

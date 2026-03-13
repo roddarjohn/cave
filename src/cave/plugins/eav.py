@@ -185,7 +185,7 @@ class EAVTablePlugin(Plugin):
     def run(self, ctx: FactoryContext) -> None:
         """Create entity and attribute tables."""
         pk_col_name = ctx["pk_columns"].first_key
-        mappings = _build_eav_mappings(ctx.schema_items)
+        mappings = _build_eav_mappings(ctx.columns)
         ctx[self.mappings_key] = mappings
 
         entity_name = resolve_name(

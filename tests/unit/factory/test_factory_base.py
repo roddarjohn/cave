@@ -10,6 +10,7 @@ plugin implementation.
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 
+from cave.check import CaveCheck
 from cave.columns import PrimaryKeyColumns
 from cave.config import CaveConfig
 from cave.errors import CaveValidationError
@@ -465,3 +466,42 @@ class TestPKColumnsViaStore:
         cols = list(pk)
         assert len(cols) == 1
         assert cols[0].key == "id"
+
+
+# -------------------------------------------------------------------
+# CaveCheck in schema_items
+# -------------------------------------------------------------------
+
+
+class TestCaveCheckInSchemaItems:
+    def test_factory_accepts_cave_check(self):
+        """ResourceFactory does not reject CaveCheck in schema_items."""
+        ResourceFactory(
+            "t",
+            "s",
+            MetaData(),
+            [
+                Column("price", Integer),
+                CaveCheck("{price} > 0", name="pos"),
+            ],
+            plugins=[],
+        )
+
+    def test_ctx_columns_filters_out_cave_check(self):
+        """FactoryContext.columns returns only Column instances."""
+        ctx = FactoryContext(
+            tablename="t",
+            schemaname="s",
+            metadata=MetaData(),
+            schema_items=[
+                Column("price", Integer),
+                CaveCheck("{price} > 0", name="pos"),
+                Column("qty", Integer),
+            ],
+            plugins=[],
+        )
+        cols = ctx.columns
+        assert len(cols) == 2
+        assert all(isinstance(c, Column) for c in cols)
+        names = {c.name for c in cols}
+        assert names == {"price", "qty"}
