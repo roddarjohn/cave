@@ -104,10 +104,7 @@ Source of truth tables should be very very clear.
 - Figure out approvals?
 - Figure out ledgers
   - Should be declarative + diff!!
-- [done] Permit / encourage declarative format of tables
-- [done] Rework the configurations
-- [done] Build plugin system that has hooks and customizes behavior
-- Figure out how to implement e.g. check constraints or nullable
+- [done] Figure out how to implement e.g. check constraints or nullable
   constraints on all the types of dimensional tables
 - In theory this could be used within e.g. FastAPI or Flask
 
