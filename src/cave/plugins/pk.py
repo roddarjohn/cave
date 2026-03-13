@@ -9,9 +9,11 @@ from sqlalchemy import Column, Integer
 if TYPE_CHECKING:
     from cave.factory.context import FactoryContext
 
-from cave.plugin import Plugin, singleton
+from cave.columns import PrimaryKeyColumns
+from cave.plugin import Plugin, produces, singleton
 
 
+@produces("pk_columns")
 @singleton("__pk__")
 class SerialPKPlugin(Plugin):
     """Provide an auto-increment integer primary key column.
@@ -25,6 +27,8 @@ class SerialPKPlugin(Plugin):
         """Store the PK column name."""
         self._column_name = column_name
 
-    def pk_columns(self, _ctx: FactoryContext) -> list[Column]:
-        """Return a single SERIAL INTEGER primary key column."""
-        return [Column(self._column_name, Integer, primary_key=True)]
+    def run(self, ctx: FactoryContext) -> None:
+        """Store a PrimaryKeyColumns in the ctx store."""
+        ctx["pk_columns"] = PrimaryKeyColumns(
+            [Column(self._column_name, Integer, primary_key=True)]
+        )

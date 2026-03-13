@@ -10,6 +10,8 @@ from cave.factory.context import FactoryContext
 from cave.validator import validate_schema_items
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from sqlalchemy import MetaData
     from sqlalchemy.schema import SchemaItem
 
@@ -42,35 +44,28 @@ def _resolve_plugins(
     return global_plugins + factory_plugins + local
 
 
-def _validate_singleton_groups(plugins: list[Plugin]) -> None:
-    """Raise if two plugins share the same singleton group.
+def _run_plugin_validators(
+    plugins: list[Plugin],
+) -> None:
+    """Collect and run all class-level validators, deduped by id.
 
     Args:
-        plugins: Resolved plugin list to inspect.
-
-    Raises:
-        CaveValidationError: When two plugins declare the same
-            non-None ``singleton_group``.
+        plugins: Resolved plugin list to validate.
 
     """
-    seen: dict[str, str] = {}
-    for plugin in plugins:
-        group = plugin.singleton_group
-        if group is None:
-            continue
-        name = type(plugin).__name__
-        if group in seen:
-            msg = (
-                f"Plugin group {group!r} allows only one plugin, "
-                f"but found both {seen[group]} and {name}. "
-                f"Remove one from the plugin list."
-            )
-            raise CaveValidationError(msg)
-        seen[group] = name
+    seen: set[int] = set()
+    for p in plugins:
+        validators: list[Callable[[list[Plugin]], None]] = getattr(
+            type(p), "_validators", []
+        )
+        for v in validators:
+            if id(v) not in seen:
+                seen.add(id(v))
+                v(plugins)
 
 
 def _sort_plugins(plugins: list[Plugin]) -> list[Plugin]:
-    """Sort plugins topologically by their produces/requires declarations.
+    """Sort plugins topologically by produces/requires declarations.
 
     Plugins with no declared dependencies keep their original relative
     order.  References to keys not produced by any plugin in this list
@@ -83,20 +78,21 @@ def _sort_plugins(plugins: list[Plugin]) -> list[Plugin]:
         A new list of the same plugins in a valid execution order.
 
     Raises:
-        CaveValidationError: If two plugins declare the same produced
-            key, or if a dependency cycle is detected.
+        CaveValidationError: If a dependency cycle is detected.
 
     """
-    # Last producer of a key wins for dependency resolution — if multiple
-    # plugins produce the same key, requires-edges point to the last one,
-    # meaning overriding plugins run after the ones they override.
+    # Last producer of a key wins for dependency resolution — if
+    # multiple plugins produce the same key, requires-edges point
+    # to the last one, meaning overriding plugins run after the
+    # ones they override.
     producers: dict[str, Plugin] = {}
     for p in plugins:
         for key in p.resolved_produces():
             producers[key] = p
 
-    # Build predecessor graph: each plugin maps to the set of plugins
-    # whose output it requires.  Only edges within this plugin list matter.
+    # Build predecessor graph: each plugin maps to the set of
+    # plugins whose output it requires.  Only edges within this
+    # plugin list matter.
     graph: dict[Plugin, set[Plugin]] = {p: set() for p in plugins}
     for p in plugins:
         for key in p.resolved_requires():
@@ -104,8 +100,8 @@ def _sort_plugins(plugins: list[Plugin]) -> list[Plugin]:
             if producer is not None:
                 graph[p].add(producer)
 
-    # Use original list index as tiebreaker so unrelated plugins preserve
-    # their declared order.
+    # Use original list index as tiebreaker so unrelated plugins
+    # preserve their declared order.
     original_order = {id(p): i for i, p in enumerate(plugins)}
     ts = TopologicalSorter(graph)
     try:
@@ -117,7 +113,10 @@ def _sort_plugins(plugins: list[Plugin]) -> list[Plugin]:
 
     result: list[Plugin] = []
     while ts.is_active():
-        ready = sorted(ts.get_ready(), key=lambda p: original_order[id(p)])
+        ready = sorted(
+            ts.get_ready(),
+            key=lambda p: original_order[id(p)],
+        )
         for p in ready:
             result.append(p)
             ts.done(p)
@@ -135,8 +134,9 @@ class ResourceFactory:
 
     Plugin execution order is determined by each plugin's
     :attr:`~cave.plugin.Plugin.produces` and
-    :attr:`~cave.plugin.Plugin.requires` declarations.  Plugins with no
-    declared dependencies run in the order they appear in the list.
+    :attr:`~cave.plugin.Plugin.requires` declarations.  Plugins
+    with no declared dependencies run in the order they appear in
+    the list.
 
     Example::
 
@@ -159,9 +159,10 @@ class ResourceFactory:
         extra_plugins: Appended to the resolved plugin list.
 
     Raises:
-        CaveValidationError: If any schema item fails validation, two
-            plugins share a singleton group, two plugins produce the
-            same ctx key, or a plugin dependency cycle is detected.
+        CaveValidationError: If any schema item fails validation,
+            two plugins share a singleton group, two plugins produce
+            the same ctx key, or a plugin dependency cycle is
+            detected.
 
     """
 
@@ -173,6 +174,7 @@ class ResourceFactory:
         schemaname: str,
         metadata: MetaData,
         schema_items: list[SchemaItem],
+        *,
         cave: object | None = None,
         plugins: list[Plugin] | None = None,
         extra_plugins: list[Plugin] | None = None,
@@ -183,7 +185,7 @@ class ResourceFactory:
         resolved = _resolve_plugins(
             cave, plugins, extra_plugins, self.DEFAULT_PLUGINS
         )
-        _validate_singleton_groups(resolved)
+        _run_plugin_validators(resolved)
 
         ctx = FactoryContext(
             tablename=tablename,
@@ -192,15 +194,6 @@ class ResourceFactory:
             schema_items=list(schema_items),
             plugins=resolved,
         )
-
-        # Collect PK and extra columns before any plugin runs.
-        ctx.pk_columns = next(
-            (c for p in resolved if (c := p.pk_columns(ctx)) is not None),
-            [],
-        )
-        ctx.extra_columns = [
-            col for p in resolved for col in p.extra_columns(ctx)
-        ]
 
         for p in _sort_plugins(resolved):
             p.run(ctx)

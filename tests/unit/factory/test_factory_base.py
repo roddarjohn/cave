@@ -1,23 +1,31 @@
 """Unit tests for ResourceFactory orchestration and FactoryContext.
 
 These tests exercise the machinery of the plugin runner in isolation:
-plugin resolution order, singleton enforcement, dependency-based sorting,
-and FactoryContext collision detection / ordering hints.  They use minimal
-stub plugins to avoid depending on any storage-layer plugin implementation.
+plugin resolution order, singleton enforcement, dependency-based
+sorting, and FactoryContext collision detection / ordering hints.
+They use minimal stub plugins to avoid depending on any storage-layer
+plugin implementation.
 """
 
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 
+from cave.columns import PrimaryKeyColumns
 from cave.config import CaveConfig
 from cave.errors import CaveValidationError
 from cave.factory.base import ResourceFactory, _sort_plugins
 from cave.factory.context import FactoryContext
-from cave.plugin import Dynamic, Plugin, produces, requires, singleton
+from cave.plugin import (
+    Dynamic,
+    Plugin,
+    produces,
+    requires,
+    singleton,
+)
 
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 # Stub plugins
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 
 
 class _WriterPlugin(Plugin):
@@ -42,40 +50,15 @@ class _ReaderPlugin(Plugin):
         self.read_value = ctx[self.key]
 
 
-class _LifecyclePlugin(Plugin):
-    """Records the order in which lifecycle hooks are called."""
+class _RunLogPlugin(Plugin):
+    """Records when run is called."""
 
     def __init__(self, log: list[str], name: str = "p") -> None:
         self.log = log
         self.name = name
 
-    def pk_columns(self, _ctx: FactoryContext) -> list[Column] | None:
-        self.log.append(f"{self.name}.pk_columns")
-        return None
-
-    def extra_columns(self, _ctx: FactoryContext) -> list[Column]:
-        self.log.append(f"{self.name}.extra_columns")
-        return []
-
     def run(self, _ctx: FactoryContext) -> None:
         self.log.append(f"{self.name}.run")
-
-
-class _PKPlugin(Plugin):
-    """Stub PK plugin that returns a fixed column list."""
-
-    def pk_columns(self, _ctx: FactoryContext) -> list[Column]:
-        return [Column("id", Integer, primary_key=True)]
-
-
-class _ExtraColPlugin(Plugin):
-    """Stub that appends a fixed extra column."""
-
-    def __init__(self, col: Column) -> None:
-        self.col = col
-
-    def extra_columns(self, _ctx: FactoryContext) -> list[Column]:
-        return [self.col]
 
 
 @singleton("__pk__")
@@ -88,9 +71,9 @@ class _SingletonB(Plugin):
     pass
 
 
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 # FactoryContext
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 
 
 class TestFactoryContext:
@@ -152,40 +135,43 @@ class TestFactoryContext:
         assert ctx["key"] == "value"
 
 
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 # Plugin resolution
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 
 
 class TestPluginResolution:
     def _factory(self, **kwargs):
         return ResourceFactory(
-            "t", "s", MetaData(), [Column("name", String)], **kwargs
+            "t",
+            "s",
+            MetaData(),
+            [Column("name", String)],
+            **kwargs,
         )
 
     def test_default_plugins_empty_by_default(self):
-        # With no plugins declared, factory runs fine with empty list.
         self._factory(plugins=[])
 
     def test_plugins_kwarg_replaces_defaults(self):
         log: list[str] = []
-        plugin = _LifecyclePlugin(log)
+        plugin = _RunLogPlugin(log)
         self._factory(plugins=[plugin])
         assert "p.run" in log
 
     def test_extra_plugins_appended_after_plugins(self):
         log: list[str] = []
-        base = _LifecyclePlugin(log, "base")
-        extra = _LifecyclePlugin(log, "extra")
+        base = _RunLogPlugin(log, "base")
+        extra = _RunLogPlugin(log, "extra")
         self._factory(plugins=[base], extra_plugins=[extra])
         base_idx = log.index("base.run")
         extra_idx = log.index("extra.run")
         assert extra_idx > base_idx
 
-    def test_cave_global_plugins_run_before_factory_plugins(self):
+    def test_cave_global_plugins_run_before_factory(self):
         log: list[str] = []
-        global_plugin = _LifecyclePlugin(log, "global")
-        factory_plugin = _LifecyclePlugin(log, "factory")
+        global_plugin = _RunLogPlugin(log, "global")
+        factory_plugin = _RunLogPlugin(log, "factory")
         cave = CaveConfig(plugins=[global_plugin])
         self._factory(cave=cave, plugins=[factory_plugin])
         global_idx = log.index("global.run")
@@ -193,39 +179,40 @@ class TestPluginResolution:
         assert global_idx < factory_idx
 
 
-# ---------------------------------------------------------------------------
-# Lifecycle ordering
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
+# Run ordering
+# -------------------------------------------------------------------
 
 
-class TestLifecycleOrdering:
-    def test_pk_and_extra_run_before_run(self):
-        log: list[str] = []
-        plugin = _LifecyclePlugin(log)
-        ResourceFactory(
-            "t", "s", MetaData(), [Column("name", String)], plugins=[plugin]
-        )
-        assert log.index("p.pk_columns") < log.index("p.run")
-        assert log.index("p.extra_columns") < log.index("p.run")
-
-    def test_writer_runs_before_reader_when_ordered_correctly(self):
+class TestRunOrdering:
+    def test_writer_runs_before_reader(self):
         writer = _WriterPlugin("table")
         reader = _ReaderPlugin("table")
-        ResourceFactory("t", "s", MetaData(), [], plugins=[writer, reader])
+        ResourceFactory(
+            "t",
+            "s",
+            MetaData(),
+            [],
+            plugins=[writer, reader],
+        )
         assert reader.read_value == "sentinel"
 
-    def test_reader_before_writer_raises_without_declarations(self):
-        # No produces/requires declared — sort preserves list order,
-        # so reader runs before writer and fails at runtime.
+    def test_reader_before_writer_raises_without_decl(self):
         writer = _WriterPlugin("table")
         reader = _ReaderPlugin("table")
         with pytest.raises(KeyError, match="plugin"):
-            ResourceFactory("t", "s", MetaData(), [], plugins=[reader, writer])
+            ResourceFactory(
+                "t",
+                "s",
+                MetaData(),
+                [],
+                plugins=[reader, writer],
+            )
 
 
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 # Dependency sorting
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 
 
 class TestDependencySorting:
@@ -241,7 +228,6 @@ class TestDependencySorting:
                 self.got = ctx["x"]
 
         a, b = _A(), _B()
-        # Give reader before writer — sort should fix it.
         sorted_list = _sort_plugins([b, a])
         assert sorted_list.index(a) < sorted_list.index(b)
 
@@ -260,8 +246,6 @@ class TestDependencySorting:
             _sort_plugins([_A(), _B()])
 
     def test_two_plugins_produce_same_key_allowed(self):
-        # Second producer should run after the first (last producer wins
-        # for dependency resolution).
         log: list[str] = []
 
         @produces("key")
@@ -278,13 +262,15 @@ class TestDependencySorting:
                 ctx.set("key", "replaced", force=True)
 
         ResourceFactory(
-            "t", "s", MetaData(), [], plugins=[_Override(), _First()]
+            "t",
+            "s",
+            MetaData(),
+            [],
+            plugins=[_Override(), _First()],
         )
         assert log == ["first", "override"]
 
     def test_sort_external_require_ignored(self):
-        # A plugin that requires a key not produced by any plugin in the
-        # list — the sort should not block on it.
         @requires("already_in_db")
         class _NeedsExternal(Plugin):
             def run(self, ctx: FactoryContext) -> None:
@@ -294,11 +280,10 @@ class TestDependencySorting:
         assert len(result) == 1
 
     def test_sort_preserves_order_when_no_deps(self):
-        plugins = [_LifecyclePlugin([], f"p{i}") for i in range(4)]
+        plugins = [_RunLogPlugin([], f"p{i}") for i in range(4)]
         assert _sort_plugins(plugins) == plugins
 
     def test_declared_deps_fix_reversed_list_order(self):
-        # Writer declared at end, reader at start; sort should reorder.
         log: list[str] = []
 
         @produces("tbl")
@@ -313,13 +298,19 @@ class TestDependencySorting:
                 log.append("read")
                 _ = ctx["tbl"]
 
-        ResourceFactory("t", "s", MetaData(), [], plugins=[_R(), _W()])
+        ResourceFactory(
+            "t",
+            "s",
+            MetaData(),
+            [],
+            plugins=[_R(), _W()],
+        )
         assert log == ["write", "read"]
 
 
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 # Dynamic validation
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
 
 
 class TestDynamicValidation:
@@ -363,9 +354,9 @@ class TestDynamicValidation:
         assert _P(src="data").resolved_requires() == ["data"]
 
 
-# ---------------------------------------------------------------------------
-# Singleton enforcement
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
+# Singleton enforcement (decorator-driven validators)
+# -------------------------------------------------------------------
 
 
 class TestSingletonEnforcement:
@@ -381,7 +372,8 @@ class TestSingletonEnforcement:
 
     def test_same_group_different_name_in_error(self):
         with pytest.raises(
-            CaveValidationError, match=r"_SingletonA|_SingletonB"
+            CaveValidationError,
+            match=r"_SingletonA|_SingletonB",
         ):
             ResourceFactory(
                 "t",
@@ -392,7 +384,13 @@ class TestSingletonEnforcement:
             )
 
     def test_single_plugin_in_group_is_fine(self):
-        ResourceFactory("t", "s", MetaData(), [], plugins=[_SingletonA()])
+        ResourceFactory(
+            "t",
+            "s",
+            MetaData(),
+            [],
+            plugins=[_SingletonA()],
+        )
 
     def test_different_groups_are_fine(self):
         @singleton("__group_x__")
@@ -403,68 +401,51 @@ class TestSingletonEnforcement:
         class _Y(Plugin):
             pass
 
-        ResourceFactory("t", "s", MetaData(), [], plugins=[_X(), _Y()])
+        ResourceFactory(
+            "t",
+            "s",
+            MetaData(),
+            [],
+            plugins=[_X(), _Y()],
+        )
 
 
-# ---------------------------------------------------------------------------
-# PK and extra column resolution
-# ---------------------------------------------------------------------------
+# -------------------------------------------------------------------
+# PK columns via ctx store
+# -------------------------------------------------------------------
 
 
-class TestColumnResolution:
-    def test_first_pk_plugin_wins(self):
-        col_a = Column("pk_a", Integer, primary_key=True)
-        col_b = Column("pk_b", Integer, primary_key=True)
+class TestPKColumnsViaStore:
+    def test_pk_plugin_stores_pk_columns(self):
+        """SerialPKPlugin writes pk_columns to the ctx store."""
+        log: list[str] = []
 
-        class _PKA(Plugin):
-            def pk_columns(self, _ctx):
-                return [col_a]
-
-        class _PKB(Plugin):
-            def pk_columns(self, _ctx):
-                return [col_b]
-
-        log: list[list[Column]] = []
-
+        @requires("pk_columns")
         class _Capture(Plugin):
-            def run(self, ctx):
-                log.append(list(ctx.pk_columns))
+            def run(self, ctx: FactoryContext) -> None:
+                pk = ctx["pk_columns"]
+                log.append(pk.first_key)
+
+        from cave.plugins.pk import SerialPKPlugin
 
         ResourceFactory(
-            "t", "s", MetaData(), [], plugins=[_PKA(), _PKB(), _Capture()]
+            "t",
+            "s",
+            MetaData(),
+            [],
+            plugins=[SerialPKPlugin(), _Capture()],
         )
-        assert log[0][0].key == "pk_a"
+        assert log == ["id"]
 
-    def test_none_pk_defers_to_next(self):
-        col = Column("id", Integer, primary_key=True)
+    def test_custom_pk_name_via_store(self):
+        log: list[str] = []
 
-        class _Defer(Plugin):
-            def pk_columns(self, _ctx):
-                return None
-
-        class _PK(Plugin):
-            def pk_columns(self, _ctx):
-                return [col]
-
-        log: list[list[Column]] = []
-
+        @requires("pk_columns")
         class _Capture(Plugin):
-            def run(self, ctx):
-                log.append(list(ctx.pk_columns))
+            def run(self, ctx: FactoryContext) -> None:
+                log.append(ctx["pk_columns"].first_key)
 
-        ResourceFactory(
-            "t", "s", MetaData(), [], plugins=[_Defer(), _PK(), _Capture()]
-        )
-        assert len(log[0]) == 1
-
-    def test_extra_columns_concatenated(self):
-        col_a = Column("extra_a", String)
-        col_b = Column("extra_b", String)
-        log: list[list[Column]] = []
-
-        class _Capture(Plugin):
-            def run(self, ctx):
-                log.append(list(ctx.extra_columns))
+        from cave.plugins.pk import SerialPKPlugin
 
         ResourceFactory(
             "t",
@@ -472,11 +453,15 @@ class TestColumnResolution:
             MetaData(),
             [],
             plugins=[
-                _ExtraColPlugin(col_a),
-                _ExtraColPlugin(col_b),
+                SerialPKPlugin(column_name="uid"),
                 _Capture(),
             ],
         )
-        keys = [c.key for c in log[0]]
-        assert "extra_a" in keys
-        assert "extra_b" in keys
+        assert log == ["uid"]
+
+    def test_pk_columns_iterable_for_unpacking(self):
+        """PrimaryKeyColumns can be unpacked with *."""
+        pk = PrimaryKeyColumns([Column("id", Integer, primary_key=True)])
+        cols = list(pk)
+        assert len(cols) == 1
+        assert cols[0].key == "id"

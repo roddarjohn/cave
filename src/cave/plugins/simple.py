@@ -32,12 +32,13 @@ def _dim_column_names(ctx: FactoryContext) -> list[str]:
 
 
 @produces(Dynamic("table_key"))
+@requires("pk_columns")
 @singleton("__table__")
 class SimpleTablePlugin(Plugin):
     """Create a single backing table for a simple dimension.
 
-    Combines ``ctx.pk_columns``, ``ctx.extra_columns``, and
-    ``ctx.schema_items`` into one table.
+    Combines ``ctx["pk_columns"]`` and ``ctx.schema_items`` into one
+    table.
 
     Args:
         table_key: Key under which the created table is stored in
@@ -51,11 +52,11 @@ class SimpleTablePlugin(Plugin):
 
     def run(self, ctx: FactoryContext) -> None:
         """Create the dimension table and store it in ctx."""
+        pk_columns = ctx["pk_columns"]
         table = Table(
             ctx.tablename,
             ctx.metadata,
-            *ctx.pk_columns,
-            *ctx.extra_columns,
+            *pk_columns,
             *ctx.schema_items,
             schema=ctx.schemaname,
         )
@@ -75,7 +76,9 @@ class SimpleTriggerPlugin(Plugin):
     """
 
     def __init__(
-        self, table_key: str = "primary", view_key: str = "api"
+        self,
+        table_key: str = "primary",
+        view_key: str = "api",
     ) -> None:
         """Store the context keys."""
         self.table_key = table_key
@@ -103,9 +106,18 @@ class SimpleTriggerPlugin(Plugin):
             tablename=ctx.tablename,
             template_vars=template_vars,
             ops=[
-                ("insert", load_template(_TEMPLATES / "insert.mako")),
-                ("update", load_template(_TEMPLATES / "update.mako")),
-                ("delete", load_template(_TEMPLATES / "delete.mako")),
+                (
+                    "insert",
+                    load_template(_TEMPLATES / "insert.mako"),
+                ),
+                (
+                    "update",
+                    load_template(_TEMPLATES / "update.mako"),
+                ),
+                (
+                    "delete",
+                    load_template(_TEMPLATES / "delete.mako"),
+                ),
             ],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="simple_function",

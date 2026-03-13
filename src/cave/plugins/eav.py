@@ -44,8 +44,6 @@ _NAMING_DEFAULTS = {
     "eav_trigger": "%(schema)s_%(table_name)s_%(op)s",
 }
 
-_PK_COL = "id"
-
 
 @dataclass
 class _EAVMapping:
@@ -57,13 +55,17 @@ class _EAVMapping:
     nullable: bool = True
 
 
-def _resolve_value_column(col: Column) -> tuple[str, sa_types.TypeEngine]:
+def _resolve_value_column(
+    col: Column,
+) -> tuple[str, sa_types.TypeEngine]:
     col_type = type(col.type)
     col_name = f"{col_type.__name__.lower()}_value"
     return col_name, col.type
 
 
-def _build_eav_mappings(dimensions: list) -> list[_EAVMapping]:
+def _build_eav_mappings(
+    dimensions: list,
+) -> list[_EAVMapping]:
     mappings: list[_EAVMapping] = []
     for dim in dimensions:
         if isinstance(dim, Column):
@@ -73,9 +75,10 @@ def _build_eav_mappings(dimensions: list) -> list[_EAVMapping]:
                     attribute_name=dim.key,
                     value_column=value_col,
                     column_type=col_type,
-                    # dim.nullable is Optional[bool]; None means the Column
-                    # was declared without an explicit nullable argument,
-                    # which SQLAlchemy treats as nullable=True.
+                    # dim.nullable is Optional[bool]; None means
+                    # the Column was declared without an explicit
+                    # nullable argument, which SQLAlchemy treats
+                    # as nullable=True.
                     nullable=dim.nullable is not False,
                 )
             )
@@ -112,8 +115,14 @@ def _build_pivot_query(
     row_num = (
         func.row_number()
         .over(
-            partition_by=[attr.c.entity_id, attr.c.attribute_name],
-            order_by=[attr.c.created_at.desc(), attr.c.id.desc()],
+            partition_by=[
+                attr.c.entity_id,
+                attr.c.attribute_name,
+            ],
+            order_by=[
+                attr.c.created_at.desc(),
+                attr.c.id.desc(),
+            ],
         )
         .label("rn")
     )
@@ -142,11 +151,14 @@ def _build_pivot_query(
 
 
 @produces(
-    Dynamic("entity_key"), Dynamic("attribute_key"), Dynamic("mappings_key")
+    Dynamic("entity_key"),
+    Dynamic("attribute_key"),
+    Dynamic("mappings_key"),
 )
+@requires("pk_columns")
 @singleton("__table__")
 class EAVTablePlugin(Plugin):
-    """Create the entity and attribute tables for an EAV dimension.
+    """Create entity and attribute tables for an EAV dimension.
 
     Args:
         entity_key: Key in ``ctx`` for the entity root table
@@ -172,14 +184,17 @@ class EAVTablePlugin(Plugin):
 
     def run(self, ctx: FactoryContext) -> None:
         """Create entity and attribute tables."""
-        pk_col_name = ctx.pk_columns[0].key if ctx.pk_columns else _PK_COL
+        pk_col_name = ctx["pk_columns"].first_key
         mappings = _build_eav_mappings(ctx.schema_items)
         ctx[self.mappings_key] = mappings
 
         entity_name = resolve_name(
             ctx.metadata,
             "eav_entity",
-            {"table_name": ctx.tablename, "schema": ctx.schemaname},
+            {
+                "table_name": ctx.tablename,
+                "schema": ctx.schemaname,
+            },
             _NAMING_DEFAULTS,
         )
         entity_table = Table(
@@ -198,7 +213,10 @@ class EAVTablePlugin(Plugin):
         attr_name = resolve_name(
             ctx.metadata,
             "eav_attribute",
-            {"table_name": ctx.tablename, "schema": ctx.schemaname},
+            {
+                "table_name": ctx.tablename,
+                "schema": ctx.schemaname,
+            },
             _NAMING_DEFAULTS,
         )
         value_cols = _needed_value_columns(mappings)
@@ -239,6 +257,7 @@ class EAVTablePlugin(Plugin):
     Dynamic("entity_key"),
     Dynamic("attribute_key"),
     Dynamic("mappings_key"),
+    "pk_columns",
 )
 class EAVViewPlugin(Plugin):
     """Create the pivot view for an EAV dimension.
@@ -273,14 +292,18 @@ class EAVViewPlugin(Plugin):
         mappings: list[_EAVMapping] = ctx[self.mappings_key]
         entity_table = ctx[self.entity_key]
         attribute_table = ctx[self.attribute_key]
-        pk_col_name = ctx.pk_columns[0].key if ctx.pk_columns else _PK_COL
+        pk_col_name = ctx["pk_columns"].first_key
 
         view_sql = compile_query(
             _build_pivot_query(entity_table, attribute_table, mappings)
         )
         register_view(
             ctx.metadata,
-            View(ctx.tablename, view_sql, schema=ctx.schemaname),
+            View(
+                ctx.tablename,
+                view_sql,
+                schema=ctx.schemaname,
+            ),
         )
 
         proxy = Table(
@@ -332,7 +355,7 @@ class EAVTriggerPlugin(Plugin):
         self.view_key = view_key
 
     def run(self, ctx: FactoryContext) -> None:
-        """Register INSTEAD OF triggers on the pivot view and API view."""
+        """Register INSTEAD OF triggers on pivot and API views."""
         mappings: list[_EAVMapping] = ctx[self.mappings_key]
         entity_table = ctx[self.entity_key]
         attribute_table = ctx[self.attribute_key]
@@ -343,24 +366,44 @@ class EAVTriggerPlugin(Plugin):
             "entity_table": entity_fullname,
             "attr_table": attr_fullname,
             "mappings": [
-                (m.attribute_name, m.value_column, m.nullable) for m in mappings
+                (
+                    m.attribute_name,
+                    m.value_column,
+                    m.nullable,
+                )
+                for m in mappings
             ],
         }
 
         ops = [
-            ("insert", load_template(_TEMPLATES / "insert.mako")),
-            ("update", load_template(_TEMPLATES / "update.mako")),
-            ("delete", load_template(_TEMPLATES / "delete.mako")),
+            (
+                "insert",
+                load_template(_TEMPLATES / "insert.mako"),
+            ),
+            (
+                "update",
+                load_template(_TEMPLATES / "update.mako"),
+            ),
+            (
+                "delete",
+                load_template(_TEMPLATES / "delete.mako"),
+            ),
         ]
 
         views_to_trigger = [
-            (ctx.schemaname, f"{ctx.schemaname}.{ctx.tablename}"),
+            (
+                ctx.schemaname,
+                f"{ctx.schemaname}.{ctx.tablename}",
+            ),
         ]
         if self.view_key in ctx:
             api_view = ctx[self.view_key]
             api_schema = api_view.schema or "api"
             views_to_trigger.append(
-                (api_schema, f"{api_schema}.{ctx.tablename}")
+                (
+                    api_schema,
+                    f"{api_schema}.{ctx.tablename}",
+                )
             )
 
         for view_schema, view_fullname in views_to_trigger:

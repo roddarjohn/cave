@@ -17,6 +17,7 @@ from cave.utils.naming import resolve_name
 
 def register_view_triggers(  # noqa: PLR0913
     metadata: MetaData,
+    *,
     view_schema: str,
     view_fullname: str,
     tablename: str,

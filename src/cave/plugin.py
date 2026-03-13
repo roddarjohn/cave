@@ -4,16 +4,14 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, TypeVar
+from typing import TYPE_CHECKING
+
+from cave.errors import CaveValidationError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from sqlalchemy import Column
-
     from cave.factory.context import FactoryContext
-
-_PluginT = TypeVar("_PluginT", bound="type[Plugin]")
 
 
 @dataclass(frozen=True)
@@ -41,17 +39,21 @@ class Dynamic:
 
 
 def _validate_dynamic_keys(
-    cls: type, keys: tuple[str | Dynamic, ...], decorator_name: str
+    cls: type,
+    keys: tuple[str | Dynamic, ...],
+    decorator_name: str,
 ) -> None:
     """Raise TypeError if any Dynamic attr is not an __init__ parameter.
 
     Args:
         cls: The plugin class being decorated.
         keys: The key arguments passed to the decorator.
-        decorator_name: ``"produces"`` or ``"requires"`` for the error message.
+        decorator_name: ``"produces"`` or ``"requires"`` for the
+            error message.
 
     Raises:
-        TypeError: If a Dynamic attr name is not an ``__init__`` kwarg.
+        TypeError: If a Dynamic attr name is not an ``__init__``
+            kwarg.
 
     """
     init = cls.__dict__.get("__init__")
@@ -61,14 +63,17 @@ def _validate_dynamic_keys(
     for key in keys:
         if isinstance(key, Dynamic) and key.attr not in params:
             msg = (
-                f"@{decorator_name}(Dynamic({key.attr!r})) on {cls.__name__} "
-                f"references an attribute that is not an __init__ parameter. "
+                f"@{decorator_name}(Dynamic({key.attr!r})) "
+                f"on {cls.__name__} references an attribute "
+                f"that is not an __init__ parameter. "
                 f"Available parameters: {sorted(params)}"
             )
             raise TypeError(msg)
 
 
-def produces(*keys: str | Dynamic) -> Callable[[_PluginT], _PluginT]:
+def produces[T: type[Plugin]](
+    *keys: str | Dynamic,
+) -> Callable[[T], T]:
     """Declare the ctx keys this plugin's ``run`` method writes.
 
     Applied as a class decorator, alongside :func:`requires` and
@@ -86,11 +91,12 @@ def produces(*keys: str | Dynamic) -> Callable[[_PluginT], _PluginT]:
         A class decorator that attaches ``_produces`` to the class.
 
     Raises:
-        TypeError: If a Dynamic attr name is not an ``__init__`` parameter.
+        TypeError: If a Dynamic attr name is not an ``__init__``
+            parameter.
 
     """
 
-    def decorator(cls: _PluginT) -> _PluginT:
+    def decorator(cls: T) -> T:
         _validate_dynamic_keys(cls, keys, "produces")
         cls._produces = list(keys)
         return cls
@@ -98,7 +104,9 @@ def produces(*keys: str | Dynamic) -> Callable[[_PluginT], _PluginT]:
     return decorator
 
 
-def requires(*keys: str | Dynamic) -> Callable[[_PluginT], _PluginT]:
+def requires[T: type[Plugin]](
+    *keys: str | Dynamic,
+) -> Callable[[T], T]:
     """Declare the ctx keys this plugin's ``run`` method reads.
 
     Applied as a class decorator, alongside :func:`produces` and
@@ -116,11 +124,12 @@ def requires(*keys: str | Dynamic) -> Callable[[_PluginT], _PluginT]:
         A class decorator that attaches ``_requires`` to the class.
 
     Raises:
-        TypeError: If a Dynamic attr name is not an ``__init__`` parameter.
+        TypeError: If a Dynamic attr name is not an ``__init__``
+            parameter.
 
     """
 
-    def decorator(cls: _PluginT) -> _PluginT:
+    def decorator(cls: T) -> T:
         _validate_dynamic_keys(cls, keys, "requires")
         cls._requires = list(keys)
         return cls
@@ -128,8 +137,38 @@ def requires(*keys: str | Dynamic) -> Callable[[_PluginT], _PluginT]:
     return decorator
 
 
-def singleton(group: str) -> Callable[[_PluginT], _PluginT]:
-    """Declare that at most one plugin of *group* may appear in a plugin list.
+def _validate_singletons(plugins: list[Plugin]) -> None:
+    """Raise if two plugins share the same singleton group.
+
+    Args:
+        plugins: Resolved plugin list to inspect.
+
+    Raises:
+        CaveValidationError: When two plugins declare the same
+            non-None ``singleton_group``.
+
+    """
+    seen: dict[str, str] = {}
+    for plugin in plugins:
+        group: str | None = getattr(plugin, "singleton_group", None)
+        if group is None:
+            continue
+        name = type(plugin).__name__
+        if group in seen:
+            msg = (
+                f"Plugin group {group!r} allows only one "
+                f"plugin, but found both {seen[group]} "
+                f"and {name}. "
+                f"Remove one from the plugin list."
+            )
+            raise CaveValidationError(msg)
+        seen[group] = name
+
+
+def singleton[T: type[Plugin]](
+    group: str,
+) -> Callable[[T], T]:
+    """Declare that at most one plugin of *group* may appear.
 
     The factory raises :class:`~cave.errors.CaveValidationError` at
     construction time if two plugins with the same group name are
@@ -146,12 +185,21 @@ def singleton(group: str) -> Callable[[_PluginT], _PluginT]:
             groups use dunder names (``"__pk__"``, ``"__table__"``).
 
     Returns:
-        A class decorator that sets ``singleton_group`` on the class.
+        A class decorator that sets ``singleton_group`` on the class
+        and registers the singleton validator.
 
     """
 
-    def decorator(cls: _PluginT) -> _PluginT:
+    def decorator(cls: T) -> T:
         cls.singleton_group = group
+        validators: list[Callable[[list[Plugin]], None]] = getattr(
+            cls, "_validators", []
+        )
+        if _validate_singletons not in validators:
+            cls._validators = [
+                *validators,
+                _validate_singletons,
+            ]
         return cls
 
     return decorator
@@ -160,18 +208,9 @@ def singleton(group: str) -> Callable[[_PluginT], _PluginT]:
 class Plugin:
     """Base class for cave factory plugins.
 
-    Each plugin can implement any subset of the lifecycle hooks.
-    All methods are no-ops by default.
-
-    Lifecycle per factory invocation:
-
-    1. ``pk_columns`` -- first non-None result across all plugins is
-       used as the PK column list.
-    2. ``extra_columns`` -- all results are concatenated and stored in
-       ``ctx.extra_columns``.
-    3. ``run`` -- called once per plugin, in dependency order.  Execution
-       order is determined by topological sort using the :func:`produces`
-       and :func:`requires` class decorators.
+    Each plugin implements ``run`` to perform its work.  Execution
+    order is determined by topological sort using the :func:`produces`
+    and :func:`requires` class decorators.
 
     Declaring dependencies::
 
@@ -189,78 +228,46 @@ class Plugin:
     plugin of a given group may appear in any resolved plugin list.
     """
 
-    singleton_group: ClassVar[str | None] = None
-    _produces: ClassVar[list[str | Dynamic]] = []
-    _requires: ClassVar[list[str | Dynamic]] = []
-
     def resolved_produces(self) -> list[str]:
         """Return the ctx keys this plugin writes, with Dynamic refs resolved.
 
-        Reads the ``_produces`` list set by the :func:`produces` decorator
-        and substitutes each :class:`Dynamic` with ``getattr(self, attr)``.
+        Reads the ``_produces`` list set by the :func:`produces`
+        decorator and substitutes each :class:`Dynamic` with
+        ``getattr(self, attr)``.
 
         Returns:
             List of ctx key strings this plugin will write to.
 
         """
+        keys: list[str | Dynamic] = getattr(type(self), "_produces", [])
         return [
-            getattr(self, k.attr) if isinstance(k, Dynamic) else k
-            for k in type(self)._produces  # noqa: SLF001
+            getattr(self, k.attr) if isinstance(k, Dynamic) else k for k in keys
         ]
 
     def resolved_requires(self) -> list[str]:
         """Return the ctx keys this plugin reads, with Dynamic refs resolved.
 
-        Reads the ``_requires`` list set by the :func:`requires` decorator
-        and substitutes each :class:`Dynamic` with ``getattr(self, attr)``.
+        Reads the ``_requires`` list set by the :func:`requires`
+        decorator and substitutes each :class:`Dynamic` with
+        ``getattr(self, attr)``.
 
         Returns:
-            List of ctx key strings this plugin expects to already be set.
+            List of ctx key strings this plugin expects to already
+            be set.
 
         """
+        keys: list[str | Dynamic] = getattr(type(self), "_requires", [])
         return [
-            getattr(self, k.attr) if isinstance(k, Dynamic) else k
-            for k in type(self)._requires  # noqa: SLF001
+            getattr(self, k.attr) if isinstance(k, Dynamic) else k for k in keys
         ]
-
-    def pk_columns(self, _ctx: FactoryContext) -> list[Column] | None:
-        """Return PK column(s) for the root table.
-
-        The first non-None result across all plugins is used.
-        Return ``None`` to defer to the next plugin.
-
-        Args:
-            _ctx: The factory context.
-
-        Returns:
-            A list of primary key columns, or ``None`` to skip.
-
-        """
-        return None
-
-    def extra_columns(self, _ctx: FactoryContext) -> list[Column]:
-        """Return additional columns to include before the user dimensions.
-
-        Results from all plugins are concatenated and stored in
-        ``ctx.extra_columns`` before ``run`` is called.
-
-        Args:
-            _ctx: The factory context.
-
-        Returns:
-            A (possibly empty) list of extra columns.
-
-        """
-        return []
 
     def run(self, ctx: FactoryContext) -> None:
         """Execute this plugin's work against *ctx*.
 
-        The factory calls this once per plugin, after all plugins have
-        had their :meth:`pk_columns` and :meth:`extra_columns` collected
-        and after topological sorting by :func:`produces` / :func:`requires`.
+        The factory calls this once per plugin, after topological
+        sorting by :func:`produces` / :func:`requires`.
 
         Args:
-            ctx: The factory context with resolved pk/extra columns.
+            ctx: The factory context.
 
         """

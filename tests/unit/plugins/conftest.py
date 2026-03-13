@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlalchemy import Column, Integer, MetaData, String
 from sqlalchemy_declarative_extensions import View
 
+from cave.columns import PrimaryKeyColumns
 from cave.factory.context import FactoryContext
 
 
@@ -15,17 +16,18 @@ def make_ctx(
     pk_col_name: str = "id",
     store: dict | None = None,
 ) -> FactoryContext:
-    """Return a FactoryContext suitable for testing an individual plugin.
+    """Return a FactoryContext suitable for testing a plugin.
 
     Args:
         tablename: Table name.
         schemaname: Schema name.
-        schema_items: Schema item columns (defaults to a single String column).
+        schema_items: Schema item columns (defaults to a single
+            String column).
         pk_col_name: Name for the pre-populated pk column.
         store: Extra keys to pre-populate in the ctx store.
 
     Returns:
-        A FactoryContext with pk_columns and extra_columns already set.
+        A FactoryContext with pk_columns in the store.
 
     """
     if schema_items is None:
@@ -36,8 +38,9 @@ def make_ctx(
         metadata=MetaData(),
         schema_items=list(schema_items),
         plugins=[],
-        pk_columns=[Column(pk_col_name, Integer, primary_key=True)],
-        extra_columns=[],
+    )
+    ctx["pk_columns"] = PrimaryKeyColumns(
+        [Column(pk_col_name, Integer, primary_key=True)]
     )
     for k, v in (store or {}).items():
         ctx[k] = v
@@ -45,5 +48,5 @@ def make_ctx(
 
 
 def make_view(name: str, schema: str, definition: str = "SELECT 1") -> View:
-    """Return a minimal View object for use as a ctx store value."""
+    """Return a minimal View object for ctx store use."""
     return View(name, definition, schema=schema)

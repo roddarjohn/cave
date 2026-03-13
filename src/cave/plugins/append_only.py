@@ -34,8 +34,6 @@ _NAMING_DEFAULTS = {
     "append_only_trigger": "%(schema)s_%(table_name)s_%(op)s",
 }
 
-_PK_COL = "id"  # always use "id" for internal FK references
-
 
 def _resolve_root_name(ctx: FactoryContext) -> str:
     return resolve_name(
@@ -60,9 +58,10 @@ def _dim_column_names(ctx: FactoryContext) -> list[str]:
 
 
 @produces(Dynamic("root_key"), Dynamic("attributes_key"))
+@requires("pk_columns")
 @singleton("__table__")
 class AppendOnlyTablePlugin(Plugin):
-    """Create the root and attributes tables for an append-only dimension.
+    """Create the root and attributes tables for an append-only dim.
 
     Args:
         root_key: Key in ``ctx`` for the entity root table
@@ -83,7 +82,7 @@ class AppendOnlyTablePlugin(Plugin):
 
     def run(self, ctx: FactoryContext) -> None:
         """Create root and attributes tables."""
-        pk_col_name = ctx.pk_columns[0].key if ctx.pk_columns else _PK_COL
+        pk_col_name = ctx["pk_columns"].first_key
 
         attr_name = _resolve_attributes_name(ctx)
         attributes_table = Table(
@@ -121,7 +120,11 @@ class AppendOnlyTablePlugin(Plugin):
 
 
 @produces(Dynamic("primary_key"))
-@requires(Dynamic("root_key"), Dynamic("attributes_key"))
+@requires(
+    Dynamic("root_key"),
+    Dynamic("attributes_key"),
+    "pk_columns",
+)
 class AppendOnlyViewPlugin(Plugin):
     """Create the join view for an append-only dimension.
 
@@ -150,7 +153,7 @@ class AppendOnlyViewPlugin(Plugin):
 
     def run(self, ctx: FactoryContext) -> None:
         """Register the join view and store the proxy in ctx."""
-        pk_col_name = ctx.pk_columns[0].key if ctx.pk_columns else _PK_COL
+        pk_col_name = ctx["pk_columns"].first_key
         root_table = ctx[self.root_key]
         attribute_table = ctx[self.attributes_key]
 
@@ -199,7 +202,11 @@ class AppendOnlyViewPlugin(Plugin):
         ctx[self.primary_key] = proxy
 
 
-@requires(Dynamic("root_key"), Dynamic("attributes_key"), Dynamic("view_key"))
+@requires(
+    Dynamic("root_key"),
+    Dynamic("attributes_key"),
+    Dynamic("view_key"),
+)
 class AppendOnlyTriggerPlugin(Plugin):
     """Register INSTEAD OF triggers for an append-only dimension.
 
@@ -229,7 +236,7 @@ class AppendOnlyTriggerPlugin(Plugin):
         self.view_key = view_key
 
     def run(self, ctx: FactoryContext) -> None:
-        """Register INSTEAD OF triggers on the join view and API view."""
+        """Register INSTEAD OF triggers on join and API views."""
         root_table = ctx[self.root_key]
         attribute_table = ctx[self.attributes_key]
         root_fullname = f"{ctx.schemaname}.{root_table.name}"
@@ -245,19 +252,34 @@ class AppendOnlyTriggerPlugin(Plugin):
         }
 
         ops = [
-            ("insert", load_template(_TEMPLATES / "insert.mako")),
-            ("update", load_template(_TEMPLATES / "update.mako")),
-            ("delete", load_template(_TEMPLATES / "delete.mako")),
+            (
+                "insert",
+                load_template(_TEMPLATES / "insert.mako"),
+            ),
+            (
+                "update",
+                load_template(_TEMPLATES / "update.mako"),
+            ),
+            (
+                "delete",
+                load_template(_TEMPLATES / "delete.mako"),
+            ),
         ]
 
         views_to_trigger = [
-            (ctx.schemaname, f"{ctx.schemaname}.{ctx.tablename}"),
+            (
+                ctx.schemaname,
+                f"{ctx.schemaname}.{ctx.tablename}",
+            ),
         ]
         if self.view_key in ctx:
             api_view = ctx[self.view_key]
             api_schema = api_view.schema or "api"
             views_to_trigger.append(
-                (api_schema, f"{api_schema}.{ctx.tablename}")
+                (
+                    api_schema,
+                    f"{api_schema}.{ctx.tablename}",
+                )
             )
 
         for view_schema, view_fullname in views_to_trigger:

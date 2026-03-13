@@ -1,9 +1,12 @@
-"""Unit tests for SimpleTablePlugin and SimpleTriggerPlugin in isolation."""
+"""Unit tests for SimpleTablePlugin and SimpleTriggerPlugin."""
 
 import pytest
 from sqlalchemy import Column, String, Table
 
-from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+from cave.plugins.simple import (
+    SimpleTablePlugin,
+    SimpleTriggerPlugin,
+)
 from tests.unit.plugins.conftest import make_ctx, make_view
 
 
@@ -34,18 +37,13 @@ class TestSimpleTablePlugin:
         pk_col_names = {c.name for c in table.columns if c.primary_key}
         assert "id" in pk_col_names
 
-    def test_table_includes_extra_columns(self):
-        plugin = SimpleTablePlugin()
-        ctx = make_ctx()
-        ctx.extra_columns = [Column("tenant_id", String)]
-        plugin.run(ctx)
-        table = ctx["primary"]
-        assert "tenant_id" in {c.name for c in table.columns}
-
     def test_table_includes_dimensions(self):
         plugin = SimpleTablePlugin()
         ctx = make_ctx(
-            schema_items=[Column("name", String), Column("code", String)]
+            schema_items=[
+                Column("name", String),
+                Column("code", String),
+            ]
         )
         plugin.run(ctx)
         table = ctx["primary"]
@@ -63,6 +61,10 @@ class TestSimpleTablePlugin:
     def test_singleton_group_is_table(self):
         assert SimpleTablePlugin.singleton_group == "__table__"
 
+    def test_requires_pk_columns(self):
+        plugin = SimpleTablePlugin()
+        assert "pk_columns" in plugin.resolved_requires()
+
 
 class TestSimpleTriggerPlugin:
     def _ctx_with_table_and_view(self, table_key="primary", view_key="api"):
@@ -78,7 +80,7 @@ class TestSimpleTriggerPlugin:
         plugin.run(ctx)
         functions = ctx.metadata.info.get("functions")
         assert functions is not None
-        assert len(functions.functions) == 3  # insert, update, delete
+        assert len(functions.functions) == 3
 
     def test_registers_triggers(self):
         plugin = SimpleTriggerPlugin()
