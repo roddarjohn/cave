@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import Column
 
 from pgcraft.check import PGCraftCheck
+from pgcraft.computed import PGCraftComputed
+from pgcraft.statistics import PGCraftStatistics
 
 if TYPE_CHECKING:
     from sqlalchemy import MetaData
@@ -52,7 +54,9 @@ class FactoryContext:
     tablename: str
     schemaname: str
     metadata: MetaData
-    schema_items: list[SchemaItem | PGCraftCheck]
+    schema_items: list[
+        SchemaItem | PGCraftCheck | PGCraftComputed | PGCraftStatistics
+    ]
     plugins: list[Plugin]
 
     _store: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
@@ -75,7 +79,14 @@ class FactoryContext:
         SQLAlchemy ``SchemaItem`` objects: columns, constraints,
         indexes, computed columns, etc.
         """
-        return [i for i in self.schema_items if not isinstance(i, PGCraftCheck)]
+        return [
+            i
+            for i in self.schema_items
+            if not isinstance(
+                i,
+                (PGCraftCheck, PGCraftComputed, PGCraftStatistics),
+            )
+        ]
 
     def __getitem__(self, key: str) -> Any:  # noqa: ANN401
         """Return the value stored under *key*.
