@@ -38,22 +38,14 @@ EXTRA_EDGES = [
     ),
 ]
 
-SAMPLES = [
+SEED_FILE = "simple_seed.sql"
+
+QUERIES = [
     {
         "query": "SELECT * FROM public.users;",
-        "headers": ["id", "name", "email"],
-        "rows": [
-            ["1", "Alice", "alice@example.com"],
-            ["2", "Bob", "bob@example.com"],
-        ],
     },
     {
         "query": "SELECT * FROM api.users;",
         "description": ("The API view exposes the same columns."),
-        "headers": ["id", "name", "email"],
-        "rows": [
-            ["1", "Alice", "alice@example.com"],
-            ["2", "Bob", "bob@example.com"],
-        ],
     },
 ]

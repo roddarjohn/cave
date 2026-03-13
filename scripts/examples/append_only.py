@@ -62,54 +62,21 @@ EXTRA_EDGES = [
     ),
 ]
 
-SAMPLES = [
+SEED_FILE = "append_only_seed.sql"
+
+QUERIES = [
     {
-        "query": "SELECT * FROM private.employees_attributes;",
+        "query": ("SELECT * FROM private.employees_attributes ORDER BY id;"),
         "description": (
             "Each change appends a new row.  Row 3 "
             "records Alice's department change."
         ),
-        "headers": [
-            "id",
-            "created_at",
-            "name",
-            "department",
-        ],
-        "rows": [
-            [
-                "1",
-                "2024-01-15 10:00",
-                "Alice",
-                "Engineering",
-            ],
-            [
-                "2",
-                "2024-01-15 10:00",
-                "Bob",
-                "Marketing",
-            ],
-            [
-                "3",
-                "2024-03-01 09:00",
-                "Alice",
-                "Management",
-            ],
-        ],
     },
     {
         "query": "SELECT * FROM private.employees_root;",
         "description": (
             "Points to the latest attribute row via the foreign key."
         ),
-        "headers": [
-            "id",
-            "created_at",
-            "employees_attributes_id",
-        ],
-        "rows": [
-            ["1", "2024-01-15 10:00", "3"],
-            ["2", "2024-01-15 10:00", "2"],
-        ],
     },
     {
         "query": "SELECT * FROM api.employees;",
@@ -117,28 +84,5 @@ SAMPLES = [
             "Joins root with the pointed-to attribute "
             "row, showing the latest values."
         ),
-        "headers": [
-            "id",
-            "created_at",
-            "updated_at",
-            "name",
-            "department",
-        ],
-        "rows": [
-            [
-                "1",
-                "2024-01-15 10:00",
-                "2024-03-01 09:00",
-                "Alice",
-                "Management",
-            ],
-            [
-                "2",
-                "2024-01-15 10:00",
-                "2024-01-15 10:00",
-                "Bob",
-                "Marketing",
-            ],
-        ],
     },
 ]

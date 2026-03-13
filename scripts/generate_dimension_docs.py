@@ -1,16 +1,19 @@
 """Generate RST docs for built-in dimension types.
 
 Imports each example module from ``scripts/examples/``,
-introspects the generated MetaData, and writes RST files
-with ERD diagrams, schema tables, and sample data to
-``docs/_generated/``.
+creates tables and views on a real PostgreSQL database,
+runs sample queries, and writes RST files with ERD
+diagrams and query output to ``docs/_generated/``.
+
+Requires ``DATABASE_URL`` to be set.
 """
 
 import importlib.util
+import os
 from pathlib import Path
 from types import ModuleType
 
-from sqlalchemy import Column, MetaData
+from sqlalchemy import Column, MetaData, create_engine, text
 
 _HERE = Path(__file__).resolve().parent
 _EXAMPLES = _HERE / "examples"
@@ -57,13 +60,12 @@ def _psql_table(
        id | name  | email
       ----+-------+-------------------
         1 | Alice | alice@example.com
-        2 | Bob   | bob@example.com
     """
     all_rows = [headers, *rows]
     widths = [max(len(row[i]) for row in all_rows) for i in range(len(headers))]
 
-    def _fmt(row: list[str], pad: str = " ") -> str:
-        cells = [f"{pad}{cell:<{widths[i]}}{pad}" for i, cell in enumerate(row)]
+    def _fmt(row: list[str]) -> str:
+        cells = [f" {cell:<{widths[i]}} " for i, cell in enumerate(row)]
         return "|".join(cells)
 
     header_line = _fmt(headers)
@@ -214,11 +216,47 @@ def _build_dot(
     return "\n".join(parts)
 
 
+# -- Database interaction --------------------------------------------
+
+
+def _create_views(conn, metadata: MetaData) -> None:  # noqa: ANN001
+    """CREATE VIEW for each view registered on *metadata*."""
+    views_obj = metadata.info.get("views")
+    if not views_obj:
+        return
+    for view in views_obj:
+        schema = view.schema or "public"
+        conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+        defn = view.compile_definition()
+        fqn = f"{schema}.{view.name}"
+        conn.execute(text(f"CREATE OR REPLACE VIEW {fqn} AS {defn}"))
+
+
+def _run_query(
+    conn,  # noqa: ANN001
+    sql: str,
+) -> tuple[list[str], list[list[str]]]:
+    """Execute *sql* and return (headers, rows) of strings."""
+    result = conn.execute(text(sql))
+    headers = list(result.keys())
+    rows = [[_format_cell(cell) for cell in row] for row in result.fetchall()]
+    return headers, rows
+
+
+def _format_cell(value: object) -> str:
+    """Format a single cell value for psql-style output."""
+    if value is None:
+        return "NULL"
+    if isinstance(value, bool):
+        return str(value).lower()
+    return str(value)
+
+
 # -- RST section builders -------------------------------------------
 
 
 def _schema_lines(tables: list[dict]) -> list[str]:
-    """RST lines for schema tables (no heading)."""
+    """RST lines for schema tables."""
     parts: list[str] = []
     for t in tables:
         parts.append(f"``{t['fullname']}``")
@@ -237,26 +275,24 @@ def _schema_lines(tables: list[dict]) -> list[str]:
     return parts
 
 
-def _sample_lines(samples: list[dict]) -> list[str]:
-    """RST lines for sample data as psql-style tables.
+def _query_lines(
+    conn,  # noqa: ANN001
+    queries: list[dict],
+) -> list[str]:
+    """Run each query and build RST code blocks.
 
-    Each *sample* has ``title``, ``headers``, ``rows``,
-    and an optional ``description``.
+    Each *query* dict has ``query`` (SQL string) and
+    an optional ``description``.
     """
     parts: list[str] = []
-    for s in samples:
-        parts.append(f"*{s['title']}*")
-        if s.get("description"):
+    for q in queries:
+        sql = q["query"]
+        if q.get("description"):
+            parts.append(q["description"])
             parts.append("")
-            parts.append(s["description"])
-        parts.append("")
-        parts.append(
-            _directive(
-                "code-block",
-                _psql_table(s["headers"], s["rows"]),
-                argument="text",
-            )
-        )
+        headers, rows = _run_query(conn, sql)
+        block = f"=# {sql}\n{_psql_table(headers, rows)}\n({len(rows)} rows)"
+        parts.append(_directive("code-block", block, argument="text"))
         parts.append("")
     return parts
 
@@ -264,16 +300,37 @@ def _sample_lines(samples: list[dict]) -> list[str]:
 # -- Main ------------------------------------------------------------
 
 
-def _generate_one(slug: str, mod: ModuleType) -> None:
+def _generate_one(
+    slug: str,
+    mod: ModuleType,
+    conn,  # noqa: ANN001
+) -> None:
     """Generate the RST include file for one dimension."""
     tables = _table_schema(mod.metadata)
     dot = _build_dot(tables, mod.VIEWS, mod.EXTRA_EDGES)
+
+    # Create schemas, drop pre-existing tables, then create fresh
+    for t in tables:
+        schema = t["fullname"].split(".")[0]
+        conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+    for key in reversed(list(mod.metadata.tables)):
+        conn.execute(text(f"DROP TABLE IF EXISTS {key} CASCADE"))
+    mod.metadata.create_all(conn)
+    _create_views(conn, mod.metadata)
+
+    # Insert sample data from seed SQL file
+    seed_path = _EXAMPLES / mod.SEED_FILE
+    seed_sql = seed_path.read_text()
+    for raw_stmt in seed_sql.strip().split(";"):
+        cleaned = raw_stmt.strip()
+        if cleaned:
+            conn.execute(text(cleaned))
 
     parts = [
         _directive("graphviz", dot),
         "",
         *_schema_lines(tables),
-        *_sample_lines(mod.SAMPLES),
+        *_query_lines(conn, mod.QUERIES),
     ]
     path = _OUT / f"dim_{slug}.rst"
     path.write_text("\n".join(parts))
@@ -289,10 +346,20 @@ _EXAMPLES_LIST = [
 
 def main() -> None:
     """Write generated RST files to docs/_generated/."""
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        msg = "DATABASE_URL must be set"
+        raise RuntimeError(msg)
+
     _OUT.mkdir(parents=True, exist_ok=True)
+    engine = create_engine(url)
+
     for slug, filename in _EXAMPLES_LIST:
         mod = _load_example(_EXAMPLES / filename)
-        _generate_one(slug, mod)
+        with engine.connect() as conn:
+            trans = conn.begin()
+            _generate_one(slug, mod, conn)
+            trans.rollback()
 
 
 if __name__ == "__main__":
