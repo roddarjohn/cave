@@ -139,12 +139,18 @@ for role/grant generation.
 
 ``columns``
     List of column names to include in the view.  When ``None``
-    (the default), all table columns are selected.
+    (the default), all table columns are selected.  Mutually
+    exclusive with ``exclude_columns``.
 
-``stats_key``
-    Context key holding statistics view info (default
-    ``"statistics_views"``).  LEFT JOINs statistics views into
-    the API view when the key exists and is non-empty.
+``exclude_columns``
+    List of column names to hide from the view.  Mutually
+    exclusive with ``columns``.
+
+``joins_key``
+    Context key holding a dict of
+    :class:`~pgcraft.statistics.JoinedView` entries (default
+    ``"joins"``).  LEFT JOINs each view into the API view when
+    the key exists and is non-empty.
 
 Default behaviour — ``SELECT *``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -183,22 +189,40 @@ The generated view:
    SELECT p.id, p.name
    FROM public.users AS p
 
-Statistics joins
-~~~~~~~~~~~~~~~~
+Excluding columns
+~~~~~~~~~~~~~~~~~
 
-When ``PGCraftStatisticsView`` items are present in
-``schema_items``, the default ``StatisticsViewPlugin`` creates
-the statistics views and ``APIPlugin`` automatically LEFT JOINs
-them into the API view.  No extra configuration is needed.
-
-See :ref:`StatisticsViewPlugin <statistics-view-plugin>` for
-the full workflow.
-
-Combined with column selection:
+Alternatively, specify which columns to hide — all others are
+included automatically:
 
 .. code-block:: python
 
-   APIPlugin(columns=["id", "name"])
+   APIPlugin(exclude_columns=["internal_notes"])
+
+This is often more convenient than ``columns`` when you only want
+to hide one or two columns from a large table.
+
+Joins
+~~~~~
+
+When ``PGCraftStatisticsView`` items are present in
+``schema_items``, the default ``StatisticsViewPlugin`` creates
+the views and stores :class:`~pgcraft.statistics.JoinedView`
+entries in ``ctx["joins"]``.  ``APIPlugin`` automatically LEFT
+JOINs them into the API view — no extra configuration needed.
+
+From the API plugin's perspective, joins are generic — any plugin
+that writes a dict of ``JoinedView`` entries to ``ctx["joins"]``
+will be picked up automatically.
+
+See :ref:`StatisticsViewPlugin <statistics-view-plugin>` for
+the statistics-specific workflow.
+
+Combined with column exclusion:
+
+.. code-block:: python
+
+   APIPlugin(exclude_columns=["internal_notes"])
 
 
 .. _statistics-view-plugin:
@@ -214,15 +238,15 @@ stores info for :class:`~pgcraft.plugins.api.APIPlugin` to
 consume.  Included in every dimension factory's default plugins —
 a no-op when no statistics items are present.
 
-**Produces:** ``"statistics_views"`` (via ``stats_key``)
+**Produces:** ``"joins"`` (via ``joins_key``)
 
 **Requires:** ``"primary"`` (via ``table_key``), ``"pk_columns"``
 
 **Parameters:**
 
-``stats_key``
+``joins_key``
     Context key to store the view info dict under (default
-    ``"statistics_views"``).
+    ``"joins"``).
 
 ``table_key``
     Context key for the source table (default ``"primary"``).
@@ -234,8 +258,8 @@ How it works
    ``ctx.schema_items``, compiles the SQLAlchemy query to SQL and
    creates a view named ``{tablename}_{name}_statistics``.
 2. Stores a dict of
-   :class:`~pgcraft.statistics.StatisticsViewInfo` in
-   ``ctx[stats_key]`` for downstream plugins.
+   :class:`~pgcraft.statistics.JoinedView` in
+   ``ctx[joins_key]`` for downstream plugins.
 3. The join key column is automatically excluded from the API
    select list — only the aggregate columns appear.
 4. Each view's ``schema`` defaults to the dimension's schema but
@@ -640,7 +664,7 @@ declarations.  A typical simple dimension pipeline runs:
    SerialPKPlugin        → pk_columns
    SimpleTablePlugin     → primary, __root__
    TableCheckPlugin      (reads __root__)
-   StatisticsViewPlugin  → statistics_views  (no-op if empty)
+   StatisticsViewPlugin  → joins  (no-op if empty)
    APIPlugin             → api
    SimpleTriggerPlugin   (reads primary, api)
 

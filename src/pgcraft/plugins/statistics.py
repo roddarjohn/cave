@@ -11,24 +11,25 @@ if TYPE_CHECKING:
 
 from pgcraft.plugin import Dynamic, Plugin, produces, requires
 from pgcraft.statistics import (
-    StatisticsViewInfo,
+    JoinedView,
     collect_statistics,
 )
 from pgcraft.utils.query import compile_query
 
 
-@produces(Dynamic("stats_key"))
+@produces(Dynamic("joins_key"))
 @requires(Dynamic("table_key"), "pk_columns")
 class StatisticsViewPlugin(Plugin):
     """Create statistics views from PGCraftStatisticsView items.
 
     For each :class:`~pgcraft.statistics.PGCraftStatisticsView` in
     ``ctx.schema_items``, creates a view (or materialized view)
-    and stores info in ``ctx[stats_key]`` for the API plugin.
+    and stores a :class:`~pgcraft.statistics.JoinedView` entry in
+    ``ctx[joins_key]`` for the API plugin to LEFT JOIN.
 
     Args:
-        stats_key: Key to store view info dict under
-            (default ``"statistics_views"``).
+        joins_key: Key to store the joined view info dict under
+            (default ``"joins"``).
         table_key: Key in ``ctx`` for the source table
             (default ``"primary"``).
 
@@ -36,19 +37,19 @@ class StatisticsViewPlugin(Plugin):
 
     def __init__(
         self,
-        stats_key: str = "statistics_views",
+        joins_key: str = "joins",
         table_key: str = "primary",
     ) -> None:
         """Store configuration and context keys."""
-        self.stats_key = stats_key
+        self.joins_key = joins_key
         self.table_key = table_key
 
     def run(self, ctx: FactoryContext) -> None:
-        """Create statistics views and store info for API."""
+        """Create statistics views and store join info."""
         pk_columns = ctx["pk_columns"]
         pk_col_name = pk_columns.first_key
         stats_items = collect_statistics(ctx.schema_items)
-        info: dict[str, StatisticsViewInfo] = {}
+        joins: dict[str, JoinedView] = {}
 
         for stat in stats_items:
             view_name = f"{ctx.tablename}_{stat.view_suffix}"
@@ -65,11 +66,11 @@ class StatisticsViewPlugin(Plugin):
                 materialized=stat.materialized,
             )
             register_view(ctx.metadata, view)
-            exposed_cols = [c for c in stat.column_names if c != join_key]
-            info[stat.name] = StatisticsViewInfo(
+            exposed_cols = [col for col in stat.column_names if col != join_key]
+            joins[stat.name] = JoinedView(
                 view_name=f"{view_schema}.{view_name}",
                 join_key=join_key,
                 column_names=exposed_cols,
             )
 
-        ctx[self.stats_key] = info
+        ctx[self.joins_key] = joins

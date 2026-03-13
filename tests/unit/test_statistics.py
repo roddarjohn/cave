@@ -12,8 +12,8 @@ from sqlalchemy import (
 )
 
 from pgcraft.statistics import (
+    JoinedView,
     PGCraftStatisticsView,
-    StatisticsViewInfo,
     collect_statistics,
 )
 
@@ -111,9 +111,9 @@ class TestPGCraftStatisticsViewDefaults:
         assert stat.schema == "analytics"
 
 
-class TestStatisticsViewInfo:
+class TestJoinedView:
     def test_stores_fields(self):
-        info = StatisticsViewInfo(
+        info = JoinedView(
             view_name="dim.customer_orders_statistics",
             join_key="customer_id",
             column_names=["cnt"],

@@ -65,7 +65,7 @@ class FactoryContext:
         Useful when a plugin needs to iterate over column
         definitions (e.g. to extract column names or types).
         """
-        return [i for i in self.schema_items if isinstance(i, Column)]
+        return [item for item in self.schema_items if isinstance(item, Column)]
 
     @property
     def table_items(self) -> list[SchemaItem]:
@@ -77,10 +77,10 @@ class FactoryContext:
         indexes, computed columns, etc.
         """
         return [
-            i
-            for i in self.schema_items
+            item
+            for item in self.schema_items
             if not isinstance(
-                i,
+                item,
                 (PGCraftCheck, PGCraftStatisticsView),
             )
         ]

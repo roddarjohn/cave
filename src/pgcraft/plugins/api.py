@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from sqlalchemy import Table
 
     from pgcraft.factory.context import FactoryContext
-    from pgcraft.statistics import StatisticsViewInfo
+    from pgcraft.statistics import JoinedView
 
 from pgcraft.plugin import Dynamic, Plugin, produces, requires
 from pgcraft.resource import (
@@ -61,26 +61,67 @@ def _resolve_columns(
     return result
 
 
-def _build_stats_columns(
-    stats: dict[str, StatisticsViewInfo],
-    aliases: dict[str, str],
-) -> list[Any]:
-    """Build select-list entries for statistics view columns.
+def _resolve_included_columns(
+    primary: Table,
+    columns: list[str] | None,
+    exclude_columns: list[str] | None,
+) -> list[str] | None:
+    """Resolve the effective column list.
 
     Args:
-        stats: Statistics view info dict from ctx.
-        aliases: Map of stats name to table alias.
+        primary: The source table.
+        columns: Explicit include list (or ``None``).
+        exclude_columns: Explicit exclude list (or ``None``).
 
     Returns:
-        List of labeled column expressions for stats columns.
+        Resolved column name list, or ``None`` for all columns.
+
+    Raises:
+        ValueError: If both are set, or an excluded column is
+            not found on the table.
+
+    """
+    if columns is not None and exclude_columns is not None:
+        msg = "Cannot specify both 'columns' and 'exclude_columns' on APIPlugin"
+        raise ValueError(msg)
+
+    if exclude_columns is not None:
+        table_cols = {col.key for col in primary.columns}
+        for name in exclude_columns:
+            if name not in table_cols:
+                msg = (
+                    f"Column {name!r} in exclude_columns "
+                    f"not found on table "
+                    f"({sorted(table_cols)})"
+                )
+                raise ValueError(msg)
+        return [
+            col.key for col in primary.columns if col.key not in exclude_columns
+        ]
+
+    return columns
+
+
+def _build_join_columns(
+    joins: dict[str, JoinedView],
+    aliases: dict[str, str],
+) -> list[Any]:
+    """Build select-list entries for joined view columns.
+
+    Args:
+        joins: Joined view info dict from ctx.
+        aliases: Map of join name to table alias.
+
+    Returns:
+        List of labeled column expressions.
 
     """
     result: list[Any] = []
-    for name, info in stats.items():
+    for name, view_info in joins.items():
         alias = aliases[name]
         result.extend(
             literal_column(f"{alias}.{col_name}").label(col_name)
-            for col_name in info.column_names
+            for col_name in view_info.column_names
         )
     return result
 
@@ -101,11 +142,14 @@ class APIPlugin(Plugin):
             view proxy from (default ``"primary"``).
         view_key: Key in ``ctx`` to store the created view
             under (default ``"api"``).
-        columns: Column names to include in the view. When
-            ``None``, all table columns are included.
-        stats_key: Key in ``ctx`` holding statistics view info.
-            LEFT JOINs stats views into the API view when
-            the key exists and is non-empty.
+        columns: Column names to include in the view. Mutually
+            exclusive with ``exclude_columns``.
+        exclude_columns: Column names to exclude from the view.
+            Mutually exclusive with ``columns``.
+        joins_key: Key in ``ctx`` holding a dict of
+            :class:`~pgcraft.statistics.JoinedView` entries.
+            LEFT JOINs each view into the API view when the key
+            exists and is non-empty.
 
     """
 
@@ -116,7 +160,8 @@ class APIPlugin(Plugin):
         table_key: str = "primary",
         view_key: str = "api",
         columns: list[str] | None = None,
-        stats_key: str = "statistics_views",
+        exclude_columns: list[str] | None = None,
+        joins_key: str = "joins",
     ) -> None:
         """Store the API configuration and context keys."""
         self.schema = schema
@@ -124,20 +169,33 @@ class APIPlugin(Plugin):
         self.table_key = table_key
         self.view_key = view_key
         self.columns = columns
-        self.stats_key = stats_key
+        self.exclude_columns = exclude_columns
+        self.joins_key = joins_key
 
     def run(self, ctx: FactoryContext) -> None:
         """Create the API view and register the resource."""
         primary = ctx[self.table_key]
-        if self.stats_key in ctx:
-            stats: dict[str, StatisticsViewInfo] = ctx[self.stats_key]
+
+        if self.joins_key in ctx:
+            joins: dict[str, JoinedView] = ctx[self.joins_key]
         else:
-            stats = {}
-        use_alias = self.columns is not None or bool(stats)
+            joins = {}
+
+        effective_columns = _resolve_included_columns(
+            primary,
+            self.columns,
+            self.exclude_columns,
+        )
+
+        use_alias = effective_columns is not None or bool(joins)
         alias = "p"
 
-        if self.columns is not None:
-            select_cols = _resolve_columns(primary, self.columns, alias)
+        if effective_columns is not None:
+            select_cols = _resolve_columns(
+                primary,
+                effective_columns,
+                alias,
+            )
         elif use_alias:
             select_cols = [
                 literal_column(f"{alias}.{col.key}").label(col.key)
@@ -146,18 +204,18 @@ class APIPlugin(Plugin):
         else:
             select_cols = [col.label(col.key) for col in primary.columns]
 
-        if stats:
+        if joins:
             aliases: dict[str, str] = {}
-            for i, name in enumerate(stats):
+            for i, name in enumerate(joins):
                 aliases[name] = f"s{i}" if i > 0 else "s"
-            select_cols.extend(_build_stats_columns(stats, aliases))
+            select_cols.extend(_build_join_columns(joins, aliases))
 
-        if stats:
-            definition = self._build_stats_sql(
+        if joins:
+            definition = self._build_join_sql(
                 ctx,
                 primary,
                 select_cols,
-                stats,
+                joins,
                 aliases,
                 alias,
             )
@@ -186,15 +244,15 @@ class APIPlugin(Plugin):
         )
 
     @staticmethod
-    def _build_stats_sql(  # noqa: PLR0913
+    def _build_join_sql(  # noqa: PLR0913
         ctx: FactoryContext,
         primary: Table,
         select_cols: list[Any],
-        stats: dict[str, StatisticsViewInfo],
+        joins: dict[str, JoinedView],
         aliases: dict[str, str],
         alias: str,
     ) -> str:
-        """Build raw SQL with LEFT JOINs for statistics views."""
+        """Build raw SQL with LEFT JOINs."""
         col_strs = []
         for col_expr in select_cols:
             compiled = col_expr.compile(dialect=postgresql.dialect())
@@ -205,13 +263,13 @@ class APIPlugin(Plugin):
 
         join_clauses = []
         pk_col_name = ctx["pk_columns"].first_key
-        for name, info in stats.items():
-            sa = aliases[name]
+        for name, view_info in joins.items():
+            join_alias = aliases[name]
             join_clauses.append(
-                f"LEFT OUTER JOIN {info.view_name}"
-                f" AS {sa}"
+                f"LEFT OUTER JOIN {view_info.view_name}"
+                f" AS {join_alias}"
                 f" ON {alias}.{pk_col_name}"
-                f" = {sa}.{info.join_key}"
+                f" = {join_alias}.{view_info.join_key}"
             )
 
         parts = [

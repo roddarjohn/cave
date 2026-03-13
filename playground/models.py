@@ -169,12 +169,6 @@ SimpleDimensionResourceFactory(
             join_key="customer_id",
         ),
     ],
-    plugins=[
-        SerialPKPlugin(),
-        SimpleTablePlugin(),
-        APIPlugin(),
-        SimpleTriggerPlugin(),
-    ],
 )
 
 # -- Declarative models -------------------------------------------------

@@ -451,6 +451,14 @@ The ``internal_notes`` column exists in the backing table but is
 invisible through the PostgREST API.  Any column name not found on
 the table raises ``ValueError`` at factory construction time.
 
+Alternatively, use ``exclude_columns`` to hide specific columns
+while including everything else — often more convenient for large
+tables:
+
+.. code-block:: python
+
+   APIPlugin(exclude_columns=["internal_notes"])
+
 
 .. _cookbook-statistics-views:
 

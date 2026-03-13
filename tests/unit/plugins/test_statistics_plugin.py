@@ -112,7 +112,7 @@ class TestStatisticsViewPlugin:
         plugin = StatisticsViewPlugin()
         ctx = _ctx_with_stats([stat])
         plugin.run(ctx)
-        info = ctx["statistics_views"]
+        info = ctx["joins"]
         assert "orders" in info
         si = info["orders"]
         assert si.view_name == "dim.customer_orders_statistics"
@@ -128,7 +128,7 @@ class TestStatisticsViewPlugin:
         plugin = StatisticsViewPlugin()
         ctx = _ctx_with_stats([stat])
         plugin.run(ctx)
-        info = ctx["statistics_views"]
+        info = ctx["joins"]
         assert "customer_id" not in info["orders"].column_names
 
     def test_join_key_defaults_to_pk(self):
@@ -142,17 +142,17 @@ class TestStatisticsViewPlugin:
         plugin = StatisticsViewPlugin()
         ctx = _ctx_with_stats([stat])
         plugin.run(ctx)
-        info = ctx["statistics_views"]
+        info = ctx["joins"]
         assert info["orders"].join_key == "id"
         assert info["orders"].column_names == ["cnt"]
 
-    def test_custom_stats_key(self):
+    def test_custom_joins_key(self):
         stat = PGCraftStatisticsView(
             name="orders",
             query=_order_stats_query(),
             join_key="customer_id",
         )
-        plugin = StatisticsViewPlugin(stats_key="my_stats")
+        plugin = StatisticsViewPlugin(joins_key="my_stats")
         ctx = _ctx_with_stats([stat])
         plugin.run(ctx)
         assert "my_stats" in ctx
@@ -161,7 +161,7 @@ class TestStatisticsViewPlugin:
         plugin = StatisticsViewPlugin()
         ctx = _ctx_with_stats([])
         plugin.run(ctx)
-        assert ctx["statistics_views"] == {}
+        assert ctx["joins"] == {}
 
     def test_materialized_view(self):
         stat = PGCraftStatisticsView(
@@ -188,7 +188,7 @@ class TestStatisticsViewPlugin:
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
         assert view.schema == "analytics"
-        info = ctx["statistics_views"]
+        info = ctx["joins"]
         assert info["orders"].view_name == (
             "analytics.customer_orders_statistics"
         )
@@ -211,7 +211,7 @@ class TestStatisticsViewPlugin:
         plugin.run(ctx)
         views = ctx.metadata.info["views"]
         assert len(views.views) == 2
-        info = ctx["statistics_views"]
+        info = ctx["joins"]
         assert "orders" in info
         assert "invoices" in info
         assert info["orders"].column_names == ["order_count"]

@@ -89,11 +89,11 @@ class PGCraftStatisticsView:
 
 
 @dataclass(frozen=True)
-class StatisticsViewInfo:
-    """Runtime info about a created statistics view.
+class JoinedView:
+    """A view to LEFT JOIN into the API view.
 
-    Stored in ``ctx[stats_key]`` by the statistics plugin for
-    the API plugin to consume when building LEFT JOINs.
+    Produced by plugins (e.g. ``StatisticsViewPlugin``) and
+    consumed by ``APIPlugin`` when building the API view SQL.
 
     Args:
         view_name: Fully qualified view name
