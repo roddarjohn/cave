@@ -1,7 +1,7 @@
 Development
 ===========
 
-This guide explains how to set up a local development environment for **cave**,
+This guide explains how to set up a local development environment for **pgcraft**,
 run tests, lint code, and build the documentation.
 
 Prerequisites
@@ -24,10 +24,10 @@ Install ``just`` by following the
 Fork and clone
 --------------
 
-`Fork the repository <https://github.com/roddajohn/cave/fork>`_ on GitHub, then clone your fork::
+`Fork the repository <https://github.com/roddarjohn/pgcraft/fork>`_ on GitHub, then clone your fork::
 
-    git clone https://github.com/<your-username>/cave
-    cd cave
+    git clone https://github.com/<your-username>/pgcraft
+    cd pgcraft
 
 Install all dependency groups and activate the virtual environment::
 
@@ -42,10 +42,10 @@ That's it. You're ready to develop.
 Running tests
 -------------
 
-cave uses `pytest <https://docs.pytest.org>`_ for testing.
+pgcraft uses `pytest <https://docs.pytest.org>`_ for testing.
 
 Tests are organised into three directories that mirror the source tree under
-``src/cave/``:
+``src/pgcraft/``:
 
 ``tests/unit/``
     Pure Python tests with no database dependency.  These run instantly and
@@ -85,12 +85,12 @@ Both commands pass arguments through to pytest::
    Integration tests require a PostgreSQL instance.  Set ``DATABASE_URL``
    before running them, for example::
 
-       DATABASE_URL=postgresql+psycopg://postgres@localhost/cave just dev-test tests/integration
+       DATABASE_URL=postgresql+psycopg://postgres@localhost/pgcraft just dev-test tests/integration
 
 Coverage
 --------
 
-cave uses `slipcover <https://github.com/plasma-umass/slipcover>`_ for
+pgcraft uses `slipcover <https://github.com/plasma-umass/slipcover>`_ for
 coverage reporting::
 
     just coverage
@@ -105,7 +105,7 @@ scope::
 Linting and formatting
 -----------------------
 
-cave uses `ruff <https://docs.astral.sh/ruff/>`_ for linting and formatting.
+pgcraft uses `ruff <https://docs.astral.sh/ruff/>`_ for linting and formatting.
 It runs automatically as a pre-commit hook, but you can also run it manually::
 
     just lint
@@ -118,7 +118,7 @@ Ruff will check for style issues and verify formatting. To auto-fix and auto-for
 Type checking
 -------------
 
-cave uses `ty <https://github.com/astral-sh/ty>`_ for type checking::
+pgcraft uses `ty <https://github.com/astral-sh/ty>`_ for type checking::
 
     just type-check
 
@@ -156,5 +156,5 @@ To report a bug, open a GitHub issue with a minimal reproduction case, what
 you expected, what happened, and your Python version and OS.
 
 For security vulnerabilities, see
-`SECURITY.md <https://github.com/roddajohn/cave/blob/main/SECURITY.md>`_
+`SECURITY.md <https://github.com/roddarjohn/pgcraft/blob/main/SECURITY.md>`_
 rather than opening a public issue.

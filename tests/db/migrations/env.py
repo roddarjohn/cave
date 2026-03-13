@@ -6,13 +6,13 @@ from pathlib import Path
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from cave.alembic.register import (
-    cave_alembic_hook,
-    cave_configure_metadata,
-    cave_process_revision_directives,
+from pgcraft.alembic.register import (
+    pgcraft_alembic_hook,
+    pgcraft_configure_metadata,
+    pgcraft_process_revision_directives,
 )
 
-cave_alembic_hook()
+pgcraft_alembic_hook()
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -25,7 +25,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
-cave_configure_metadata(target_metadata)
+pgcraft_configure_metadata(target_metadata)
 
 
 def run_migrations_offline() -> None:
@@ -37,7 +37,7 @@ def run_migrations_offline() -> None:
         include_schemas=True,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        process_revision_directives=cave_process_revision_directives,
+        process_revision_directives=pgcraft_process_revision_directives,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -55,7 +55,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             include_schemas=True,
-            process_revision_directives=cave_process_revision_directives,
+            process_revision_directives=pgcraft_process_revision_directives,
         )
         with context.begin_transaction():
             context.run_migrations()

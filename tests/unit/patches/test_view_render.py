@@ -1,11 +1,11 @@
-"""Unit tests for cave.patches.view_render."""
+"""Unit tests for pgcraft.patches.view_render."""
 
 from unittest.mock import MagicMock, patch
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy_declarative_extensions.view.base import View
 
-from cave.patches.view_render import _patched_render_definition, apply
+from pgcraft.patches.view_render import _patched_render_definition, apply
 
 
 def _make_pg_conn():
@@ -98,7 +98,7 @@ class TestPatchedRenderDefinitionHappyPath:
         mock_view_obj.definition = "SELECT 1"
 
         with patch(
-            "cave.patches.view_render.get_view",
+            "pgcraft.patches.view_render.get_view",
             return_value=mock_view_obj,
         ):
             result = _patched_render_definition(view, mock_conn)
@@ -121,7 +121,8 @@ class TestPatchedRenderDefinitionHappyPath:
             call_count += 1
             return mock_view1 if call_count == 1 else mock_view2
 
-        with patch("cave.patches.view_render.get_view", side_effect=_get_view):
+        _target = "pgcraft.patches.view_render.get_view"
+        with patch(_target, side_effect=_get_view):
             result = _patched_render_definition(view, mock_conn)
 
         assert "SELECT" in result
@@ -144,7 +145,8 @@ class TestPatchedRenderDefinitionHappyPath:
             idx += 1
             return v
 
-        with patch("cave.patches.view_render.get_view", side_effect=_get_view):
+        _target = "pgcraft.patches.view_render.get_view"
+        with patch(_target, side_effect=_get_view):
             result = _patched_render_definition(view, mock_conn)
 
         assert isinstance(result, str)

@@ -3,7 +3,7 @@
 import pytest
 from sqlalchemy import Column, Integer
 
-from cave.columns import PrimaryKeyColumns
+from pgcraft.columns import PrimaryKeyColumns
 
 
 class TestPrimaryKeyColumns:

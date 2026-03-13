@@ -9,12 +9,12 @@ from pathlib import Path
 import pytest
 from sqlalchemy import text
 
-from cave.utils.template import load_template
+from pgcraft.utils.template import load_template
 
 _SIMPLE_TEMPLATES = (
     Path(__file__).resolve().parents[4]
     / "src"
-    / "cave"
+    / "pgcraft"
     / "plugins"
     / "templates"
     / "simple"

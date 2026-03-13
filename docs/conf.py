@@ -1,4 +1,4 @@
-project = "cave"
+project = "pgcraft"
 author = "Rodda John"
 extensions = [
     "sphinx.ext.autodoc",
@@ -12,7 +12,7 @@ extensions = [
 ]
 graphviz_output_format = "svg"
 html_theme = "furo"
-html_title = "cave"
+html_title = "pgcraft"
 exclude_patterns = ["_generated"]
 add_module_names = False
 nitpicky = True
@@ -21,7 +21,7 @@ nitpick_ignore = [
     ("py:class", "alembic.operations.ops.MigrateOperation"),
     ("py:class", "alembic.autogenerate.rewriter.Rewriter"),
     # private Protocol used only for internal type checking
-    ("py:class", "cave.validator._SchemaItemValidator"),
+    ("py:class", "pgcraft.validator._SchemaItemValidator"),
 ]
 
 intersphinx_mapping = {

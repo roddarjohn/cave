@@ -1,10 +1,10 @@
-"""Unit tests for cave.validator."""
+"""Unit tests for pgcraft.validator."""
 
 import pytest
 from sqlalchemy import Column, Integer, String
 
-from cave.errors import CaveValidationError
-from cave.validator import (
+from pgcraft.errors import PGCraftValidationError
+from pgcraft.validator import (
     is_schema_item_not_primary_key,
     validate_schema_items,
 )
@@ -49,12 +49,12 @@ class TestValidateSchemaItems:
             Column("id", Integer, primary_key=True),
             Column("name", String),
         ]
-        with pytest.raises(CaveValidationError):
+        with pytest.raises(PGCraftValidationError):
             validate_schema_items(items)
 
     def test_single_pk_column_raises(self):
         items = [Column("id", Integer, primary_key=True)]
-        with pytest.raises(CaveValidationError):
+        with pytest.raises(PGCraftValidationError):
             validate_schema_items(items)
 
     def test_custom_validator_used_when_provided(self):
@@ -64,7 +64,7 @@ class TestValidateSchemaItems:
             return False
 
         items = [Column("name", String)]
-        with pytest.raises(CaveValidationError):
+        with pytest.raises(PGCraftValidationError):
             validate_schema_items(items, validators=[always_false])
 
     def test_custom_always_true_validator(self):

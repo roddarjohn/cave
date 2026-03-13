@@ -1,7 +1,7 @@
 Plugin architecture
 ===================
 
-cave's resource factories are built entirely on a plugin system.  A factory
+pgcraft's resource factories are built entirely on a plugin system.  A factory
 is a thin runner that topologically sorts a list of plugins by their declared
 dependencies and calls each one in turn.  All behaviour — primary keys, table
 layout, views, triggers, API exposure — is provided by plugins, so every part
@@ -14,15 +14,15 @@ Plugin
 ~~~~~~
 
 A plugin is any instance of a class that inherits from
-:class:`~cave.plugin.Plugin`.  The :meth:`~cave.plugin.Plugin.run` method is
+:class:`~pgcraft.plugin.Plugin`.  The :meth:`~pgcraft.plugin.Plugin.run` method is
 a no-op by default, so a plugin only needs to implement the hooks it cares
 about.  Plugins communicate by writing to and reading from a shared
-:class:`~cave.factory.context.FactoryContext`.
+:class:`~pgcraft.factory.context.FactoryContext`.
 
 FactoryContext
 ~~~~~~~~~~~~~~
 
-:class:`~cave.factory.context.FactoryContext` carries the inputs supplied to
+:class:`~pgcraft.factory.context.FactoryContext` carries the inputs supplied to
 the factory (table name, schema, metadata, schema items) together with a flat
 key/value store that plugins use to pass objects between themselves.
 
@@ -48,11 +48,11 @@ hint naming the missing key.
 ResourceFactory
 ~~~~~~~~~~~~~~~
 
-:class:`~cave.factory.base.ResourceFactory` is the plugin runner.  It takes
+:class:`~pgcraft.factory.base.ResourceFactory` is the plugin runner.  It takes
 a list of plugins, validates it for singleton conflicts, topologically sorts
-the plugins by their :func:`~cave.plugin.produces` /
-:func:`~cave.plugin.requires` declarations, and calls
-:meth:`~cave.plugin.Plugin.run` on each in the resolved order.
+the plugins by their :func:`~pgcraft.plugin.produces` /
+:func:`~pgcraft.plugin.requires` declarations, and calls
+:meth:`~pgcraft.plugin.Plugin.run` on each in the resolved order.
 
 Subclasses declare ``DEFAULT_PLUGINS`` to establish their standard behaviour.
 The three built-in dimension factories are thin wrappers:
@@ -72,23 +72,23 @@ Plugin execution order
 ----------------------
 
 Execution order is determined by sorting plugins topologically using two class
-decorators: :func:`~cave.plugin.produces` and :func:`~cave.plugin.requires`.
+decorators: :func:`~pgcraft.plugin.produces` and :func:`~pgcraft.plugin.requires`.
 
-:func:`~cave.plugin.produces`
-    Declare the ``ctx`` keys this plugin's :meth:`~cave.plugin.Plugin.run`
+:func:`~pgcraft.plugin.produces`
+    Declare the ``ctx`` keys this plugin's :meth:`~pgcraft.plugin.Plugin.run`
     method will write.
 
-:func:`~cave.plugin.requires`
-    Declare the ``ctx`` keys this plugin's :meth:`~cave.plugin.Plugin.run`
+:func:`~pgcraft.plugin.requires`
+    Declare the ``ctx`` keys this plugin's :meth:`~pgcraft.plugin.Plugin.run`
     method needs to already be set before it runs.
 
 The factory builds a dependency graph from these declarations and calls
-:meth:`~cave.plugin.Plugin.run` in a valid topological order.  Plugins with
+:meth:`~pgcraft.plugin.Plugin.run` in a valid topological order.  Plugins with
 no relationship to each other preserve their original list order.
 
 .. code-block:: python
 
-   from cave.plugin import Dynamic, Plugin, produces, requires
+   from pgcraft.plugin import Dynamic, Plugin, produces, requires
 
    @produces(Dynamic("out_key"))
    @requires("primary")
@@ -106,7 +106,7 @@ no relationship to each other preserve their original list order.
 ``MyTransformPlugin`` will always run after the plugin that produces
 ``"primary"``, regardless of the order they appear in the plugin list.
 
-Before any :meth:`~cave.plugin.Plugin.run` call the factory collects two
+Before any :meth:`~pgcraft.plugin.Plugin.run` call the factory collects two
 special inputs:
 
 ``pk_columns``
@@ -117,14 +117,14 @@ special inputs:
     Results from all plugins are concatenated and stored in
     ``ctx.extra_columns``.
 
-Both are available to every plugin's :meth:`~cave.plugin.Plugin.run` via the
+Both are available to every plugin's :meth:`~pgcraft.plugin.Plugin.run` via the
 typed fields ``ctx.pk_columns`` and ``ctx.extra_columns``.
 
 Dynamic key references
 ~~~~~~~~~~~~~~~~~~~~~~
 
 When a ctx key name is a constructor parameter rather than a fixed string, use
-:class:`~cave.plugin.Dynamic` inside the decorator:
+:class:`~pgcraft.plugin.Dynamic` inside the decorator:
 
 .. code-block:: python
 
@@ -146,20 +146,20 @@ Plugin resolution
 Each factory call resolves its plugin list from three sources, concatenated
 in this order:
 
-1. **Global plugins** — from :class:`~cave.config.CaveConfig`, if passed via
-   the ``cave=`` argument.  Prepended before everything else.
+1. **Global plugins** — from :class:`~pgcraft.config.PGCraftConfig`, if passed via
+   the ``config=`` argument.  Prepended before everything else.
 2. **Factory plugins** — ``plugins`` kwarg if supplied, otherwise
    ``DEFAULT_PLUGINS``.
 3. **Extra plugins** — always appended via ``extra_plugins``.
 
 .. code-block:: python
 
-   cave_cfg = CaveConfig()
+   cave_cfg = PGCraftConfig()
    cave_cfg.register(AuditPlugin())         # prepended to every factory
 
    SimpleDimensionResourceFactory(
        "users", "app", metadata, schema_items,
-       cave=cave_cfg,                        # global plugins first
+       config=pgcraft_cfg,                        # global plugins first
        extra_plugins=[TenantPlugin()],       # appended after defaults
    )
 
@@ -182,14 +182,14 @@ Singleton groups
 ----------------
 
 Some plugins must appear at most once in a resolved list (e.g. you cannot
-have two PK plugins).  The :func:`~cave.plugin.singleton` decorator
+have two PK plugins).  The :func:`~pgcraft.plugin.singleton` decorator
 declares a *group name*; the factory raises
-:class:`~cave.errors.CaveValidationError` at construction time if two
+:class:`~pgcraft.errors.PGCraftValidationError` at construction time if two
 plugins share the same group.
 
 .. code-block:: python
 
-   from cave.plugin import Plugin, singleton
+   from pgcraft.plugin import Plugin, singleton
 
    @singleton("__pk__")
    class MyPKPlugin(Plugin):
@@ -249,21 +249,21 @@ a single factory.
 Writing a custom plugin
 -----------------------
 
-Implement :meth:`~cave.plugin.Plugin.run` and declare your dependencies with
-:func:`~cave.plugin.produces` and :func:`~cave.plugin.requires`.  Use
+Implement :meth:`~pgcraft.plugin.Plugin.run` and declare your dependencies with
+:func:`~pgcraft.plugin.produces` and :func:`~pgcraft.plugin.requires`.  Use
 ``ctx`` to pass objects to downstream plugins.
 
 A simple plugin that only contributes extra columns needs no dependency
-declarations at all — it implements :meth:`~cave.plugin.Plugin.extra_columns`
-instead of :meth:`~cave.plugin.Plugin.run`:
+declarations at all — it implements :meth:`~pgcraft.plugin.Plugin.extra_columns`
+instead of :meth:`~pgcraft.plugin.Plugin.run`:
 
 .. code-block:: python
 
    from __future__ import annotations
 
    from sqlalchemy import Column, DateTime, func
-   from cave.plugin import Plugin
-   from cave.factory.context import FactoryContext
+   from pgcraft.plugin import Plugin
+   from pgcraft.factory.context import FactoryContext
 
 
    class TimestampPlugin(Plugin):
@@ -281,18 +281,18 @@ Register it globally so it applies to every factory in the project:
 
 .. code-block:: python
 
-   from cave.config import CaveConfig
-   from cave.factory.dimension.simple import SimpleDimensionResourceFactory
-   from cave.factory.dimension.append_only import AppendOnlyDimensionResourceFactory
+   from pgcraft.config import PGCraftConfig
+   from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
+   from pgcraft.factory.dimension.append_only import AppendOnlyDimensionResourceFactory
 
-   cave_cfg = CaveConfig()
+   cave_cfg = PGCraftConfig()
    cave_cfg.register(TimestampPlugin())
 
    SimpleDimensionResourceFactory(
-       "products", "app", metadata, schema_items, cave=cave_cfg
+       "products", "app", metadata, schema_items, config=pgcraft_cfg
    )
    AppendOnlyDimensionResourceFactory(
-       "orders", "app", metadata, schema_items, cave=cave_cfg
+       "orders", "app", metadata, schema_items, config=pgcraft_cfg
    )
 
 Or apply it to a single factory only:
@@ -313,8 +313,8 @@ and makes it available to a downstream trigger plugin via a ctx key.
 .. code-block:: python
 
    from sqlalchemy import Column, DateTime, ForeignKey, Integer, Table
-   from cave.plugin import Dynamic, Plugin, produces, requires, singleton
-   from cave.factory.context import FactoryContext
+   from pgcraft.plugin import Dynamic, Plugin, produces, requires, singleton
+   from pgcraft.factory.context import FactoryContext
 
 
    @produces(Dynamic("shadow_key"))
@@ -361,38 +361,38 @@ and makes it available to a downstream trigger plugin via a ctx key.
 Global configuration
 --------------------
 
-:class:`~cave.config.CaveConfig` holds the global plugin list that is
+:class:`~pgcraft.config.PGCraftConfig` holds the global plugin list that is
 prepended to every factory that references it.
 
 .. code-block:: python
 
-   from cave.config import CaveConfig
+   from pgcraft.config import PGCraftConfig
 
-   cave_cfg = CaveConfig()
+   cave_cfg = PGCraftConfig()
    cave_cfg.register(TimestampPlugin(), TenantPlugin())
 
    # -- or equivalently --
-   cave_cfg = CaveConfig(plugins=[TimestampPlugin(), TenantPlugin()])
+   cave_cfg = PGCraftConfig(plugins=[TimestampPlugin(), TenantPlugin()])
 
-Pass it to each factory via the ``cave=`` argument.  A common pattern is to
-create one ``CaveConfig`` per project and import it wherever factories are
+Pass it to each factory via the ``config=`` argument.  A common pattern is to
+create one ``PGCraftConfig`` per project and import it wherever factories are
 defined:
 
 .. code-block:: python
 
    # cave_setup.py
-   from cave.config import CaveConfig
+   from pgcraft.config import PGCraftConfig
    from myapp.plugins import TimestampPlugin, TenantPlugin
 
-   cave_cfg = CaveConfig()
+   cave_cfg = PGCraftConfig()
    cave_cfg.register(TimestampPlugin(), TenantPlugin())
 
    # models.py
    from myapp.cave_setup import cave_cfg
-   from cave.factory.dimension.simple import SimpleDimensionResourceFactory
+   from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
 
    SimpleDimensionResourceFactory(
-       "users", "app", metadata, schema_items, cave=cave_cfg
+       "users", "app", metadata, schema_items, config=pgcraft_cfg
    )
 
 

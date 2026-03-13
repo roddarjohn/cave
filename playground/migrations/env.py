@@ -7,13 +7,13 @@ from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
-from cave.alembic.register import (
-    cave_alembic_hook,
-    cave_configure_metadata,
-    cave_process_revision_directives,
+from pgcraft.alembic.register import (
+    pgcraft_alembic_hook,
+    pgcraft_configure_metadata,
+    pgcraft_process_revision_directives,
 )
 
-cave_alembic_hook()
+pgcraft_alembic_hook()
 
 playground_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(playground_dir))
@@ -26,12 +26,12 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import must happen after fileConfig so that logging is configured before
-# models.py runs. Importing models triggers cave's factory code, which logs
+# models.py runs. Importing models triggers pgcraft's factory code, which logs
 # at module load time — if logging isn't set up yet, those messages are lost.
 from models import metadata  # noqa: E402  # type: ignore[unresolved-import]
 
 target_metadata = metadata
-cave_configure_metadata(target_metadata)
+pgcraft_configure_metadata(target_metadata)
 
 
 def run_migrations_offline() -> None:
@@ -43,7 +43,7 @@ def run_migrations_offline() -> None:
         include_schemas=True,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        process_revision_directives=cave_process_revision_directives,
+        process_revision_directives=pgcraft_process_revision_directives,
     )
 
     with context.begin_transaction():
@@ -63,7 +63,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             include_schemas=True,
-            process_revision_directives=cave_process_revision_directives,
+            process_revision_directives=pgcraft_process_revision_directives,
         )
 
         with context.begin_transaction():

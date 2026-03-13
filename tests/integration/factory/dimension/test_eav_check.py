@@ -16,14 +16,14 @@ from pathlib import Path
 import pytest
 from sqlalchemy import Integer, text
 
-from cave.check import CaveCheck
-from cave.plugins.eav import _EAVMapping
-from cave.utils.template import load_template
+from pgcraft.check import PGCraftCheck
+from pgcraft.plugins.eav import _EAVMapping
+from pgcraft.utils.template import load_template
 
 _EAV_TEMPLATES = (
     Path(__file__).resolve().parents[4]
     / "src"
-    / "cave"
+    / "pgcraft"
     / "plugins"
     / "templates"
     / "eav"
@@ -32,7 +32,7 @@ _EAV_TEMPLATES = (
 _CHECK_TEMPLATES = (
     Path(__file__).resolve().parents[4]
     / "src"
-    / "cave"
+    / "pgcraft"
     / "plugins"
     / "templates"
     / "check"
@@ -40,7 +40,7 @@ _CHECK_TEMPLATES = (
 
 
 def _render_check_validate(
-    checks: list[CaveCheck],
+    checks: list[PGCraftCheck],
 ) -> str:
     """Render the check-enforcement trigger body."""
     tpl = load_template(_CHECK_TEMPLATES / "validate.mako")
@@ -79,7 +79,7 @@ def _setup_eav_with_checks(
     conn,
     schema: str,
     mappings: list[_EAVMapping],
-    checks: list[CaveCheck],
+    checks: list[PGCraftCheck],
 ) -> None:
     """Create EAV tables, pivot view, check triggers, and EAV triggers."""
     value_cols = dict.fromkeys(m.value_column for m in mappings)
@@ -196,9 +196,9 @@ def eav_with_checks(db_conn, db_schema):
         _EAVMapping("qty", "integer_value", Integer(), nullable=False),
     ]
     checks = [
-        CaveCheck("{price} > 0", name="positive_price"),
-        CaveCheck("{qty} >= 0", name="nonneg_qty"),
-        CaveCheck(
+        PGCraftCheck("{price} > 0", name="positive_price"),
+        PGCraftCheck("{qty} >= 0", name="nonneg_qty"),
+        PGCraftCheck(
             "{price} * {qty} <= 1000000",
             name="max_total",
         ),

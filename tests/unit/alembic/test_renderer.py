@@ -1,4 +1,4 @@
-"""Unit tests for cave.alembic.renderer."""
+"""Unit tests for pgcraft.alembic.renderer."""
 
 from unittest.mock import MagicMock
 
@@ -29,7 +29,7 @@ from sqlalchemy_declarative_extensions.role.generic import Role
 from sqlalchemy_declarative_extensions.schema.base import Schema
 from sqlalchemy_declarative_extensions.view.base import View
 
-from cave.alembic.renderer import (
+from pgcraft.alembic.renderer import (
     _format_function_body,
     _prettify,
     _render_ddl_op,

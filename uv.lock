@@ -100,73 +100,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cave"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "pglast" },
-    { name = "pydantic" },
-    { name = "sqlalchemy-declarative-extensions" },
-    { name = "typer" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "alembic" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pytest" },
-    { name = "pytest-alembic" },
-    { name = "python-dotenv" },
-    { name = "slipcover" },
-    { name = "sqlalchemy" },
-    { name = "tox" },
-    { name = "tox-uv" },
-]
-docs = [
-    { name = "furo" },
-    { name = "sphinx" },
-    { name = "sphinx-autobuild" },
-    { name = "sphinx-autodoc-typehints" },
-    { name = "sphinx-copybutton" },
-]
-lint = [
-    { name = "ruff" },
-    { name = "ty" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "pglast", specifier = ">=7.11" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "sqlalchemy-declarative-extensions", specifier = ">=0.16.8" },
-    { name = "typer", specifier = ">=0.24.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "alembic", specifier = ">=1.18.4" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.3" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "pytest-alembic", specifier = ">=0.12.1" },
-    { name = "python-dotenv", specifier = ">=1.2.2" },
-    { name = "slipcover", specifier = ">=1.0.17" },
-    { name = "sqlalchemy", specifier = ">=2.0.48" },
-    { name = "tox", specifier = ">=4.49.1" },
-    { name = "tox-uv", specifier = ">=1.33.2" },
-]
-docs = [
-    { name = "furo", specifier = ">=2025.12.19" },
-    { name = "sphinx", specifier = ">=7.0" },
-    { name = "sphinx-autobuild", specifier = ">=2025.8.25" },
-    { name = "sphinx-autodoc-typehints", specifier = ">=3.0.1" },
-    { name = "sphinx-copybutton", specifier = ">=0.5.2" },
-]
-lint = [
-    { name = "ruff", specifier = ">=0.15.5" },
-    { name = "ty", specifier = ">=0.0.20" },
-]
-
-[[package]]
 name = "certifi"
 version = "2026.2.25"
 source = { registry = "https://pypi.org/simple" }
@@ -486,6 +419,73 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/65/ee/299d360cdc32edc7d2cf530f3accf79c4fca01e96ffc950d8a52213bd8e4/packaging-26.0.tar.gz", hash = "sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4", size = 143416, upload-time = "2026-01-21T20:50:39.064Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/b9/c538f279a4e237a006a2c98387d081e9eb060d203d8ed34467cc0f0b9b53/packaging-26.0-py3-none-any.whl", hash = "sha256:b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529", size = 74366, upload-time = "2026-01-21T20:50:37.788Z" },
+]
+
+[[package]]
+name = "pgcraft"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "pglast" },
+    { name = "pydantic" },
+    { name = "sqlalchemy-declarative-extensions" },
+    { name = "typer" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "alembic" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pytest" },
+    { name = "pytest-alembic" },
+    { name = "python-dotenv" },
+    { name = "slipcover" },
+    { name = "sqlalchemy" },
+    { name = "tox" },
+    { name = "tox-uv" },
+]
+docs = [
+    { name = "furo" },
+    { name = "sphinx" },
+    { name = "sphinx-autobuild" },
+    { name = "sphinx-autodoc-typehints" },
+    { name = "sphinx-copybutton" },
+]
+lint = [
+    { name = "ruff" },
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pglast", specifier = ">=7.11" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "sqlalchemy-declarative-extensions", specifier = ">=0.16.8" },
+    { name = "typer", specifier = ">=0.24.1" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "alembic", specifier = ">=1.18.4" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.3" },
+    { name = "pytest", specifier = ">=8" },
+    { name = "pytest-alembic", specifier = ">=0.12.1" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "slipcover", specifier = ">=1.0.17" },
+    { name = "sqlalchemy", specifier = ">=2.0.48" },
+    { name = "tox", specifier = ">=4.49.1" },
+    { name = "tox-uv", specifier = ">=1.33.2" },
+]
+docs = [
+    { name = "furo", specifier = ">=2025.12.19" },
+    { name = "sphinx", specifier = ">=7.0" },
+    { name = "sphinx-autobuild", specifier = ">=2025.8.25" },
+    { name = "sphinx-autodoc-typehints", specifier = ">=3.0.1" },
+    { name = "sphinx-copybutton", specifier = ">=0.5.2" },
+]
+lint = [
+    { name = "ruff", specifier = ">=0.15.5" },
+    { name = "ty", specifier = ">=0.0.20" },
 ]
 
 [[package]]

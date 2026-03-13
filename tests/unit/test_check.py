@@ -1,52 +1,52 @@
-"""Unit tests for cave.check module."""
+"""Unit tests for pgcraft.check module."""
 
 import pytest
 
-from cave.check import CaveCheck, collect_checks
+from pgcraft.check import PGCraftCheck, collect_checks
 
 
-class TestCaveCheckColumnNames:
+class TestPGCraftCheckColumnNames:
     def test_single_marker(self):
-        check = CaveCheck("{price} > 0", name="pos_price")
+        check = PGCraftCheck("{price} > 0", name="pos_price")
         assert check.column_names() == ["price"]
 
     def test_multiple_markers(self):
-        check = CaveCheck("{price} * {qty} <= 1000000", name="max_total")
+        check = PGCraftCheck("{price} * {qty} <= 1000000", name="max_total")
         assert check.column_names() == ["price", "qty"]
 
     def test_duplicate_markers_deduplicated(self):
-        check = CaveCheck("{x} > 0 AND {x} < 100", name="x_range")
+        check = PGCraftCheck("{x} > 0 AND {x} < 100", name="x_range")
         assert check.column_names() == ["x"]
 
     def test_no_markers(self):
-        check = CaveCheck("1 = 1", name="trivial")
+        check = PGCraftCheck("1 = 1", name="trivial")
         assert check.column_names() == []
 
 
-class TestCaveCheckResolve:
+class TestPGCraftCheckResolve:
     def test_identity_mapping(self):
-        check = CaveCheck("{price} > 0", name="pos")
+        check = PGCraftCheck("{price} > 0", name="pos")
         assert check.resolve(lambda c: c) == "price > 0"
 
     def test_new_prefix_mapping(self):
-        check = CaveCheck("{price} > 0", name="pos")
+        check = PGCraftCheck("{price} > 0", name="pos")
         result = check.resolve(lambda c: f"NEW.{c}")
         assert result == "NEW.price > 0"
 
     def test_multi_column_resolve(self):
-        check = CaveCheck("{price} * {qty} <= 1000000", name="max")
+        check = PGCraftCheck("{price} * {qty} <= 1000000", name="max")
         result = check.resolve(lambda c: f"NEW.{c}")
         assert result == "NEW.price * NEW.qty <= 1000000"
 
     def test_duplicate_markers_all_resolved(self):
-        check = CaveCheck("{x} > 0 AND {x} < 100", name="range")
+        check = PGCraftCheck("{x} > 0 AND {x} < 100", name="range")
         result = check.resolve(lambda c: f"NEW.{c}")
         assert result == "NEW.x > 0 AND NEW.x < 100"
 
 
-class TestCaveCheckFrozen:
+class TestPGCraftCheckFrozen:
     def test_is_immutable(self):
-        check = CaveCheck("{a} > 0", name="test")
+        check = PGCraftCheck("{a} > 0", name="test")
         with pytest.raises(AttributeError):
             check.expression = "{b} > 0"  # type: ignore[misc]
 
@@ -57,9 +57,9 @@ class TestCollectChecks:
 
         items = [
             Column("price", Integer),
-            CaveCheck("{price} > 0", name="pos"),
+            PGCraftCheck("{price} > 0", name="pos"),
             Column("qty", Integer),
-            CaveCheck("{qty} >= 0", name="nonneg"),
+            PGCraftCheck("{qty} >= 0", name="nonneg"),
         ]
         result = collect_checks(items)
         assert len(result) == 2

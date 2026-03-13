@@ -6,11 +6,11 @@ from sqlalchemy_declarative_extensions.dialects.postgresql.trigger import (
     TriggerTimes,
 )
 
-from cave.errors import CaveValidationError
-from cave.factory.dimension.simple import SimpleDimensionResourceFactory
-from cave.plugins.api import APIPlugin
-from cave.plugins.pk import SerialPKPlugin
-from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+from pgcraft.errors import PGCraftValidationError
+from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
+from pgcraft.plugins.api import APIPlugin
+from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 
 _CRUD_OPS = ("insert", "update", "delete")
 
@@ -225,7 +225,7 @@ class TestSimpleDimensionResourceFactoryAPIResource:
 class TestSimpleDimensionResourceFactoryValidation:
     def test_pk_column_raises(self):
         metadata = MetaData()
-        with pytest.raises(CaveValidationError):
+        with pytest.raises(PGCraftValidationError):
             SimpleDimensionResourceFactory(
                 "product",
                 "dim",

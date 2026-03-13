@@ -15,10 +15,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql.expression import Label
 
-from cave.errors import CaveValidationError
-from cave.factory.dimension.eav import EAVDimensionResourceFactory
-from cave.plugins.api import APIPlugin
-from cave.plugins.eav import (
+from pgcraft.errors import PGCraftValidationError
+from pgcraft.factory.dimension.eav import EAVDimensionResourceFactory
+from pgcraft.plugins.api import APIPlugin
+from pgcraft.plugins.eav import (
     EAVTablePlugin,
     EAVTriggerPlugin,
     EAVViewPlugin,
@@ -27,7 +27,7 @@ from cave.plugins.eav import (
     _pivot_aggregate,
     _resolve_value_column,
 )
-from cave.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.pk import SerialPKPlugin
 
 # ---------------------------------------------------------------------------
 # _resolve_value_column
@@ -354,7 +354,7 @@ class TestEAVDimensionResourceFactoryTriggers:
 class TestEAVDimensionResourceFactoryValidation:
     def test_pk_column_raises(self):
         metadata = MetaData()
-        with pytest.raises(CaveValidationError):
+        with pytest.raises(PGCraftValidationError):
             EAVDimensionResourceFactory(
                 "product",
                 "dim",

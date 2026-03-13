@@ -9,18 +9,18 @@ from sqlalchemy import (
     String,
 )
 
-from cave.check import CaveCheck
-from cave.declarative import register
-from cave.factory.dimension import (
+from pgcraft.check import PGCraftCheck
+from pgcraft.declarative import register
+from pgcraft.factory.dimension import (
     AppendOnlyDimensionResourceFactory,
     EAVDimensionResourceFactory,
     SimpleDimensionResourceFactory,
 )
-from cave.plugins.api import APIPlugin
-from cave.plugins.check import TableCheckPlugin, TriggerCheckPlugin
-from cave.plugins.pk import SerialPKPlugin
-from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
-from cave.utils.naming_convention import build_naming_convention
+from pgcraft.plugins.api import APIPlugin
+from pgcraft.plugins.check import TableCheckPlugin, TriggerCheckPlugin
+from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+from pgcraft.utils.naming_convention import build_naming_convention
 
 metadata = MetaData(
     naming_convention=build_naming_convention(),
@@ -37,8 +37,8 @@ SimpleDimensionResourceFactory(
         Column("price", Integer),
         Column("qty", Integer),
         Column("total", Integer, Computed("price * qty")),
-        CaveCheck("{price} > 0", name="positive_price"),
-        CaveCheck("{qty} >= 0", name="nonneg_qty"),
+        PGCraftCheck("{price} > 0", name="positive_price"),
+        PGCraftCheck("{qty} >= 0", name="nonneg_qty"),
     ],
     plugins=[
         SerialPKPlugin(),
@@ -68,7 +68,7 @@ EAVDimensionResourceFactory(
         Column("weight", Float),
         Column("is_active", Boolean),
         Column("price", Integer),
-        CaveCheck("{price} > 0", name="positive_product_price"),
+        PGCraftCheck("{price} > 0", name="positive_product_price"),
     ],
     extra_plugins=[
         TriggerCheckPlugin(),
@@ -99,6 +99,6 @@ class Locations:
     display = Column(
         String, Computed("name || ', ' || city"), nullable=True
     )
-    name_not_empty = CaveCheck(
+    name_not_empty = PGCraftCheck(
         "length({name}) > 0", name="locations_name_not_empty"
     )

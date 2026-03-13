@@ -1,4 +1,4 @@
-"""Unit tests for cave.alembic.rewriter."""
+"""Unit tests for pgcraft.alembic.rewriter."""
 
 from unittest.mock import MagicMock
 
@@ -8,12 +8,15 @@ from sqlalchemy import Column, Integer, MetaData, Table
 from sqlalchemy_declarative_extensions.alembic.schema import CreateSchemaOp
 from sqlalchemy_declarative_extensions.schema.base import Schema
 
-from cave.alembic.rewriter import _sort_ops, cave_process_revision_directives
+from pgcraft.alembic.rewriter import (
+    _sort_ops,
+    pgcraft_process_revision_directives,
+)
 
 
 class TestCaveProcessRevisionDirectives:
     def test_is_rewriter_instance(self):
-        assert isinstance(cave_process_revision_directives, Rewriter)
+        assert isinstance(pgcraft_process_revision_directives, Rewriter)
 
 
 class TestSortOps:
@@ -125,7 +128,7 @@ class TestSortOps:
 class TestRewriterDispatch:
     """Exercise _reorder_upgrade and _reorder_downgrade via the Rewriter.
 
-    The Rewriter is callable: cave_process_revision_directives(
+    The Rewriter is callable: pgcraft_process_revision_directives(
         context, revision, directives
     ) dispatches to the registered @rewrites handlers.
     """
@@ -150,14 +153,14 @@ class TestRewriterDispatch:
         """Empty UpgradeOps must pass through without error."""
         ctx = self._make_context()
         script = self._make_script()
-        cave_process_revision_directives(ctx, "test_rev", [script])
+        pgcraft_process_revision_directives(ctx, "test_rev", [script])
         assert script.upgrade_ops.ops == []
 
     def test_reorder_downgrade_called_with_empty_ops(self):
         """Empty DowngradeOps must pass through without error."""
         ctx = self._make_context()
         script = self._make_script()
-        cave_process_revision_directives(ctx, "test_rev", [script])
+        pgcraft_process_revision_directives(ctx, "test_rev", [script])
         assert script.downgrade_ops.ops == []
 
     def test_reorder_upgrade_sorts_ops(self):
@@ -175,7 +178,7 @@ class TestRewriterDispatch:
         schema_op = CreateSchemaOp(Schema("s"))
         script = self._make_script(upgrade_ops=[table_op, schema_op])
         ctx = self._make_context()
-        cave_process_revision_directives(ctx, "rev", [script])
+        pgcraft_process_revision_directives(ctx, "rev", [script])
         types = [type(op).__name__ for op in script.upgrade_ops.ops]
         assert types.index("CreateSchemaOp") < types.index("CreateTableOp")
 
@@ -190,7 +193,7 @@ class TestRewriterDispatch:
         schema_op = DropSchemaOp(Schema("s"))
         script = self._make_script(downgrade_ops=[schema_op, table_op])
         ctx = self._make_context()
-        cave_process_revision_directives(ctx, "rev", [script])
+        pgcraft_process_revision_directives(ctx, "rev", [script])
         # After sorting drops: table must be dropped before schema
         types = [type(op).__name__ for op in script.downgrade_ops.ops]
         assert types.index("DropTableOp") < types.index("DropSchemaOp")

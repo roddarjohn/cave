@@ -2,10 +2,10 @@
 
 from sqlalchemy import Column, MetaData, String
 
-from cave.factory.dimension import (
+from pgcraft.factory.dimension import (
     AppendOnlyDimensionResourceFactory,
 )
-from cave.utils.naming_convention import build_naming_convention
+from pgcraft.utils.naming_convention import build_naming_convention
 
 metadata = MetaData(naming_convention=build_naming_convention())
 

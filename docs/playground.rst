@@ -2,7 +2,7 @@ Playground
 ==========
 
 The ``playground/`` directory is a local development scratchpad for manually
-testing cave against a real PostgreSQL database. It is not part of the
+testing pgcraft against a real PostgreSQL database. It is not part of the
 distributed package — it exists purely for iterative development and
 experimentation.
 
@@ -22,9 +22,9 @@ You need a running PostgreSQL server. The easiest options are:
 .. code-block:: bash
 
     docker run -d \
-        --name cave-db \
+        --name pgcraft-db \
         -p 5432:5432 \
-        -e POSTGRES_DB=cave \
+        -e POSTGRES_DB=pgcraft \
         -e POSTGRES_HOST_AUTH_METHOD=trust \
         postgres:17
 
@@ -69,13 +69,13 @@ Edit ``playground/.env`` with your connection details:
 .. code-block:: bash
 
     # System postgres via Unix socket (passwordless, recommended):
-    DATABASE_URL=postgresql+psycopg:///cave
+    DATABASE_URL=postgresql+psycopg:///pgcraft
 
     # Docker or system postgres via TCP with no password:
-    DATABASE_URL=postgresql+psycopg://localhost/cave
+    DATABASE_URL=postgresql+psycopg://localhost/pgcraft
 
     # System postgres with a user/password:
-    DATABASE_URL=postgresql+psycopg://user:password@localhost/cave
+    DATABASE_URL=postgresql+psycopg://user:password@localhost/pgcraft
 
 ``playground/.env`` is gitignored and will never be committed.
 
@@ -121,7 +121,7 @@ Typical workflow
 Adding models
 -------------
 
-Define new models in ``playground/models.py`` using the cave dimension
+Define new models in ``playground/models.py`` using the pgcraft dimension
 factory classes::
 
     SimpleDimensionFactory(

@@ -5,7 +5,7 @@ Pure Python tests — no database required.
 
 from sqlalchemy import Column, Float, Integer, String
 
-from cave.plugins.eav import _build_eav_mappings
+from pgcraft.plugins.eav import _build_eav_mappings
 
 
 class TestBuildEAVMappings:

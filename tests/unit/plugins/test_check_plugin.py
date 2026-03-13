@@ -3,9 +3,9 @@
 import pytest
 from sqlalchemy import Column, Integer, String, Table
 
-from cave.check import CaveCheck
-from cave.errors import CaveValidationError
-from cave.plugins.check import (
+from pgcraft.check import PGCraftCheck
+from pgcraft.errors import PGCraftValidationError
+from pgcraft.plugins.check import (
     TableCheckPlugin,
     TriggerCheckPlugin,
 )
@@ -14,12 +14,12 @@ from tests.unit.plugins.conftest import make_ctx
 
 class TestTableCheckPlugin:
     def test_appends_check_constraint_to_table(self):
-        from cave.plugins.simple import SimpleTablePlugin
+        from pgcraft.plugins.simple import SimpleTablePlugin
 
         ctx = make_ctx(
             schema_items=[
                 Column("price", Integer),
-                CaveCheck("{price} > 0", name="pos_price"),
+                PGCraftCheck("{price} > 0", name="pos_price"),
             ]
         )
         SimpleTablePlugin().run(ctx)
@@ -29,13 +29,13 @@ class TestTableCheckPlugin:
         assert "pos_price" in ck_names
 
     def test_multi_column_constraint(self):
-        from cave.plugins.simple import SimpleTablePlugin
+        from pgcraft.plugins.simple import SimpleTablePlugin
 
         ctx = make_ctx(
             schema_items=[
                 Column("price", Integer),
                 Column("qty", Integer),
-                CaveCheck(
+                PGCraftCheck(
                     "{price} * {qty} <= 1000000",
                     name="max_total",
                 ),
@@ -48,7 +48,7 @@ class TestTableCheckPlugin:
         assert "max_total" in ck_names
 
     def test_no_checks_is_noop(self):
-        from cave.plugins.simple import SimpleTablePlugin
+        from pgcraft.plugins.simple import SimpleTablePlugin
 
         ctx = make_ctx(schema_items=[Column("name", String)])
         SimpleTablePlugin().run(ctx)
@@ -57,25 +57,25 @@ class TestTableCheckPlugin:
         assert isinstance(ctx["primary"], Table)
 
     def test_unknown_column_raises(self):
-        from cave.plugins.simple import SimpleTablePlugin
+        from pgcraft.plugins.simple import SimpleTablePlugin
 
         ctx = make_ctx(
             schema_items=[
                 Column("price", Integer),
-                CaveCheck("{nonexistent} > 0", name="bad"),
+                PGCraftCheck("{nonexistent} > 0", name="bad"),
             ]
         )
         SimpleTablePlugin().run(ctx)
-        with pytest.raises(CaveValidationError, match="nonexistent"):
+        with pytest.raises(PGCraftValidationError, match="nonexistent"):
             TableCheckPlugin().run(ctx)
 
     def test_custom_table_key(self):
-        from cave.plugins.simple import SimpleTablePlugin
+        from pgcraft.plugins.simple import SimpleTablePlugin
 
         ctx = make_ctx(
             schema_items=[
                 Column("price", Integer),
-                CaveCheck("{price} > 0", name="pos"),
+                PGCraftCheck("{price} > 0", name="pos"),
             ]
         )
         SimpleTablePlugin(table_key="my_table").run(ctx)
@@ -89,14 +89,14 @@ class TestTableCheckPlugin:
         assert "primary" in plugin.resolved_requires()
 
     def test_multiple_checks(self):
-        from cave.plugins.simple import SimpleTablePlugin
+        from pgcraft.plugins.simple import SimpleTablePlugin
 
         ctx = make_ctx(
             schema_items=[
                 Column("price", Integer),
                 Column("qty", Integer),
-                CaveCheck("{price} > 0", name="pos_price"),
-                CaveCheck("{qty} >= 0", name="nonneg_qty"),
+                PGCraftCheck("{price} > 0", name="pos_price"),
+                PGCraftCheck("{qty} >= 0", name="nonneg_qty"),
             ]
         )
         SimpleTablePlugin().run(ctx)
@@ -112,7 +112,7 @@ class TestTriggerCheckPlugin:
         self,
         schema_items=None,
     ):
-        from cave.plugins.eav import (
+        from pgcraft.plugins.eav import (
             EAVTablePlugin,
             EAVViewPlugin,
         )
@@ -120,7 +120,7 @@ class TestTriggerCheckPlugin:
         if schema_items is None:
             schema_items = [
                 Column("price", Integer),
-                CaveCheck("{price} > 0", name="pos_price"),
+                PGCraftCheck("{price} > 0", name="pos_price"),
             ]
         ctx = make_ctx(schema_items=schema_items)
         EAVTablePlugin().run(ctx)
@@ -172,10 +172,10 @@ class TestTriggerCheckPlugin:
         ctx = self._ctx_with_eav(
             schema_items=[
                 Column("price", Integer),
-                CaveCheck("{bogus} > 0", name="bad"),
+                PGCraftCheck("{bogus} > 0", name="bad"),
             ]
         )
-        with pytest.raises(CaveValidationError, match="bogus"):
+        with pytest.raises(PGCraftValidationError, match="bogus"):
             TriggerCheckPlugin(view_key="primary").run(ctx)
 
     def test_skips_absent_view_key(self):
@@ -189,7 +189,7 @@ class TestTriggerCheckPlugin:
             schema_items=[
                 Column("price", Integer),
                 Column("qty", Integer),
-                CaveCheck(
+                PGCraftCheck(
                     "{price} * {qty} <= 1000000",
                     name="max_total",
                 ),
@@ -213,7 +213,7 @@ class TestTriggerCheckPlugin:
 
     def test_ordering_valid_with_later_eav_triggers(self):
         """Check triggers (_check_) sort before EAV triggers (dim_)."""
-        from cave.plugins.eav import EAVTriggerPlugin
+        from pgcraft.plugins.eav import EAVTriggerPlugin
 
         ctx = self._ctx_with_eav()
         # Register check triggers first (_check_...)
@@ -243,5 +243,5 @@ class TestTriggerCheckPlugin:
         )
         # Now the check plugin registers _check_dim_product_insert
         # which sorts AFTER _aaa_, so validation should raise.
-        with pytest.raises(CaveValidationError, match="alphabetical"):
+        with pytest.raises(PGCraftValidationError, match="alphabetical"):
             TriggerCheckPlugin(view_key="primary").run(ctx)

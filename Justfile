@@ -20,12 +20,12 @@ dev-test *args:
 
 # Run tests with slipcover coverage report (branch + line coverage)
 coverage *args:
-    uv run python -m slipcover --branch --source src/cave -m pytest {{args}}
+    uv run python -m slipcover --branch --source src/pgcraft -m pytest {{args}}
 
 # Run coverage and write XML output (used by CI)
 coverage-ci *args:
     uv run python -m slipcover --branch --xml --out coverage.xml \
-        --source src/cave -m pytest {{args}}
+        --source src/pgcraft -m pytest {{args}}
 
 # Build HTML docs (output in docs/_build/html)
 docs: _docs-setup

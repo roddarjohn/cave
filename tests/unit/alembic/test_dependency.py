@@ -1,4 +1,4 @@
-"""Unit tests for cave.alembic.dependency."""
+"""Unit tests for pgcraft.alembic.dependency."""
 
 from unittest.mock import MagicMock
 
@@ -54,7 +54,7 @@ from sqlalchemy_declarative_extensions.role.generic import Role
 from sqlalchemy_declarative_extensions.schema.base import Schema
 from sqlalchemy_declarative_extensions.view.base import View
 
-from cave.alembic.dependency import (
+from pgcraft.alembic.dependency import (
     EntityIdentifier,
     _entity_identifier,
     _entity_schema,

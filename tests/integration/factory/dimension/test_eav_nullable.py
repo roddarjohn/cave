@@ -15,13 +15,13 @@ from pathlib import Path
 import pytest
 from sqlalchemy import String, text
 
-from cave.plugins.eav import _EAVMapping
-from cave.utils.template import load_template
+from pgcraft.plugins.eav import _EAVMapping
+from pgcraft.utils.template import load_template
 
 _EAV_TEMPLATES = (
     Path(__file__).resolve().parents[4]
     / "src"
-    / "cave"
+    / "pgcraft"
     / "plugins"
     / "templates"
     / "eav"

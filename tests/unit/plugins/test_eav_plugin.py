@@ -2,7 +2,7 @@
 
 from sqlalchemy import Boolean, Column, Integer, String, Table
 
-from cave.plugins.eav import (
+from pgcraft.plugins.eav import (
     EAVTablePlugin,
     EAVTriggerPlugin,
     EAVViewPlugin,

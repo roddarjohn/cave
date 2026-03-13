@@ -5,8 +5,8 @@ from __future__ import annotations
 from sqlalchemy import Column, Integer, MetaData, String
 from sqlalchemy_declarative_extensions import View
 
-from cave.columns import PrimaryKeyColumns
-from cave.factory.context import FactoryContext
+from pgcraft.columns import PrimaryKeyColumns
+from pgcraft.factory.context import FactoryContext
 
 
 def make_ctx(

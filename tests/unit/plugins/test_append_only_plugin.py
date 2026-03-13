@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, String, Table
 
-from cave.plugins.append_only import (
+from pgcraft.plugins.append_only import (
     AppendOnlyTablePlugin,
     AppendOnlyTriggerPlugin,
     AppendOnlyViewPlugin,

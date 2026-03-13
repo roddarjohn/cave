@@ -1,4 +1,4 @@
-"""Unit tests for cave.utils.naming_convention."""
+"""Unit tests for pgcraft.utils.naming_convention."""
 
 import hashlib
 
@@ -12,7 +12,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 
-from cave.utils.naming_convention import (
+from pgcraft.utils.naming_convention import (
     _cols,
     _make_token,
     build_naming_convention,

@@ -1,6 +1,6 @@
 from typer.testing import CliRunner
 
-from cave.cli import app
+from pgcraft.cli import app
 
 runner = CliRunner()
 

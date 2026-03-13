@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-## What is cave?
+## What is pgcraft?
 
 A configuration-driven PostgreSQL dimension/data warehouse framework.
 Generates SQLAlchemy models, Alembic migrations, and PostgREST APIs from
@@ -27,7 +27,7 @@ just setup         # install pre-commit hooks
 Auto-fix: `uv run --group lint ruff check --fix && uv run --group lint ruff format`
 
 Tests require a running PostgreSQL instance with `DATABASE_URL` set
-(e.g. `postgresql+psycopg://postgres@localhost/cave`).
+(e.g. `postgresql+psycopg://postgres@localhost/pgcraft`).
 
 ## Code standards
 
@@ -76,7 +76,7 @@ should add tests before submitting. Coverage is a signal, not a target
 — a line being covered does not mean it is correctly tested, but an
 uncovered line is a clear gap.
 
-Tests live in three directories that mirror `src/cave/`:
+Tests live in three directories that mirror `src/pgcraft/`:
 - `tests/unit/` — pure Python, no DB fixtures available
 - `tests/integration/` — live DB tests; each test runs in a rolled-back
   transaction so nothing persists after the suite
@@ -93,12 +93,12 @@ Before submitting, all of these must pass (CI will enforce):
 
 ## Architecture notes
 
-- `src/cave/factory/` -- Dimension table factories (simple, append-only, EAV).
+- `src/pgcraft/factory/` -- Dimension table factories (simple, append-only, EAV).
   Configuration in, SQLAlchemy models out.
-- `src/cave/alembic/` -- Custom Alembic integration: schema discovery,
+- `src/pgcraft/alembic/` -- Custom Alembic integration: schema discovery,
   sqlglot-based SQL formatting in migrations, role/grant handling.
-- `src/cave/models/` -- PostgREST role and grant declarations.
-- `src/cave/resource.py` -- PostgREST API resource registration.
+- `src/pgcraft/models/` -- PostgREST role and grant declarations.
+- `src/pgcraft/resource.py` -- PostgREST API resource registration.
 - `playground/` -- Example project showing end-to-end usage.
 
 ## Hooks

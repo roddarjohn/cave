@@ -1,7 +1,7 @@
 [project]
-name = "cave"
+name = "pgcraft"
 version = "0.1.0"
-description = "Add your description here"
+description = "Configuration-driven PostgreSQL dimension tables, migrations, and APIs."
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Rodda John", email = "roddarjohn@protonmail.com" }]
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-cave = "cave.cli:app"
+pgcraft = "pgcraft.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.10.8,<0.11.0"]

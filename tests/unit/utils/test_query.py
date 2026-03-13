@@ -1,8 +1,8 @@
-"""Unit tests for cave.utils.query."""
+"""Unit tests for pgcraft.utils.query."""
 
 from sqlalchemy import Column, Integer, MetaData, String, Table, select
 
-from cave.utils.query import compile_query
+from pgcraft.utils.query import compile_query
 
 
 class TestCompileQuery:

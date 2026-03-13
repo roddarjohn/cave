@@ -1,19 +1,19 @@
-"""Unit tests for cave.declarative.register decorator."""
+"""Unit tests for pgcraft.declarative.register decorator."""
 # ruff: noqa: RUF012
 
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from cave.check import CaveCheck
-from cave.columns import PrimaryKeyColumns
-from cave.declarative import register
-from cave.errors import CaveValidationError
-from cave.factory.context import FactoryContext
-from cave.plugin import Plugin, requires
-from cave.plugins.api import APIPlugin
-from cave.plugins.pk import SerialPKPlugin
-from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+from pgcraft.check import PGCraftCheck
+from pgcraft.columns import PrimaryKeyColumns
+from pgcraft.declarative import register
+from pgcraft.errors import PGCraftValidationError
+from pgcraft.factory.context import FactoryContext
+from pgcraft.plugin import Plugin, requires
+from pgcraft.plugins.api import APIPlugin
+from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 
 
 class Base(DeclarativeBase):
@@ -236,10 +236,10 @@ class TestRegisterDecorator:
             __table_args__ = {"schema": "dim"}
 
             price = Column(Integer)
-            positive_price = CaveCheck("{price} > 0", name="pos")
+            positive_price = PGCraftCheck("{price} > 0", name="pos")
 
         items = _CapturePlugin.captured["schema_items"]
-        checks = [i for i in items if isinstance(i, CaveCheck)]
+        checks = [i for i in items if isinstance(i, PGCraftCheck)]
         assert len(checks) == 1
         assert checks[0].name == "pos"
 
@@ -307,7 +307,7 @@ class TestRegisterValidation:
         Base.metadata.clear()
 
     def test_declarative_subclass_raises(self):
-        with pytest.raises(CaveValidationError, match="__table__"):
+        with pytest.raises(PGCraftValidationError, match="__table__"):
 
             @register(plugins=[], metadata=MetaData())
             class Bad(Base):
@@ -317,7 +317,7 @@ class TestRegisterValidation:
                 id: Mapped[int] = mapped_column(primary_key=True)
 
     def test_no_metadata_or_base_raises(self):
-        with pytest.raises(CaveValidationError, match="metadata"):
+        with pytest.raises(PGCraftValidationError, match="metadata"):
 
             @register(plugins=[])
             class Bad:
@@ -325,21 +325,21 @@ class TestRegisterValidation:
                 __table_args__ = {"schema": "s"}
 
     def test_no_tablename_raises(self):
-        with pytest.raises(CaveValidationError, match="__tablename__"):
+        with pytest.raises(PGCraftValidationError, match="__tablename__"):
 
             @register(metadata=MetaData(), plugins=[])
             class Bad:
                 __table_args__ = {"schema": "s"}
 
     def test_no_schema_raises(self):
-        with pytest.raises(CaveValidationError, match="schema"):
+        with pytest.raises(PGCraftValidationError, match="schema"):
 
             @register(metadata=MetaData(), plugins=[])
             class Bad:
                 __tablename__ = "x"
 
     def test_no_root_raises(self):
-        with pytest.raises(CaveValidationError, match="__root__"):
+        with pytest.raises(PGCraftValidationError, match="__root__"):
 
             @register(
                 metadata=MetaData(),
@@ -382,7 +382,7 @@ class TestRootKeyViaFactory:
             def run(self, ctx: FactoryContext) -> None:
                 _Check.root = ctx["__root__"]
 
-        from cave.factory.base import ResourceFactory
+        from pgcraft.factory.base import ResourceFactory
 
         ResourceFactory(
             "t",

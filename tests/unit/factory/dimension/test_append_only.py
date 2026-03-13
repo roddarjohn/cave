@@ -3,17 +3,17 @@
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 
-from cave.errors import CaveValidationError
-from cave.factory.dimension.append_only import (
+from pgcraft.errors import PGCraftValidationError
+from pgcraft.factory.dimension.append_only import (
     AppendOnlyDimensionResourceFactory,
 )
-from cave.plugins.api import APIPlugin
-from cave.plugins.append_only import (
+from pgcraft.plugins.api import APIPlugin
+from pgcraft.plugins.append_only import (
     AppendOnlyTablePlugin,
     AppendOnlyTriggerPlugin,
     AppendOnlyViewPlugin,
 )
-from cave.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.pk import SerialPKPlugin
 
 
 class TestAppendOnlyDimensionResourceFactoryTables:
@@ -209,7 +209,7 @@ class TestAppendOnlyDimensionResourceFactoryAPIResource:
 class TestAppendOnlyDimensionResourceFactoryValidation:
     def test_pk_column_raises(self):
         metadata = MetaData()
-        with pytest.raises(CaveValidationError):
+        with pytest.raises(PGCraftValidationError):
             AppendOnlyDimensionResourceFactory(
                 "product",
                 "dim",

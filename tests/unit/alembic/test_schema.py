@@ -1,11 +1,11 @@
-"""Unit tests for cave.alembic.schema."""
+"""Unit tests for pgcraft.alembic.schema."""
 
 import pytest
 from sqlalchemy import Column, Integer, MetaData, Table
 from sqlalchemy_declarative_extensions import Schemas, Views
 from sqlalchemy_declarative_extensions.view.base import View
 
-from cave.alembic.schema import (
+from pgcraft.alembic.schema import (
     SYSTEM_SCHEMAS,
     collect_schemas,
     register_schemas,

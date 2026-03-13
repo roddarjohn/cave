@@ -10,8 +10,8 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 
-from cave.check import CaveCheck
-from cave.plugins.simple import (
+from pgcraft.check import PGCraftCheck
+from pgcraft.plugins.simple import (
     SimpleTablePlugin,
     SimpleTriggerPlugin,
 )
@@ -112,14 +112,14 @@ class TestSimpleTablePlugin:
         ctx = make_ctx(
             schema_items=[
                 Column("price", Integer),
-                CaveCheck("{price} > 0", name="pos"),
+                PGCraftCheck("{price} > 0", name="pos"),
             ]
         )
         plugin.run(ctx)
         table = ctx["primary"]
         col_names = {c.name for c in table.columns}
         assert "price" in col_names
-        # CaveCheck should not appear as a column or constraint
+        # PGCraftCheck should not appear as a column or constraint
         ck_names = [c.name for c in table.constraints if hasattr(c, "sqltext")]
         assert "pos" not in ck_names
 

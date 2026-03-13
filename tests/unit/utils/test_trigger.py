@@ -1,9 +1,9 @@
-"""Unit tests for cave.utils.trigger."""
+"""Unit tests for pgcraft.utils.trigger."""
 
 from mako.template import Template
 from sqlalchemy import MetaData
 
-from cave.utils.trigger import register_view_triggers
+from pgcraft.utils.trigger import register_view_triggers
 
 _NAMING_DEFAULTS = {
     "fn_key": "%(schema)s_%(table_name)s_%(op)s",

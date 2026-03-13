@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, Integer, MetaData, String, Table
 
-from cave.plugins.api import APIPlugin
+from pgcraft.plugins.api import APIPlugin
 from tests.unit.plugins.conftest import make_ctx
 
 

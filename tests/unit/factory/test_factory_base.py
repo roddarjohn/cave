@@ -10,13 +10,13 @@ plugin implementation.
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 
-from cave.check import CaveCheck
-from cave.columns import PrimaryKeyColumns
-from cave.config import CaveConfig
-from cave.errors import CaveValidationError
-from cave.factory.base import ResourceFactory, _sort_plugins
-from cave.factory.context import FactoryContext
-from cave.plugin import (
+from pgcraft.check import PGCraftCheck
+from pgcraft.columns import PrimaryKeyColumns
+from pgcraft.config import PGCraftConfig
+from pgcraft.errors import PGCraftValidationError
+from pgcraft.factory.base import ResourceFactory, _sort_plugins
+from pgcraft.factory.context import FactoryContext
+from pgcraft.plugin import (
     Dynamic,
     Plugin,
     produces,
@@ -173,8 +173,8 @@ class TestPluginResolution:
         log: list[str] = []
         global_plugin = _RunLogPlugin(log, "global")
         factory_plugin = _RunLogPlugin(log, "factory")
-        cave = CaveConfig(plugins=[global_plugin])
-        self._factory(cave=cave, plugins=[factory_plugin])
+        config = PGCraftConfig(plugins=[global_plugin])
+        self._factory(config=config, plugins=[factory_plugin])
         global_idx = log.index("global.run")
         factory_idx = log.index("factory.run")
         assert global_idx < factory_idx
@@ -243,7 +243,7 @@ class TestDependencySorting:
         class _B(Plugin):
             pass
 
-        with pytest.raises(CaveValidationError, match="Circular"):
+        with pytest.raises(PGCraftValidationError, match="Circular"):
             _sort_plugins([_A(), _B()])
 
     def test_two_plugins_produce_same_key_allowed(self):
@@ -362,7 +362,7 @@ class TestDynamicValidation:
 
 class TestSingletonEnforcement:
     def test_two_plugins_same_group_raises(self):
-        with pytest.raises(CaveValidationError, match="__pk__"):
+        with pytest.raises(PGCraftValidationError, match="__pk__"):
             ResourceFactory(
                 "t",
                 "s",
@@ -373,7 +373,7 @@ class TestSingletonEnforcement:
 
     def test_same_group_different_name_in_error(self):
         with pytest.raises(
-            CaveValidationError,
+            PGCraftValidationError,
             match=r"_SingletonA|_SingletonB",
         ):
             ResourceFactory(
@@ -427,7 +427,7 @@ class TestPKColumnsViaStore:
                 pk = ctx["pk_columns"]
                 log.append(pk.first_key)
 
-        from cave.plugins.pk import SerialPKPlugin
+        from pgcraft.plugins.pk import SerialPKPlugin
 
         ResourceFactory(
             "t",
@@ -446,7 +446,7 @@ class TestPKColumnsViaStore:
             def run(self, ctx: FactoryContext) -> None:
                 log.append(ctx["pk_columns"].first_key)
 
-        from cave.plugins.pk import SerialPKPlugin
+        from pgcraft.plugins.pk import SerialPKPlugin
 
         ResourceFactory(
             "t",
@@ -469,20 +469,20 @@ class TestPKColumnsViaStore:
 
 
 # -------------------------------------------------------------------
-# CaveCheck in schema_items
+# PGCraftCheck in schema_items
 # -------------------------------------------------------------------
 
 
-class TestCaveCheckInSchemaItems:
+class TestPGCraftCheckInSchemaItems:
     def test_factory_accepts_cave_check(self):
-        """ResourceFactory does not reject CaveCheck in schema_items."""
+        """ResourceFactory does not reject PGCraftCheck in schema_items."""
         ResourceFactory(
             "t",
             "s",
             MetaData(),
             [
                 Column("price", Integer),
-                CaveCheck("{price} > 0", name="pos"),
+                PGCraftCheck("{price} > 0", name="pos"),
             ],
             plugins=[],
         )
@@ -495,7 +495,7 @@ class TestCaveCheckInSchemaItems:
             metadata=MetaData(),
             schema_items=[
                 Column("price", Integer),
-                CaveCheck("{price} > 0", name="pos"),
+                PGCraftCheck("{price} > 0", name="pos"),
                 Column("qty", Integer),
             ],
             plugins=[],

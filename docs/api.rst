@@ -4,83 +4,83 @@ API reference
 Plugin system
 -------------
 
-.. automodule:: cave.plugin
+.. automodule:: pgcraft.plugin
    :members:
 
-.. automodule:: cave.factory.base
+.. automodule:: pgcraft.factory.base
    :members:
 
-.. automodule:: cave.factory.context
+.. automodule:: pgcraft.factory.context
    :members:
 
-.. automodule:: cave.config
+.. automodule:: pgcraft.config
    :members:
 
-.. automodule:: cave.check
+.. automodule:: pgcraft.check
    :members:
 
-.. automodule:: cave.errors
+.. automodule:: pgcraft.errors
    :members:
 
-.. automodule:: cave.validator
+.. automodule:: pgcraft.validator
    :members:
 
 Dimension resource factories
 ----------------------------
 
-.. automodule:: cave.factory.dimension.simple
+.. automodule:: pgcraft.factory.dimension.simple
    :members:
 
-.. automodule:: cave.factory.dimension.append_only
+.. automodule:: pgcraft.factory.dimension.append_only
    :members:
 
-.. automodule:: cave.factory.dimension.eav
+.. automodule:: pgcraft.factory.dimension.eav
    :members:
 
 Built-in plugins
 ----------------
 
-.. automodule:: cave.plugins.pk
+.. automodule:: pgcraft.plugins.pk
    :members:
 
-.. automodule:: cave.plugins.simple
+.. automodule:: pgcraft.plugins.simple
    :members:
 
-.. automodule:: cave.plugins.api
+.. automodule:: pgcraft.plugins.api
    :members:
 
-.. automodule:: cave.plugins.append_only
+.. automodule:: pgcraft.plugins.append_only
    :members:
 
-.. automodule:: cave.plugins.check
+.. automodule:: pgcraft.plugins.check
    :members:
 
-.. automodule:: cave.plugins.eav
+.. automodule:: pgcraft.plugins.eav
    :members:
 
 Alembic integration
 -------------------
 
-.. automodule:: cave.alembic.register
+.. automodule:: pgcraft.alembic.register
    :members:
 
-.. automodule:: cave.alembic.dependency
+.. automodule:: pgcraft.alembic.dependency
    :members:
 
-.. automodule:: cave.alembic.schema
+.. automodule:: pgcraft.alembic.schema
    :members:
 
-.. automodule:: cave.alembic.renderer
+.. automodule:: pgcraft.alembic.renderer
    :members:
 
-.. automodule:: cave.alembic.rewriter
+.. automodule:: pgcraft.alembic.rewriter
    :members:
 
 PostgREST / API
 ---------------
 
-.. automodule:: cave.resource
+.. automodule:: pgcraft.resource
    :members:
 
-.. automodule:: cave.models.roles
+.. automodule:: pgcraft.models.roles
    :members:

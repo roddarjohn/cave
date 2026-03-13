@@ -2,9 +2,9 @@
 
 from sqlalchemy import Integer, MetaData
 
-from cave.columns import PrimaryKeyColumns
-from cave.factory.context import FactoryContext
-from cave.plugins.pk import SerialPKPlugin
+from pgcraft.columns import PrimaryKeyColumns
+from pgcraft.factory.context import FactoryContext
+from pgcraft.plugins.pk import SerialPKPlugin
 
 
 def _bare_ctx() -> FactoryContext:

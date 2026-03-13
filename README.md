@@ -1,15 +1,12 @@
-# cave *(working name)*
+# pgcraft
 
-[Documentation](https://roddarjohn.github.io/cave/)
+[Documentation](https://roddarjohn.github.io/pgcraft/)
 
 **Configuration-driven PostgreSQL dimension tables, migrations, and APIs.**
 
-Cave generates SQLAlchemy models, Alembic migrations, and
+pgcraft generates SQLAlchemy models, Alembic migrations, and
 [PostgREST](https://postgrest.org) API views from declarative dimension
-configurations. Define your schema once; cave handles the rest.
-
-> **Note:** "cave" is a working name and may change before the first stable
-> release.
+configurations. Define your schema once; pgcraft handles the rest.
 
 ---
 
@@ -32,14 +29,14 @@ configurations. Define your schema once; cave handles the rest.
 ### Install
 
 ```bash
-pip install cave            # or: uv add cave
+pip install pgcraft            # or: uv add pgcraft
 ```
 
 ### Define a dimension
 
 ```python
 from sqlalchemy import Column, MetaData, String
-from cave.factory.dimension import SimpleDimensionResourceFactory
+from pgcraft.factory.dimension import SimpleDimensionResourceFactory
 
 metadata = MetaData()
 
@@ -63,13 +60,13 @@ This creates:
 ### Generate migrations
 
 ```bash
-cave migrate revision --autogenerate -m "add users"
-cave migrate upgrade head
+pgcraft migrate revision --autogenerate -m "add users"
+pgcraft migrate upgrade head
 ```
 
 ## Dimension types
 
-Cave ships with three built-in dimension types:
+pgcraft ships with three built-in dimension types:
 
 | Type | Use case | History? |
 |------|----------|----------|
@@ -77,26 +74,26 @@ Cave ships with three built-in dimension types:
 | **Append-Only** (SCD Type 2) | Track changes over time | Yes |
 | **EAV** | Flexible / sparse attributes with full audit trail | Yes |
 
-See the [dimensions documentation](https://roddarjohn.github.io/cave/dimensions.html) for ERD diagrams, schema details, and worked examples.
+See the [dimensions documentation](https://roddarjohn.github.io/pgcraft/dimensions.html) for ERD diagrams, schema details, and worked examples.
 
 ## Documentation
 
 Full documentation is available at
-[roddarjohn.github.io/cave](https://roddarjohn.github.io/cave/).
+[roddarjohn.github.io/pgcraft](https://roddarjohn.github.io/pgcraft/).
 
-- [Setup & installation](https://roddarjohn.github.io/cave/setup.html)
-- [Built-in dimensions](https://roddarjohn.github.io/cave/dimensions.html)
-- [Plugin system](https://roddarjohn.github.io/cave/plugins.html)
-- [API reference](https://roddarjohn.github.io/cave/api.html)
-- [Development guide](https://roddarjohn.github.io/cave/development.html)
-- [Playground](https://roddarjohn.github.io/cave/playground.html)
+- [Setup & installation](https://roddarjohn.github.io/pgcraft/setup.html)
+- [Built-in dimensions](https://roddarjohn.github.io/pgcraft/dimensions.html)
+- [Plugin system](https://roddarjohn.github.io/pgcraft/plugins.html)
+- [API reference](https://roddarjohn.github.io/pgcraft/api.html)
+- [Development guide](https://roddarjohn.github.io/pgcraft/development.html)
+- [Playground](https://roddarjohn.github.io/pgcraft/playground.html)
 
 ## Development
 
 ```bash
 # Clone and install
-git clone https://github.com/<username>/cave.git
-cd cave
+git clone https://github.com/<username>/pgcraft.git
+cd pgcraft
 uv sync --all-groups
 
 # Run checks
@@ -110,7 +107,7 @@ just docs          # build Sphinx HTML docs
 Tests require a running PostgreSQL instance:
 
 ```bash
-DATABASE_URL=postgresql+psycopg:///cave just dev-test
+DATABASE_URL=postgresql+psycopg:///pgcraft just dev-test
 ```
 
 ## Design philosophy

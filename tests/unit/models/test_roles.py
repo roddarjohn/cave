@@ -1,9 +1,9 @@
-"""Unit tests for cave.models.roles."""
+"""Unit tests for pgcraft.models.roles."""
 
 from sqlalchemy import MetaData
 
-from cave.models.roles import anon, authenticator, register_roles
-from cave.resource import APIResource, register_api_resource
+from pgcraft.models.roles import anon, authenticator, register_roles
+from pgcraft.resource import APIResource, register_api_resource
 
 
 class TestModuleLevelRoles:

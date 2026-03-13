@@ -1,13 +1,13 @@
 Setting up a new project
 ========================
 
-This guide walks through integrating cave into a new project that uses
+This guide walks through integrating pgcraft into a new project that uses
 Alembic for database migrations and SQLAlchemy for models.
 
 Dependencies
 ------------
 
-Add ``cave`` as a dependency alongside your existing Alembic and SQLAlchemy
+Add ``pgcraft`` as a dependency alongside your existing Alembic and SQLAlchemy
 dependencies. See the `Alembic documentation`_ for a full project setup guide.
 
 .. _Alembic documentation: https://alembic.sqlalchemy.org/en/latest/tutorial.html
@@ -15,52 +15,52 @@ dependencies. See the `Alembic documentation`_ for a full project setup guide.
 ``alembic.ini``
 ---------------
 
-In your ``alembic.ini``, add a ``[logger_cave]`` section to enable cave's
+In your ``alembic.ini``, add a ``[logger_pgcraft]`` section to enable pgcraft's
 debug output:
 
 .. code-block:: ini
 
    [loggers]
-   keys = root,sqlalchemy,alembic,cave
+   keys = root,sqlalchemy,alembic,pgcraft
 
-   [logger_cave]
+   [logger_pgcraft]
    level = DEBUG
    handlers = console
-   qualname = cave
+   qualname = pgcraft
    propagate = 0
 
 ``env.py``
 ----------
 
-Make two cave-specific additions to ``migrations/env.py``:
+Make two pgcraft-specific additions to ``migrations/env.py``:
 
-1. Call :func:`cave.alembic.register.cave_alembic_hook` before importing
-   your models. This applies cave's patches and registers its Alembic
+1. Call :func:`pgcraft.alembic.register.pgcraft_alembic_hook` before importing
+   your models. This applies pgcraft's patches and registers its Alembic
    extensions.
-2. Call :func:`cave.alembic.register.cave_configure_metadata` after loading
+2. Call :func:`pgcraft.alembic.register.pgcraft_configure_metadata` after loading
    your models/metadata. This registers schemas, roles, and grants.
-3. Pass ``cave_process_revision_directives`` to both ``context.configure()``
-   calls. This enables cave's autogenerate extensions, including dependency
+3. Pass ``pgcraft_process_revision_directives`` to both ``context.configure()``
+   calls. This enables pgcraft's autogenerate extensions, including dependency
    ordering of operations within each generated migration.
 
 .. code-block:: python
 
-   from cave.alembic.register import (
-       cave_alembic_hook,
-       cave_configure_metadata,
-       cave_process_revision_directives,
+   from pgcraft.alembic.register import (
+       pgcraft_alembic_hook,
+       pgcraft_configure_metadata,
+       pgcraft_process_revision_directives,
    )
 
-   cave_alembic_hook()
+   pgcraft_alembic_hook()
 
    # ... your existing env.py setup (loading config, metadata, etc.) ...
 
-   cave_configure_metadata(target_metadata)
+   pgcraft_configure_metadata(target_metadata)
 
    def run_migrations_offline() -> None:
        context.configure(
            # ... your existing options ...
-           process_revision_directives=cave_process_revision_directives,
+           process_revision_directives=pgcraft_process_revision_directives,
        )
        with context.begin_transaction():
            context.run_migrations()
@@ -70,7 +70,7 @@ Make two cave-specific additions to ``migrations/env.py``:
        with connectable.connect() as connection:
            context.configure(
                # ... your existing options ...
-               process_revision_directives=cave_process_revision_directives,
+               process_revision_directives=pgcraft_process_revision_directives,
            )
            with context.begin_transaction():
                context.run_migrations()
@@ -78,7 +78,7 @@ Make two cave-specific additions to ``migrations/env.py``:
 ``models.py``
 -------------
 
-Pass your ``MetaData`` instance to a cave dimension factory so that
+Pass your ``MetaData`` instance to a pgcraft dimension factory so that
 generated tables are registered for autogenerate detection.
 
 Simple dimension (single table)
@@ -90,7 +90,7 @@ A simple dimension stores each row in one table and exposes it through an
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, String, Text
-   from cave.factory.dimension.simple import SimpleDimensionFactory
+   from pgcraft.factory.dimension.simple import SimpleDimensionFactory
 
    metadata = MetaData()
 
@@ -113,7 +113,7 @@ current state is always the most recent row in the attributes log:
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, Numeric, String
-   from cave.factory.dimension.append_only import AppendOnlyDimensionFactory
+   from pgcraft.factory.dimension.append_only import AppendOnlyDimensionFactory
 
    AppendOnlyDimensionFactory(
        tablename="prices",
@@ -136,7 +136,7 @@ frequently:
 .. code-block:: python
 
    from sqlalchemy import Boolean, Column, Integer, MetaData, String
-   from cave.factory.dimension.eav import EAVDimensionFactory
+   from pgcraft.factory.dimension.eav import EAVDimensionFactory
 
    EAVDimensionFactory(
        tablename="features",
@@ -159,10 +159,10 @@ Custom PK column name:
 
 .. code-block:: python
 
-   from cave.factory.dimension.simple import SimpleDimensionFactory
-   from cave.plugins.pk import SerialPKPlugin
-   from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
-   from cave.plugins.api import APIPlugin
+   from pgcraft.factory.dimension.simple import SimpleDimensionFactory
+   from pgcraft.plugins.pk import SerialPKPlugin
+   from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+   from pgcraft.plugins.api import APIPlugin
 
    SimpleDimensionFactory(
        "products", "dim", metadata, dimensions,
@@ -188,18 +188,18 @@ Custom API schema:
        ],
    )
 
-Apply a custom plugin to every factory via :class:`~cave.config.CaveConfig`:
+Apply a custom plugin to every factory via :class:`~pgcraft.config.PGCraftConfig`:
 
 .. code-block:: python
 
-   from cave.config import CaveConfig
+   from pgcraft.config import PGCraftConfig
 
-   cave_cfg = CaveConfig()
+   cave_cfg = PGCraftConfig()
    cave_cfg.register(TimestampPlugin(), TenantPlugin())
 
    SimpleDimensionFactory(
-       "products", "dim", metadata, dimensions, cave=cave_cfg
+       "products", "dim", metadata, dimensions, config=pgcraft_cfg
    )
    AppendOnlyDimensionFactory(
-       "orders", "dim", metadata, dimensions, cave=cave_cfg
+       "orders", "dim", metadata, dimensions, config=pgcraft_cfg
    )
