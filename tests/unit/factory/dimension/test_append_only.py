@@ -13,6 +13,7 @@ from pgcraft.plugins.append_only import (
     AppendOnlyTriggerPlugin,
     AppendOnlyViewPlugin,
 )
+from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.pk import SerialPKPlugin
 
 
@@ -135,6 +136,7 @@ class TestAppendOnlyDimensionResourceFactoryViews:
             [Column("name", String)],
             plugins=[
                 SerialPKPlugin(),
+                CreatedAtPlugin(),
                 AppendOnlyTablePlugin(),
                 AppendOnlyViewPlugin(),
                 APIPlugin(schema="custom_api"),

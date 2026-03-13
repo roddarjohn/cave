@@ -101,6 +101,34 @@ Before submitting, all of these must pass (CI will enforce):
 - `src/pgcraft/resource.py` -- PostgREST API resource registration.
 - `playground/` -- Example project showing end-to-end usage.
 
+### Plugin system
+
+Everything in pgcraft is a plugin. PKs, tables, views, triggers, API
+resources, timestamps, and check constraints are all implemented as plugins
+that communicate through a shared `FactoryContext` key-value store.
+
+Key files:
+- `src/pgcraft/plugin.py` -- `Plugin` base class and decorators
+  (`@produces`, `@requires`, `@singleton`, `Dynamic`).
+- `src/pgcraft/factory/context.py` -- `FactoryContext` store.
+- `src/pgcraft/factory/base.py` -- `ResourceFactory` plugin runner
+  (resolution, validation, topological sort, execution).
+- `src/pgcraft/plugins/` -- Built-in plugins (pk, created_at, simple,
+  append_only, eav, api, check).
+
+How plugins compose:
+- `@produces("key")` declares ctx keys a plugin writes.
+- `@requires("key")` declares ctx keys a plugin reads. The factory
+  topologically sorts plugins by these declarations.
+- `@singleton("group")` ensures at most one plugin of a group exists.
+- `Dynamic("attr")` defers the ctx key name to an instance attribute,
+  allowing the same plugin class to target different keys.
+- Dimension factories define `DEFAULT_PLUGINS` lists. Callers can
+  override with `plugins=[...]` or extend with `extra_plugins=[...]`.
+  Global plugins via `PGCraftConfig` are prepended.
+
+See `docs/plugins.rst` for the full plugin authoring guide.
+
 ## Hooks
 
 A post-tool-use hook runs `just lint && just type-check` after every file

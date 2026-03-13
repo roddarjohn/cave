@@ -110,6 +110,7 @@ def _build_pivot_query(
     entity_table: Table,
     attribute_table: Table,
     mappings: list[_EAVMapping],
+    created_at_col: str = "created_at",
 ) -> Select:
     attr = attribute_table
     row_num = (
@@ -136,7 +137,7 @@ def _build_pivot_query(
     return (
         select(
             entity_table.c.id.label("id"),
-            entity_table.c.created_at.label("created_at"),
+            entity_table.c[created_at_col].label(created_at_col),
             *pivot_cols,
         )
         .select_from(
@@ -146,7 +147,7 @@ def _build_pivot_query(
                 isouter=True,
             )
         )
-        .group_by(entity_table.c.id, entity_table.c.created_at)
+        .group_by(entity_table.c.id, entity_table.c[created_at_col])
     )
 
 
@@ -155,7 +156,7 @@ def _build_pivot_query(
     Dynamic("attribute_key"),
     Dynamic("mappings_key"),
 )
-@requires("pk_columns")
+@requires("pk_columns", "created_at_column")
 @singleton("__table__")
 class EAVTablePlugin(Plugin):
     """Create entity and attribute tables for an EAV dimension.
@@ -185,6 +186,7 @@ class EAVTablePlugin(Plugin):
     def run(self, ctx: FactoryContext) -> None:
         """Create entity and attribute tables."""
         pk_col_name = ctx["pk_columns"].first_key
+        created_at_col = ctx["created_at_column"]
         mappings = _build_eav_mappings(ctx.columns)
         ctx[self.mappings_key] = mappings
 
@@ -202,7 +204,7 @@ class EAVTablePlugin(Plugin):
             ctx.metadata,
             Column(pk_col_name, Integer, primary_key=True),
             Column(
-                "created_at",
+                created_at_col,
                 DateTime(timezone=True),
                 server_default="now()",
             ),
@@ -258,6 +260,7 @@ class EAVTablePlugin(Plugin):
     Dynamic("attribute_key"),
     Dynamic("mappings_key"),
     "pk_columns",
+    "created_at_column",
 )
 class EAVViewPlugin(Plugin):
     """Create the pivot view for an EAV dimension.
@@ -293,9 +296,15 @@ class EAVViewPlugin(Plugin):
         entity_table = ctx[self.entity_key]
         attribute_table = ctx[self.attribute_key]
         pk_col_name = ctx["pk_columns"].first_key
+        created_at_col = ctx["created_at_column"]
 
         view_sql = compile_query(
-            _build_pivot_query(entity_table, attribute_table, mappings)
+            _build_pivot_query(
+                entity_table,
+                attribute_table,
+                mappings,
+                created_at_col,
+            )
         )
         register_view(
             ctx.metadata,
@@ -310,7 +319,7 @@ class EAVViewPlugin(Plugin):
             ctx.tablename,
             MetaData(),
             Column(pk_col_name, Integer, primary_key=True),
-            Column("created_at", DateTime(timezone=True)),
+            Column(created_at_col, DateTime(timezone=True)),
             *[Column(m.attribute_name, m.column_type) for m in mappings],
             schema=ctx.schemaname,
         )

@@ -58,7 +58,7 @@ def _dim_column_names(ctx: FactoryContext) -> list[str]:
 
 
 @produces(Dynamic("root_key"), Dynamic("attributes_key"))
-@requires("pk_columns")
+@requires("pk_columns", "created_at_column")
 @singleton("__table__")
 class AppendOnlyTablePlugin(Plugin):
     """Create the root and attributes tables for an append-only dim.
@@ -83,6 +83,7 @@ class AppendOnlyTablePlugin(Plugin):
     def run(self, ctx: FactoryContext) -> None:
         """Create root and attributes tables."""
         pk_col_name = ctx["pk_columns"].first_key
+        created_at_col = ctx["created_at_column"]
 
         attr_name = _resolve_attributes_name(ctx)
         attributes_table = Table(
@@ -106,7 +107,7 @@ class AppendOnlyTablePlugin(Plugin):
             ctx.metadata,
             Column(pk_col_name, Integer, primary_key=True),
             Column(
-                "created_at",
+                created_at_col,
                 DateTime(timezone=True),
                 server_default="now()",
             ),
@@ -124,6 +125,7 @@ class AppendOnlyTablePlugin(Plugin):
     Dynamic("root_key"),
     Dynamic("attributes_key"),
     "pk_columns",
+    "created_at_column",
 )
 class AppendOnlyViewPlugin(Plugin):
     """Create the join view for an append-only dimension.
@@ -154,13 +156,14 @@ class AppendOnlyViewPlugin(Plugin):
     def run(self, ctx: FactoryContext) -> None:
         """Register the join view and store the proxy in ctx."""
         pk_col_name = ctx["pk_columns"].first_key
+        created_at_col = ctx["created_at_column"]
         root_table = ctx[self.root_key]
         attribute_table = ctx[self.attributes_key]
 
         view_query = (
             select(
                 root_table.c[pk_col_name].label(pk_col_name),
-                root_table.c["created_at"].label("created_at"),
+                root_table.c[created_at_col].label(created_at_col),
                 attribute_table.c["created_at"].label("updated_at"),
                 *[col.label(col.key) for col in ctx.columns],
             )
@@ -186,7 +189,7 @@ class AppendOnlyViewPlugin(Plugin):
             ctx.tablename,
             MetaData(),
             Column(pk_col_name, Integer, primary_key=True),
-            Column("created_at", DateTime(timezone=True)),
+            Column(created_at_col, DateTime(timezone=True)),
             Column("updated_at", DateTime(timezone=True)),
             *[Column(col.key, col.type) for col in ctx.columns],
             schema=ctx.schemaname,
