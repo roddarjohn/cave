@@ -6,6 +6,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Rodda John", email = "roddarjohn@protonmail.com" }]
 requires-python = ">=3.12"
+classifiers = ["Development Status :: 2 - Pre-Alpha"]
 dependencies = [
   "pglast>=7.11",
   "pydantic>=2.12.5",

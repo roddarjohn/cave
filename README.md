@@ -3,6 +3,9 @@
 [![PyPI](https://img.shields.io/pypi/v/pgcraft)](https://pypi.org/project/pgcraft/)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://roddarjohn.github.io/pgcraft/)
 
+> **Pre-alpha** — pgcraft is under active development. APIs may change
+> between releases. Feedback and contributions are welcome.
+
 **Configuration-driven PostgreSQL data schemas, migrations, and APIs.**
 
 pgcraft generates SQLAlchemy models, Alembic migrations, and
