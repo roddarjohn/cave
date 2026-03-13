@@ -40,3 +40,4 @@ _docs-setup:
     mkdir -p docs/_generated
     just --list | uv run python scripts/just_to_rst.py > docs/_generated/just_commands.rst
     just --justfile playground/Justfile --list | uv run python scripts/just_to_rst.py > docs/_generated/playground_just_commands.rst
+    uv run python scripts/generate_dimension_docs.py
