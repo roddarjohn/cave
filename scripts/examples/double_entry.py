@@ -8,9 +8,9 @@ from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
 )
-from pgcraft.utils.naming_convention import build_naming_convention
+from pgcraft import pg_build_naming_conventions
 
-metadata = MetaData(naming_convention=build_naming_convention())
+metadata = MetaData(naming_convention=pg_build_naming_conventions())
 
 # --- example start ---
 SimpleDimensionResourceFactory(

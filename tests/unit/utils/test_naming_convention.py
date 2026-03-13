@@ -15,30 +15,30 @@ from sqlalchemy import (
 from pgcraft.utils.naming_convention import (
     _cols,
     _make_token,
-    build_naming_convention,
+    pg_build_naming_conventions,
 )
 
 # ---------------------------------------------------------------------------
-# build_naming_convention structure
+# pg_build_naming_conventions structure
 # ---------------------------------------------------------------------------
 
 
 class TestBuildNamingConventionStructure:
     def test_returns_dict(self):
-        assert isinstance(build_naming_convention(), dict)
+        assert isinstance(pg_build_naming_conventions(), dict)
 
     def test_contains_required_keys(self):
-        conv = build_naming_convention()
+        conv = pg_build_naming_conventions()
         for key in ("fk", "uq", "ix", "pk", "ck"):
             assert key in conv
 
     def test_contains_token_callable_keys(self):
-        conv = build_naming_convention()
+        conv = pg_build_naming_conventions()
         for key in ("fk_name", "uq_name", "ix_name", "pk_name", "ck_name"):
             assert key in conv
 
     def test_template_strings_reference_tokens(self):
-        conv = build_naming_convention()
+        conv = pg_build_naming_conventions()
         assert conv["fk"] == "%(fk_name)s"
         assert conv["uq"] == "%(uq_name)s"
         assert conv["ix"] == "%(ix_name)s"
@@ -46,7 +46,7 @@ class TestBuildNamingConventionStructure:
         assert conv["ck"] == "%(ck_name)s"
 
     def test_token_callables_are_callable(self):
-        conv = build_naming_convention()
+        conv = pg_build_naming_conventions()
         for key in ("fk_name", "uq_name", "ix_name", "pk_name", "ck_name"):
             assert callable(conv[key])
 
@@ -84,7 +84,7 @@ class TestCols:
 
 class TestUniqueConstraintNaming:
     def _make_metadata(self) -> tuple[MetaData, Table]:
-        conv = build_naming_convention()
+        conv = pg_build_naming_conventions()
         md = MetaData(naming_convention=conv)
         t = Table(
             "users",
@@ -97,13 +97,13 @@ class TestUniqueConstraintNaming:
 
     def test_uq_name_format(self):
         _md, t = self._make_metadata()
-        conv = build_naming_convention()
+        conv = pg_build_naming_conventions()
         uq = UniqueConstraint(t.c.email)
         name = conv["uq_name"](uq, t)
         assert name == "uq__users__email"
 
     def test_uq_name_multi_column(self):
-        conv = build_naming_convention()
+        conv = pg_build_naming_conventions()
         md = MetaData(naming_convention=conv)
         t = Table(
             "orders",
@@ -124,7 +124,7 @@ class TestUniqueConstraintNaming:
 
 class TestFKNaming:
     def test_fk_name_format(self):
-        conv = build_naming_convention()
+        conv = pg_build_naming_conventions()
         md = MetaData(naming_convention=conv)
         Table(
             "parent",
@@ -152,7 +152,7 @@ class TestFKNaming:
 class TestTokenTruncation:
     def test_long_name_truncated_to_max_length(self):
         max_len = 20
-        conv = build_naming_convention(max_length=max_len)
+        conv = pg_build_naming_conventions(max_length=max_len)
         md = MetaData(naming_convention=conv)
         t = Table(
             "my_very_long_table",
@@ -166,7 +166,7 @@ class TestTokenTruncation:
 
     def test_long_name_ends_with_digest(self):
         """Truncated names must end with an 8-char MD5 hex digest."""
-        conv = build_naming_convention(max_length=20)
+        conv = pg_build_naming_conventions(max_length=20)
         md = MetaData(naming_convention=conv)
         t = Table(
             "my_very_long_table",
@@ -182,7 +182,7 @@ class TestTokenTruncation:
 
     def test_short_name_not_truncated(self):
         """Short names should not be modified."""
-        conv = build_naming_convention(max_length=63)
+        conv = pg_build_naming_conventions(max_length=63)
         md = MetaData(naming_convention=conv)
         t = Table(
             "t",
@@ -196,7 +196,7 @@ class TestTokenTruncation:
 
     def test_truncation_digest_is_md5_based(self):
         """The 8-char digest must match the first 8 chars of MD5(full)."""
-        conv = build_naming_convention(max_length=20)
+        conv = pg_build_naming_conventions(max_length=20)
         md = MetaData(naming_convention=conv)
         t = Table(
             "my_very_long_table",
@@ -215,7 +215,7 @@ class TestTokenTruncation:
     def test_max_length_parameter_respected(self):
         """Custom max_length values should be honoured."""
         for max_len in (15, 30, 50):
-            conv = build_naming_convention(max_length=max_len)
+            conv = pg_build_naming_conventions(max_length=max_len)
             md = MetaData(naming_convention=conv)
             t = Table(
                 "a_very_long_table_name",
