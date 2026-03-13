@@ -7,11 +7,13 @@ from pgcraft.factory.dimension.append_only import (
 )
 from pgcraft.factory.dimension.eav import EAVDimensionResourceFactory
 from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
+from pgcraft.factory.ledger import LedgerResourceFactory
 
 __all__ = [
     "AppendOnlyDimensionResourceFactory",
     "EAVDimensionResourceFactory",
     "FactoryContext",
+    "LedgerResourceFactory",
     "ResourceFactory",
     "SimpleDimensionResourceFactory",
 ]

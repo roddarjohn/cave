@@ -107,6 +107,50 @@ no relationship to each other preserve their original list order.
 ``MyTransformPlugin`` will always run after the plugin that produces
 ``"primary"``, regardless of the order they appear in the plugin list.
 
+Injected columns
+~~~~~~~~~~~~~~~~~
+
+Some plugins need to contribute columns to a table without knowing
+which table plugin will consume them.  For this, plugins append
+:class:`~sqlalchemy.Column` objects to ``ctx.injected_columns`` — a
+shared list on :class:`~pgcraft.factory.context.FactoryContext`.  Table
+plugins that support this pattern (currently
+:class:`~pgcraft.plugins.ledger.LedgerTablePlugin`) spread the list
+into the table definition:
+
+.. code-block:: python
+
+   # Column-providing plugin
+   class MyColumnPlugin(Plugin):
+       def run(self, ctx: FactoryContext) -> None:
+           ctx.injected_columns.append(
+               Column("tenant_id", Integer, nullable=False)
+           )
+
+   # Table plugin spreads injected columns
+   table = Table(
+       ctx.tablename, ctx.metadata,
+       *pk_columns,
+       *ctx.injected_columns,   # entry_id, created_at, etc.
+       Column("value", Integer(), nullable=False),
+       *ctx.table_items,
+       schema=ctx.schemaname,
+   )
+
+Built-in plugins that inject columns:
+
+- :class:`~pgcraft.plugins.created_at.CreatedAtPlugin` — injects a
+  ``created_at`` timestamp column.
+- :class:`~pgcraft.plugins.entry_id.UUIDEntryIDPlugin` — injects an
+  ``entry_id`` UUID column.
+- :class:`~pgcraft.plugins.ledger.DoubleEntryPlugin` — injects a
+  ``direction`` column for debit/credit semantics.
+
+These plugins also write their standard ctx store keys (e.g.
+``"created_at_column"``, ``"entry_id_column"``, ``"double_entry_columns"``)
+so that downstream trigger plugins can look up column metadata.
+
+
 Before any :meth:`~pgcraft.plugin.Plugin.run` call the factory collects two
 special inputs:
 
@@ -196,9 +240,96 @@ plugins share the same group.
    class MyPKPlugin(Plugin):
        ...
 
-The built-in groups are ``"__pk__"`` (one PK plugin) and ``"__table__"``
-(one table-layout plugin).  You can define your own group names for custom
-plugins.
+The built-in groups are ``"__pk__"`` (one PK plugin), ``"__table__"``
+(one table-layout plugin), ``"__entry_id__"`` (one entry ID plugin),
+and ``"__double_entry__"`` (one double-entry plugin).  You can define
+your own group names for custom plugins.
+
+
+Context keys
+------------
+
+Plugins read and write objects in ``ctx`` using string keys.  Every built-in
+plugin accepts its key names as constructor arguments with sensible defaults,
+so two independent pipelines can coexist in one factory without colliding.
+
+``SerialPKPlugin``
+    Sets ``ctx.pk_columns`` (typed field, not a store key).
+
+``SimpleTablePlugin``
+    Writes ``"primary"`` (the backing table).
+
+``APIPlugin``
+    Reads ``"primary"`` (via ``table_key``).  Writes ``"api"`` (via
+    ``view_key``).
+
+``SimpleTriggerPlugin``
+    Reads ``"primary"`` (via ``table_key``) and ``"api"`` (via ``view_key``).
+
+``AppendOnlyTablePlugin``
+    Writes ``"root_table"`` and ``"attributes"``.
+
+``AppendOnlyViewPlugin``
+    Reads ``"root_table"`` and ``"attributes"``.  Writes ``"primary"``.
+
+``AppendOnlyTriggerPlugin``
+    Reads ``"root_table"``, ``"attributes"``, and ``"api"`` (optional;
+    skipped if absent from ``ctx``).
+
+``EAVTablePlugin``
+    Writes ``"entity"``, ``"attribute"``, and ``"eav_mappings"``.
+
+``EAVViewPlugin``
+    Reads ``"entity"``, ``"attribute"``, and ``"eav_mappings"``.  Writes
+    ``"primary"``.
+
+``EAVTriggerPlugin``
+    Reads ``"entity"``, ``"attribute"``, ``"eav_mappings"``, and ``"api"``
+    (optional; skipped if absent from ``ctx``).
+
+``UUIDEntryIDPlugin``
+    Writes ``"entry_id_column"`` (a ``Column`` object).  Also appends
+    the column to ``ctx.injected_columns``.
+
+``CreatedAtPlugin``
+    Writes ``"created_at_column"`` (the column name string).  Also
+    appends a ``DateTime`` column to ``ctx.injected_columns``.
+
+``LedgerTablePlugin``
+    Reads ``"pk_columns"`` and ``ctx.injected_columns``.  Requires
+    ``"entry_id_column"`` and ``"created_at_column"`` for ordering.
+    Writes ``"primary"`` (the table) and ``"__root__"``.
+
+``LedgerTriggerPlugin``
+    Reads ``"primary"`` (via ``table_key``), ``"api"`` (via
+    ``view_key``), and ``"entry_id_column"``.
+
+``LedgerLatestViewPlugin``
+    Reads ``"primary"`` (via ``table_key``) and
+    ``"created_at_column"``.  Writes ``"latest_view"``
+    (via ``latest_view_key``).
+
+``LedgerBalanceViewPlugin``
+    Reads ``"primary"`` (via ``table_key``).  Writes
+    ``"balance_view"`` (via ``balance_view_key``).
+
+``LedgerBalanceCheckPlugin``
+    Reads ``"primary"`` (via ``table_key``).  Registers an
+    AFTER INSERT trigger enforcing ``SUM(value) >= min_balance``
+    per dimension group.
+
+``DoubleEntryPlugin``
+    Writes ``"double_entry_columns"`` (the direction column name).
+    Appends a ``direction`` column to ``ctx.injected_columns``.
+
+``DoubleEntryTriggerPlugin``
+    Reads ``"primary"`` (via ``table_key``),
+    ``"double_entry_columns"``, and ``"entry_id_column"``.
+
+All key names are overridable via constructor arguments, which means you can
+wire plugins together in non-standard ways or run multiple pipelines within
+a single factory.
+
 
 
 Writing a custom plugin

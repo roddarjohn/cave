@@ -10,6 +10,7 @@ pgcraft
 
    setup
    dimensions
+   ledgers
    builtin_plugins
    plugins
    cookbook

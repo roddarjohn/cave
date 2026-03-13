@@ -20,10 +20,18 @@ from pgcraft.factory.dimension import (
     EAVDimensionResourceFactory,
     SimpleDimensionResourceFactory,
 )
+from pgcraft.factory.ledger import LedgerResourceFactory
 from pgcraft.plugins.api import APIPlugin
 from pgcraft.plugins.check import (
     TableCheckPlugin,
     TriggerCheckPlugin,
+)
+from pgcraft.plugins.ledger import (
+    DoubleEntryPlugin,
+    DoubleEntryTriggerPlugin,
+    LedgerBalanceCheckPlugin,
+    LedgerBalanceViewPlugin,
+    LedgerLatestViewPlugin,
 )
 from pgcraft.plugins.pk import SerialPKPlugin
 from pgcraft.plugins.simple import (
@@ -168,6 +176,64 @@ SimpleDimensionResourceFactory(
             query=_invoice_stats,
             join_key="customer_id",
         ),
+    ],
+)
+
+# -- Ledger models ------------------------------------------------------
+
+LedgerResourceFactory(
+    tablename="order_events",
+    schemaname="private",
+    metadata=metadata,
+    schema_items=[
+        Column("order_id", String, nullable=False),
+        Column("status", String, nullable=False),
+    ],
+    extra_plugins=[
+        LedgerLatestViewPlugin(dimensions=["order_id"]),
+    ],
+)
+
+LedgerResourceFactory(
+    tablename="stock_movements",
+    schemaname="private",
+    metadata=metadata,
+    schema_items=[
+        Column("warehouse", String, nullable=False),
+        Column("sku", String, nullable=False),
+    ],
+    extra_plugins=[
+        LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
+        LedgerBalanceCheckPlugin(
+            dimensions=["warehouse", "sku"],
+        ),
+    ],
+)
+
+SimpleDimensionResourceFactory(
+    tablename="accounts",
+    schemaname="private",
+    metadata=metadata,
+    schema_items=[
+        Column("name", String, nullable=False),
+        Column("category", String, nullable=False),
+    ],
+)
+
+LedgerResourceFactory(
+    tablename="journal",
+    schemaname="private",
+    metadata=metadata,
+    schema_items=[
+        Column(
+            "account_id",
+            ForeignKey("private.accounts.id"),
+            nullable=False,
+        ),
+    ],
+    extra_plugins=[
+        DoubleEntryPlugin(),
+        DoubleEntryTriggerPlugin(),
     ],
 )
 

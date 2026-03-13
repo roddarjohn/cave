@@ -142,6 +142,31 @@ current state is always the most recent row in the attributes log:
        ],
    )
 
+Ledger (append-only value table)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A ledger stores immutable entries with a ``value`` column, an ``entry_id``
+UUID for correlating related entries, and dimension columns.  Only INSERT
+is allowed through the API view:
+
+.. code-block:: python
+
+   from sqlalchemy import Column, MetaData, String
+   from pgcraft.factory.ledger import LedgerResourceFactory
+
+   LedgerResourceFactory(
+       tablename="order_events",
+       schemaname="ops",
+       metadata=metadata,
+       schema_items=[
+           Column("order_id", String, nullable=False),
+           Column("status", String, nullable=False),
+       ],
+   )
+
+See :doc:`ledgers` for balance views, double-entry enforcement, and
+numeric value types.
+
 EAV dimension (sparse / dynamic attributes)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
