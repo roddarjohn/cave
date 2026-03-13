@@ -303,6 +303,6 @@ class TestEAVCheckUpdate:
             self.conn.execute(
                 text(
                     f"UPDATE {self.schema}.products"
-                    f" SET price = 999999, qty = 999999"
+                    f" SET price = 1001, qty = 1000"
                 )
             )
