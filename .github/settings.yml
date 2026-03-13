@@ -1,0 +1,25 @@
+repository:
+  name: cave
+  default_branch: main
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false
+  delete_branch_on_merge: true
+
+branches:
+  - name: main
+    protection:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+      required_status_checks:
+        strict: true
+        contexts:
+          - lint
+          - "test (pg14)"
+          - "test (pg15)"
+          - "test (pg16)"
+          - "test (pg17)"
+          - docs
+      enforce_admins: false
+      required_linear_history: true
