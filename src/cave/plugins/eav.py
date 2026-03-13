@@ -236,7 +236,9 @@ class EAVTablePlugin(Plugin):
 
 @produces(Dynamic("primary_key"))
 @requires(
-    Dynamic("entity_key"), Dynamic("attribute_key"), Dynamic("mappings_key")
+    Dynamic("entity_key"),
+    Dynamic("attribute_key"),
+    Dynamic("mappings_key"),
 )
 class EAVViewPlugin(Plugin):
     """Create the pivot view for an EAV dimension.
