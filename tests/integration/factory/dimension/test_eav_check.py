@@ -137,18 +137,18 @@ def _setup_eav_with_checks(
             fn_name = f"00_check_{schema}_products_{op}"
             conn.execute(
                 text(f"""
-                CREATE FUNCTION {schema}.{fn_name}()
+                CREATE FUNCTION {schema}."{fn_name}"()
                 RETURNS trigger
                 LANGUAGE plpgsql AS $$ {check_body} $$
             """)
             )
             conn.execute(
                 text(f"""
-                CREATE TRIGGER {fn_name}
+                CREATE TRIGGER "{fn_name}"
                 INSTEAD OF {op.upper()}
                 ON {schema}.products
                 FOR EACH ROW
-                EXECUTE FUNCTION {schema}.{fn_name}()
+                EXECUTE FUNCTION {schema}."{fn_name}"()
             """)
             )
 
