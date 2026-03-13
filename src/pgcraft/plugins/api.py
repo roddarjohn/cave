@@ -104,7 +104,8 @@ class APIPlugin(Plugin):
         columns: Column names to include in the view. When
             ``None``, all table columns are included.
         stats_key: Key in ``ctx`` holding statistics view info.
-            When set, LEFT JOINs stats views into the API view.
+            LEFT JOINs stats views into the API view when
+            the key exists and is non-empty.
 
     """
 
@@ -115,7 +116,7 @@ class APIPlugin(Plugin):
         table_key: str = "primary",
         view_key: str = "api",
         columns: list[str] | None = None,
-        stats_key: str | None = None,
+        stats_key: str = "statistics_views",
     ) -> None:
         """Store the API configuration and context keys."""
         self.schema = schema
@@ -128,11 +129,10 @@ class APIPlugin(Plugin):
     def run(self, ctx: FactoryContext) -> None:
         """Create the API view and register the resource."""
         primary = ctx[self.table_key]
-        stats: dict[str, StatisticsViewInfo] = (
-            ctx[self.stats_key]
-            if self.stats_key is not None and self.stats_key in ctx
-            else {}
-        )
+        if self.stats_key in ctx:
+            stats: dict[str, StatisticsViewInfo] = ctx[self.stats_key]
+        else:
+            stats = {}
         use_alias = self.columns is not None or bool(stats)
         alias = "p"
 

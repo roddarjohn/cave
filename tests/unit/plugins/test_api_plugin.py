@@ -139,7 +139,7 @@ class TestAPIPluginStatsJoin:
         )
 
     def test_stats_join_in_definition(self):
-        plugin = APIPlugin(stats_key="statistics_views")
+        plugin = APIPlugin()
         ctx = self._ctx_with_stats()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
@@ -148,7 +148,7 @@ class TestAPIPluginStatsJoin:
         assert "product_statistics" in defn
 
     def test_stats_columns_in_select(self):
-        plugin = APIPlugin(stats_key="statistics_views")
+        plugin = APIPlugin()
         ctx = self._ctx_with_stats()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
@@ -162,10 +162,7 @@ class TestAPIPluginStatsJoin:
                 column_names=["order_count"],
             ),
         }
-        plugin = APIPlugin(
-            columns=["id"],
-            stats_key="statistics_views",
-        )
+        plugin = APIPlugin(columns=["id"])
         ctx = _ctx_with_primary(
             store={"statistics_views": stats_info},
         )
@@ -174,7 +171,16 @@ class TestAPIPluginStatsJoin:
         assert "p.id" in view.definition
         assert "order_count" in view.definition
 
-    def test_no_stats_key_no_join(self):
+    def test_empty_stats_no_join(self):
+        plugin = APIPlugin()
+        ctx = _ctx_with_primary(
+            store={"statistics_views": {}},
+        )
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert "join" not in view.definition.lower()
+
+    def test_missing_stats_key_no_join(self):
         plugin = APIPlugin()
         ctx = _ctx_with_primary()
         plugin.run(ctx)

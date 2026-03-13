@@ -11,7 +11,7 @@ from sqlalchemy import (
 )
 
 from pgcraft.plugins.statistics import StatisticsViewPlugin
-from pgcraft.statistics import PGCraftStatistics
+from pgcraft.statistics import PGCraftStatisticsView
 from tests.unit.plugins.conftest import make_ctx
 
 _md = MetaData()
@@ -32,7 +32,7 @@ _invoices = Table(
 
 
 def _ctx_with_stats(stats_items=None):
-    """Return a ctx with a Table and PGCraftStatistics items."""
+    """Return a ctx with a Table and PGCraftStatisticsView items."""
     schema_items = list(stats_items or [])
     schema_items.append(Column("name", String))
     ctx = make_ctx(
@@ -67,7 +67,7 @@ def _invoice_stats_query():
 
 class TestStatisticsViewPlugin:
     def test_creates_view_in_metadata(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=_order_stats_query(),
             join_key="customer_id",
@@ -80,7 +80,7 @@ class TestStatisticsViewPlugin:
         assert len(views.views) == 1
 
     def test_view_name_follows_convention(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=_order_stats_query(),
             join_key="customer_id",
@@ -92,7 +92,7 @@ class TestStatisticsViewPlugin:
         assert view.name == "customer_orders_statistics"
 
     def test_view_schema_matches_ctx(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=_order_stats_query(),
             join_key="customer_id",
@@ -104,7 +104,7 @@ class TestStatisticsViewPlugin:
         assert view.schema == "dim"
 
     def test_stores_info_in_ctx(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=_order_stats_query(),
             join_key="customer_id",
@@ -120,7 +120,7 @@ class TestStatisticsViewPlugin:
         assert si.column_names == ["order_count"]
 
     def test_join_key_excluded_from_column_names(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=_order_stats_query(),
             join_key="customer_id",
@@ -132,7 +132,7 @@ class TestStatisticsViewPlugin:
         assert "customer_id" not in info["orders"].column_names
 
     def test_join_key_defaults_to_pk(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=select(
                 _orders.c.id,
@@ -147,7 +147,7 @@ class TestStatisticsViewPlugin:
         assert info["orders"].column_names == ["cnt"]
 
     def test_custom_stats_key(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=_order_stats_query(),
             join_key="customer_id",
@@ -164,7 +164,7 @@ class TestStatisticsViewPlugin:
         assert ctx["statistics_views"] == {}
 
     def test_materialized_view(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=_order_stats_query(),
             join_key="customer_id",
@@ -176,14 +176,31 @@ class TestStatisticsViewPlugin:
         view = ctx.metadata.info["views"].views[0]
         assert view.materialized is True
 
+    def test_custom_schema(self):
+        stat = PGCraftStatisticsView(
+            name="orders",
+            query=_order_stats_query(),
+            join_key="customer_id",
+            schema="analytics",
+        )
+        plugin = StatisticsViewPlugin()
+        ctx = _ctx_with_stats([stat])
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert view.schema == "analytics"
+        info = ctx["statistics_views"]
+        assert info["orders"].view_name == (
+            "analytics.customer_orders_statistics"
+        )
+
     def test_multiple_stats_views(self):
         stats = [
-            PGCraftStatistics(
+            PGCraftStatisticsView(
                 name="orders",
                 query=_order_stats_query(),
                 join_key="customer_id",
             ),
-            PGCraftStatistics(
+            PGCraftStatisticsView(
                 name="invoices",
                 query=_invoice_stats_query(),
                 join_key="customer_id",
@@ -204,7 +221,7 @@ class TestStatisticsViewPlugin:
         assert "customer_invoices_statistics" in view_names
 
     def test_view_definition_contains_compiled_sql(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=_order_stats_query(),
             join_key="customer_id",

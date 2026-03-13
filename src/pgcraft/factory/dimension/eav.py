@@ -8,6 +8,7 @@ from pgcraft.plugins.api import APIPlugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.eav import EAVTablePlugin, EAVTriggerPlugin, EAVViewPlugin
 from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.statistics import StatisticsViewPlugin
 
 
 class EAVDimensionResourceFactory(ResourceFactory):
@@ -21,8 +22,10 @@ class EAVDimensionResourceFactory(ResourceFactory):
     3. :class:`~pgcraft.plugins.eav.EAVTablePlugin` -- entity +
        attribute tables.
     4. :class:`~pgcraft.plugins.eav.EAVViewPlugin` -- pivot view.
-    5. :class:`~pgcraft.plugins.api.APIPlugin` -- API view + resource.
-    6. :class:`~pgcraft.plugins.eav.EAVTriggerPlugin` -- INSTEAD OF triggers.
+    5. :class:`~pgcraft.plugins.statistics.StatisticsViewPlugin` --
+       statistics views (no-op when no statistics items).
+    6. :class:`~pgcraft.plugins.api.APIPlugin` -- API view + resource.
+    7. :class:`~pgcraft.plugins.eav.EAVTriggerPlugin` -- INSTEAD OF triggers.
     """
 
     DEFAULT_PLUGINS: ClassVar[list[Plugin]] = [
@@ -30,6 +33,7 @@ class EAVDimensionResourceFactory(ResourceFactory):
         CreatedAtPlugin(),
         EAVTablePlugin(),
         EAVViewPlugin(),
+        StatisticsViewPlugin(),
         APIPlugin(),
         EAVTriggerPlugin(),
     ]

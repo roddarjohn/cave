@@ -1,7 +1,8 @@
 """Statistics view support for pgcraft dimensions.
 
-Provides :class:`PGCraftStatistics`, a declarative statistics view
-definition that can be joined into the API view as read-only fields.
+Provides :class:`PGCraftStatisticsView`, a declarative statistics
+view definition that can be joined into the API view as read-only
+fields.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
-class PGCraftStatistics:
+class PGCraftStatisticsView:
     """A declarative statistics view definition.
 
     The ``query`` is a SQLAlchemy :class:`~sqlalchemy.Select` whose
@@ -34,6 +35,8 @@ class PGCraftStatistics:
         materialized: Whether to create a materialized view.
         join_key: Column name used to join back to the primary
             table.  Defaults to the PK column name at runtime.
+        schema: PostgreSQL schema for the view.  Defaults to the
+            dimension's schema at runtime.
 
     Example::
 
@@ -41,7 +44,7 @@ class PGCraftStatistics:
 
         orders = Table("orders", metadata, ...)
 
-        PGCraftStatistics(
+        PGCraftStatisticsView(
             name="orders",
             query=select(
                 orders.c.customer_id,
@@ -56,6 +59,7 @@ class PGCraftStatistics:
     query: Select
     materialized: bool = False
     join_key: str | None = None
+    schema: str | None = None
 
     @property
     def view_suffix(self) -> str:
@@ -107,15 +111,15 @@ class StatisticsViewInfo:
 
 def collect_statistics(
     schema_items: list,
-) -> list[PGCraftStatistics]:
-    """Filter :class:`PGCraftStatistics` from a schema items list.
+) -> list[PGCraftStatisticsView]:
+    """Filter :class:`PGCraftStatisticsView` from a schema items list.
 
     Args:
         schema_items: Mixed list of ``Column``,
-            ``PGCraftStatistics``, and other schema items.
+            ``PGCraftStatisticsView``, and other schema items.
 
     Returns:
-        Only the ``PGCraftStatistics`` items, in original order.
+        Only the ``PGCraftStatisticsView`` items, in original order.
 
     """
-    return [i for i in schema_items if isinstance(i, PGCraftStatistics)]
+    return [i for i in schema_items if isinstance(i, PGCraftStatisticsView)]

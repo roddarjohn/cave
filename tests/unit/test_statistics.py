@@ -12,7 +12,7 @@ from sqlalchemy import (
 )
 
 from pgcraft.statistics import (
-    PGCraftStatistics,
+    PGCraftStatisticsView,
     StatisticsViewInfo,
     collect_statistics,
 )
@@ -27,9 +27,9 @@ _orders = Table(
 )
 
 
-class TestPGCraftStatisticsColumnNames:
+class TestPGCraftStatisticsViewColumnNames:
     def test_returns_column_names(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=select(
                 _orders.c.customer_id,
@@ -39,7 +39,7 @@ class TestPGCraftStatisticsColumnNames:
         assert stat.column_names == ["customer_id", "cnt"]
 
     def test_multiple_columns(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=select(
                 _orders.c.customer_id,
@@ -56,23 +56,23 @@ class TestPGCraftStatisticsColumnNames:
 
 class TestPGCraftStatisticsViewSuffix:
     def test_appends_statistics(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="orders",
             query=select(_orders.c.id),
         )
         assert stat.view_suffix == "orders_statistics"
 
     def test_different_name(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="invoices",
             query=select(_orders.c.id),
         )
         assert stat.view_suffix == "invoices_statistics"
 
 
-class TestPGCraftStatisticsFrozen:
+class TestPGCraftStatisticsViewFrozen:
     def test_is_immutable(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="s",
             query=select(_orders.c.id),
         )
@@ -80,20 +80,35 @@ class TestPGCraftStatisticsFrozen:
             stat.name = "other"  # type: ignore[misc]
 
 
-class TestPGCraftStatisticsDefaults:
+class TestPGCraftStatisticsViewDefaults:
     def test_materialized_defaults_false(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="s",
             query=select(_orders.c.id),
         )
         assert stat.materialized is False
 
     def test_join_key_defaults_none(self):
-        stat = PGCraftStatistics(
+        stat = PGCraftStatisticsView(
             name="s",
             query=select(_orders.c.id),
         )
         assert stat.join_key is None
+
+    def test_schema_defaults_none(self):
+        stat = PGCraftStatisticsView(
+            name="s",
+            query=select(_orders.c.id),
+        )
+        assert stat.schema is None
+
+    def test_custom_schema(self):
+        stat = PGCraftStatisticsView(
+            name="s",
+            query=select(_orders.c.id),
+            schema="analytics",
+        )
+        assert stat.schema == "analytics"
 
 
 class TestStatisticsViewInfo:
@@ -112,7 +127,7 @@ class TestCollectStatistics:
     def test_filters_statistics_from_mixed_list(self):
         items = [
             Column("name", String),
-            PGCraftStatistics(
+            PGCraftStatisticsView(
                 name="orders",
                 query=select(
                     _orders.c.customer_id,

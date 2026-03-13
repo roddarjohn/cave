@@ -12,6 +12,7 @@ from pgcraft.plugins.append_only import (
 )
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.statistics import StatisticsViewPlugin
 
 
 class AppendOnlyDimensionResourceFactory(ResourceFactory):
@@ -26,8 +27,10 @@ class AppendOnlyDimensionResourceFactory(ResourceFactory):
        root + attributes tables.
     4. :class:`~pgcraft.plugins.append_only.AppendOnlyViewPlugin` --
        join view.
-    5. :class:`~pgcraft.plugins.api.APIPlugin` -- API view + resource.
-    6. :class:`~pgcraft.plugins.append_only.AppendOnlyTriggerPlugin` --
+    5. :class:`~pgcraft.plugins.statistics.StatisticsViewPlugin` --
+       statistics views (no-op when no statistics items).
+    6. :class:`~pgcraft.plugins.api.APIPlugin` -- API view + resource.
+    7. :class:`~pgcraft.plugins.append_only.AppendOnlyTriggerPlugin` --
        INSTEAD OF triggers.
     """
 
@@ -36,6 +39,7 @@ class AppendOnlyDimensionResourceFactory(ResourceFactory):
         CreatedAtPlugin(),
         AppendOnlyTablePlugin(),
         AppendOnlyViewPlugin(),
+        StatisticsViewPlugin(),
         APIPlugin(),
         AppendOnlyTriggerPlugin(),
     ]

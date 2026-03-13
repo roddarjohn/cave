@@ -10,6 +10,7 @@ pgcraft
 
    setup
    dimensions
+   builtin_plugins
    plugins
    cookbook
    api

@@ -63,6 +63,7 @@ The three built-in dimension factories are thin wrappers:
        DEFAULT_PLUGINS = [
            SerialPKPlugin(),
            SimpleTablePlugin(),
+           StatisticsViewPlugin(),
            APIPlugin(),
            SimpleTriggerPlugin(),
        ]
@@ -198,59 +199,6 @@ plugins share the same group.
 The built-in groups are ``"__pk__"`` (one PK plugin) and ``"__table__"``
 (one table-layout plugin).  You can define your own group names for custom
 plugins.
-
-
-Context keys
-------------
-
-Plugins read and write objects in ``ctx`` using string keys.  Every built-in
-plugin accepts its key names as constructor arguments with sensible defaults,
-so two independent pipelines can coexist in one factory without colliding.
-
-``SerialPKPlugin``
-    Sets ``ctx.pk_columns`` (typed field, not a store key).
-
-``SimpleTablePlugin``
-    Writes ``"primary"`` (the backing table).
-
-``APIPlugin``
-    Reads ``"primary"`` (via ``table_key``).  Writes ``"api"`` (via
-    ``view_key``).  Optionally reads ``"statistics_views"`` (via
-    ``stats_key``) to LEFT JOIN statistics views into the API view.
-    Accepts ``columns`` to expose a subset of table columns.
-
-``StatisticsViewPlugin``
-    Reads ``"primary"`` (via ``table_key``) and ``"pk_columns"``.  Writes
-    ``"statistics_views"`` (via ``stats_key``).  Creates views from
-    :class:`~pgcraft.statistics.PGCraftStatistics` schema items.
-
-``SimpleTriggerPlugin``
-    Reads ``"primary"`` (via ``table_key``) and ``"api"`` (via ``view_key``).
-
-``AppendOnlyTablePlugin``
-    Writes ``"root_table"`` and ``"attributes"``.
-
-``AppendOnlyViewPlugin``
-    Reads ``"root_table"`` and ``"attributes"``.  Writes ``"primary"``.
-
-``AppendOnlyTriggerPlugin``
-    Reads ``"root_table"``, ``"attributes"``, and ``"api"`` (optional;
-    skipped if absent from ``ctx``).
-
-``EAVTablePlugin``
-    Writes ``"entity"``, ``"attribute"``, and ``"eav_mappings"``.
-
-``EAVViewPlugin``
-    Reads ``"entity"``, ``"attribute"``, and ``"eav_mappings"``.  Writes
-    ``"primary"``.
-
-``EAVTriggerPlugin``
-    Reads ``"entity"``, ``"attribute"``, ``"eav_mappings"``, and ``"api"``
-    (optional; skipped if absent from ``ctx``).
-
-All key names are overridable via constructor arguments, which means you can
-wire plugins together in non-standard ways or run multiple pipelines within
-a single factory.
 
 
 Writing a custom plugin
@@ -406,4 +354,5 @@ defined:
 Built-in plugins reference
 --------------------------
 
-See the :doc:`api` reference for full autodoc on all built-in plugins.
+See :doc:`builtin_plugins` for detailed documentation of every built-in
+plugin, including parameters, context keys, and usage examples.

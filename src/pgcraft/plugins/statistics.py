@@ -1,4 +1,4 @@
-"""Statistics view plugin: creates views from PGCraftStatistics."""
+"""Statistics view plugin: creates views from PGCraftStatisticsView."""
 
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ from pgcraft.utils.query import compile_query
 @produces(Dynamic("stats_key"))
 @requires(Dynamic("table_key"), "pk_columns")
 class StatisticsViewPlugin(Plugin):
-    """Create statistics views from PGCraftStatistics items.
+    """Create statistics views from PGCraftStatisticsView items.
 
-    For each :class:`~pgcraft.statistics.PGCraftStatistics` in
+    For each :class:`~pgcraft.statistics.PGCraftStatisticsView` in
     ``ctx.schema_items``, creates a view (or materialized view)
     and stores info in ``ctx[stats_key]`` for the API plugin.
 
@@ -55,16 +55,19 @@ class StatisticsViewPlugin(Plugin):
             join_key = (
                 stat.join_key if stat.join_key is not None else pk_col_name
             )
+            view_schema = (
+                stat.schema if stat.schema is not None else ctx.schemaname
+            )
             view = View(
                 view_name,
                 compile_query(stat.query),
-                schema=ctx.schemaname,
+                schema=view_schema,
                 materialized=stat.materialized,
             )
             register_view(ctx.metadata, view)
             exposed_cols = [c for c in stat.column_names if c != join_key]
             info[stat.name] = StatisticsViewInfo(
-                view_name=f"{ctx.schemaname}.{view_name}",
+                view_name=f"{view_schema}.{view_name}",
                 join_key=join_key,
                 column_names=exposed_cols,
             )

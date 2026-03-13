@@ -30,8 +30,7 @@ from pgcraft.plugins.simple import (
     SimpleTablePlugin,
     SimpleTriggerPlugin,
 )
-from pgcraft.plugins.statistics import StatisticsViewPlugin
-from pgcraft.statistics import PGCraftStatistics
+from pgcraft.statistics import PGCraftStatisticsView
 from pgcraft.utils.naming_convention import build_naming_convention
 
 metadata = MetaData(
@@ -159,12 +158,12 @@ SimpleDimensionResourceFactory(
     schema_items=[
         Column("name", String, nullable=False),
         Column("email", String),
-        PGCraftStatistics(
+        PGCraftStatisticsView(
             name="orders",
             query=_order_stats,
             join_key="customer_id",
         ),
-        PGCraftStatistics(
+        PGCraftStatisticsView(
             name="invoices",
             query=_invoice_stats,
             join_key="customer_id",
@@ -173,8 +172,7 @@ SimpleDimensionResourceFactory(
     plugins=[
         SerialPKPlugin(),
         SimpleTablePlugin(),
-        StatisticsViewPlugin(),
-        APIPlugin(stats_key="statistics_views"),
+        APIPlugin(),
         SimpleTriggerPlugin(),
     ],
 )

@@ -7,6 +7,7 @@ from pgcraft.plugin import Plugin
 from pgcraft.plugins.api import APIPlugin
 from pgcraft.plugins.pk import SerialPKPlugin
 from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+from pgcraft.plugins.statistics import StatisticsViewPlugin
 
 
 class SimpleDimensionResourceFactory(ResourceFactory):
@@ -16,8 +17,10 @@ class SimpleDimensionResourceFactory(ResourceFactory):
 
     1. :class:`~pgcraft.plugins.pk.SerialPKPlugin` -- auto-increment PK.
     2. :class:`~pgcraft.plugins.simple.SimpleTablePlugin` -- backing table.
-    3. :class:`~pgcraft.plugins.api.APIPlugin` -- API view + resource.
-    4. :class:`~pgcraft.plugins.simple.SimpleTriggerPlugin` --
+    3. :class:`~pgcraft.plugins.statistics.StatisticsViewPlugin` --
+       statistics views (no-op when no statistics items).
+    4. :class:`~pgcraft.plugins.api.APIPlugin` -- API view + resource.
+    5. :class:`~pgcraft.plugins.simple.SimpleTriggerPlugin` --
        INSTEAD OF triggers.
 
     Pass ``plugins=[...]`` to replace these entirely, or
@@ -27,6 +30,7 @@ class SimpleDimensionResourceFactory(ResourceFactory):
     DEFAULT_PLUGINS: ClassVar[list[Plugin]] = [
         SerialPKPlugin(),
         SimpleTablePlugin(),
+        StatisticsViewPlugin(),
         APIPlugin(),
         SimpleTriggerPlugin(),
     ]
