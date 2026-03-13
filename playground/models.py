@@ -6,7 +6,11 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     MetaData,
+    Numeric,
     String,
+    Table,
+    func,
+    select,
 )
 
 from pgcraft.check import PGCraftCheck
@@ -18,7 +22,10 @@ from pgcraft.factory.dimension import (
 )
 from pgcraft.factory.ledger import LedgerResourceFactory
 from pgcraft.plugins.api import APIPlugin
-from pgcraft.plugins.check import TableCheckPlugin, TriggerCheckPlugin
+from pgcraft.plugins.check import (
+    TableCheckPlugin,
+    TriggerCheckPlugin,
+)
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
@@ -27,7 +34,11 @@ from pgcraft.plugins.ledger import (
     LedgerLatestViewPlugin,
 )
 from pgcraft.plugins.pk import SerialPKPlugin
-from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+from pgcraft.plugins.simple import (
+    SimpleTablePlugin,
+    SimpleTriggerPlugin,
+)
+from pgcraft.statistics import PGCraftStatisticsView
 from pgcraft.utils.naming_convention import build_naming_convention
 
 metadata = MetaData(
@@ -52,7 +63,9 @@ SimpleDimensionResourceFactory(
         SerialPKPlugin(),
         SimpleTablePlugin(),
         TableCheckPlugin(),
-        APIPlugin(grants=["select", "insert", "update", "delete"]),
+        APIPlugin(
+            grants=["select", "insert", "update", "delete"]
+        ),
         SimpleTriggerPlugin(),
     ],
 )
@@ -67,6 +80,26 @@ AppendOnlyDimensionResourceFactory(
     ],
 )
 
+# -- Invoices (EAV dimension) ------------------------------------------
+
+EAVDimensionResourceFactory(
+    tablename="invoices",
+    schemaname="private",
+    metadata=metadata,
+    schema_items=[
+        Column("customer_id", Integer),
+        Column("amount", Numeric(10, 2)),
+        Column("paid", Boolean),
+        Column("description", String),
+    ],
+    extra_plugins=[
+        TriggerCheckPlugin(),
+        TriggerCheckPlugin(view_key="api"),
+    ],
+)
+
+# -- Products (EAV dimension) ------------------------------------------
+
 EAVDimensionResourceFactory(
     tablename="products",
     schemaname="private",
@@ -76,11 +109,73 @@ EAVDimensionResourceFactory(
         Column("weight", Float),
         Column("is_active", Boolean),
         Column("price", Integer),
-        PGCraftCheck("{price} > 0", name="positive_product_price"),
+        PGCraftCheck(
+            "{price} > 0", name="positive_product_price"
+        ),
     ],
     extra_plugins=[
         TriggerCheckPlugin(),
         TriggerCheckPlugin(view_key="api"),
+    ],
+)
+
+# -- Reference tables for statistics queries ----------------------------
+# These reflect tables that already exist in the database.
+# They are not managed by pgcraft — they only provide column
+# metadata so SQLAlchemy can compile the statistics queries.
+
+_orders_ref = Table(
+    "orders",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("customer_id", Integer),
+    Column("total", Numeric(10, 2)),
+    schema="public",
+    extend_existing=True,
+)
+
+_invoices_ref = Table(
+    "invoices_entity",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("customer_id", Integer),
+    Column("amount", Numeric(10, 2)),
+    Column("paid", Boolean),
+    schema="private",
+    extend_existing=True,
+)
+
+# -- Customers with statistics ------------------------------------------
+
+_order_stats = select(
+    _orders_ref.c.customer_id,
+    func.count().label("order_count"),
+    func.sum(_orders_ref.c.total).label("order_total"),
+).group_by(_orders_ref.c.customer_id)
+
+_invoice_stats = select(
+    _invoices_ref.c.customer_id,
+    func.count().label("invoice_count"),
+    func.sum(_invoices_ref.c.amount).label("invoiced_total"),
+).group_by(_invoices_ref.c.customer_id)
+
+SimpleDimensionResourceFactory(
+    tablename="customers",
+    schemaname="public",
+    metadata=metadata,
+    schema_items=[
+        Column("name", String, nullable=False),
+        Column("email", String),
+        PGCraftStatisticsView(
+            name="orders",
+            query=_order_stats,
+            join_key="customer_id",
+        ),
+        PGCraftStatisticsView(
+            name="invoices",
+            query=_invoice_stats,
+            join_key="customer_id",
+        ),
     ],
 )
 
@@ -163,7 +258,9 @@ class Locations:
     city = Column(String)
     country = Column(String)
     display = Column(
-        String, Computed("name || ', ' || city"), nullable=True
+        String,
+        Computed("name || ', ' || city"),
+        nullable=True,
     )
     name_not_empty = PGCraftCheck(
         "length({name}) > 0", name="locations_name_not_empty"

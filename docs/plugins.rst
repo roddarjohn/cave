@@ -63,6 +63,7 @@ The three built-in dimension factories are thin wrappers:
        DEFAULT_PLUGINS = [
            SerialPKPlugin(),
            SimpleTablePlugin(),
+           StatisticsViewPlugin(),
            APIPlugin(),
            SimpleTriggerPlugin(),
        ]
@@ -198,8 +199,8 @@ in this order:
 
 .. code-block:: python
 
-   cave_cfg = PGCraftConfig()
-   cave_cfg.register(AuditPlugin())         # prepended to every factory
+   pgcraft_cfg = PGCraftConfig()
+   pgcraft_cfg.register(AuditPlugin())         # prepended to every factory
 
    SimpleDimensionResourceFactory(
        "users", "app", metadata, schema_items,
@@ -330,6 +331,7 @@ wire plugins together in non-standard ways or run multiple pipelines within
 a single factory.
 
 
+
 Writing a custom plugin
 -----------------------
 
@@ -369,8 +371,8 @@ Register it globally so it applies to every factory in the project:
    from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
    from pgcraft.factory.dimension.append_only import AppendOnlyDimensionResourceFactory
 
-   cave_cfg = PGCraftConfig()
-   cave_cfg.register(TimestampPlugin())
+   pgcraft_cfg = PGCraftConfig()
+   pgcraft_cfg.register(TimestampPlugin())
 
    SimpleDimensionResourceFactory(
        "products", "app", metadata, schema_items, config=pgcraft_cfg
@@ -452,11 +454,11 @@ prepended to every factory that references it.
 
    from pgcraft.config import PGCraftConfig
 
-   cave_cfg = PGCraftConfig()
-   cave_cfg.register(TimestampPlugin(), TenantPlugin())
+   pgcraft_cfg = PGCraftConfig()
+   pgcraft_cfg.register(TimestampPlugin(), TenantPlugin())
 
    # -- or equivalently --
-   cave_cfg = PGCraftConfig(plugins=[TimestampPlugin(), TenantPlugin()])
+   pgcraft_cfg = PGCraftConfig(plugins=[TimestampPlugin(), TenantPlugin()])
 
 Pass it to each factory via the ``config=`` argument.  A common pattern is to
 create one ``PGCraftConfig`` per project and import it wherever factories are
@@ -464,15 +466,15 @@ defined:
 
 .. code-block:: python
 
-   # cave_setup.py
+   # pgcraft_setup.py
    from pgcraft.config import PGCraftConfig
    from myapp.plugins import TimestampPlugin, TenantPlugin
 
-   cave_cfg = PGCraftConfig()
-   cave_cfg.register(TimestampPlugin(), TenantPlugin())
+   pgcraft_cfg = PGCraftConfig()
+   pgcraft_cfg.register(TimestampPlugin(), TenantPlugin())
 
    # models.py
-   from myapp.cave_setup import cave_cfg
+   from myapp.pgcraft_setup import pgcraft_cfg
    from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
 
    SimpleDimensionResourceFactory(
@@ -483,4 +485,5 @@ defined:
 Built-in plugins reference
 --------------------------
 
-See the :doc:`api` reference for full autodoc on all built-in plugins.
+See :doc:`builtin_plugins` for detailed documentation of every built-in
+plugin, including parameters, context keys, and usage examples.

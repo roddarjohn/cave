@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import Column
 
 from pgcraft.check import PGCraftCheck
+from pgcraft.statistics import PGCraftStatisticsView
 
 if TYPE_CHECKING:
     from sqlalchemy import MetaData
@@ -60,7 +61,7 @@ class FactoryContext:
     tablename: str
     schemaname: str
     metadata: MetaData
-    schema_items: list[SchemaItem | PGCraftCheck]
+    schema_items: list[SchemaItem | PGCraftCheck | PGCraftStatisticsView]
     plugins: list[Plugin]
 
     _store: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
@@ -75,7 +76,7 @@ class FactoryContext:
         Useful when a plugin needs to iterate over column
         definitions (e.g. to extract column names or types).
         """
-        return [i for i in self.schema_items if isinstance(i, Column)]
+        return [item for item in self.schema_items if isinstance(item, Column)]
 
     @property
     def table_items(self) -> list[SchemaItem]:
@@ -86,7 +87,14 @@ class FactoryContext:
         SQLAlchemy ``SchemaItem`` objects: columns, constraints,
         indexes, computed columns, etc.
         """
-        return [i for i in self.schema_items if not isinstance(i, PGCraftCheck)]
+        return [
+            item
+            for item in self.schema_items
+            if not isinstance(
+                item,
+                (PGCraftCheck, PGCraftStatisticsView),
+            )
+        ]
 
     def __getitem__(self, key: str) -> Any:  # noqa: ANN401
         """Return the value stored under *key*.

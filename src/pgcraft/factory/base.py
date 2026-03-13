@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from pgcraft.check import PGCraftCheck
     from pgcraft.plugin import Plugin
+    from pgcraft.statistics import PGCraftStatisticsView
 
 
 def _resolve_plugins(
@@ -174,7 +175,7 @@ class ResourceFactory:
         tablename: str,
         schemaname: str,
         metadata: MetaData,
-        schema_items: list[SchemaItem | PGCraftCheck],
+        schema_items: list[SchemaItem | PGCraftCheck | PGCraftStatisticsView],
         *,
         config: object | None = None,
         plugins: list[Plugin] | None = None,

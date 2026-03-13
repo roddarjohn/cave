@@ -128,6 +128,10 @@ Documentation
 The docs are built with `Sphinx <https://www.sphinx-doc.org>`_ using the
 `Furo <https://pradyunsg.me/furo/>`_ theme.
 
+The doc build generates schema diagrams and query examples from a live
+PostgreSQL database, so ``DATABASE_URL`` must be set. If it is not set,
+the build defaults to ``postgresql+psycopg:///pgcraft``.
+
 To build the docs::
 
     just docs
@@ -135,6 +139,10 @@ To build the docs::
 To serve the docs locally with live reload at ``http://localhost:8000``::
 
     just serve-docs
+
+Or with an explicit database URL::
+
+    DATABASE_URL=postgresql+psycopg://localhost/pgcraft just serve-docs
 
 The docs will automatically rebuild whenever you save a file.
 

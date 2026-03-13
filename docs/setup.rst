@@ -48,7 +48,7 @@ debug output:
 ``env.py``
 ----------
 
-Make two pgcraft-specific additions to ``migrations/env.py``:
+Make three pgcraft-specific additions to ``migrations/env.py``:
 
 1. Call :func:`pgcraft.alembic.register.pgcraft_alembic_hook` before importing
    your models. This applies pgcraft's patches and registers its Alembic
@@ -235,8 +235,8 @@ Apply a custom plugin to every factory via :class:`~pgcraft.config.PGCraftConfig
 
    from pgcraft.config import PGCraftConfig
 
-   cave_cfg = PGCraftConfig()
-   cave_cfg.register(TimestampPlugin(), TenantPlugin())
+   pgcraft_cfg = PGCraftConfig()
+   pgcraft_cfg.register(TimestampPlugin(), TenantPlugin())
 
    SimpleDimensionFactory(
        "products", "dim", metadata, dimensions, config=pgcraft_cfg
