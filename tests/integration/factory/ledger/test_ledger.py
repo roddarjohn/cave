@@ -361,6 +361,8 @@ def _setup_double_entry_ledger(conn, schema, tablename):
         table=base_table,
         direction_col="direction",
         entry_id_col="entry_id",
+        debit="debit",
+        credit="credit",
     )
     conn.execute(
         text(f"""
