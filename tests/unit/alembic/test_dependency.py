@@ -985,3 +985,67 @@ class TestSortMigrationOpsWithFkGraph:
         )
         result = sort_migration_ops([sentinel, create_op])
         assert result[-1] is sentinel
+
+
+# ---------------------------------------------------------------------------
+# sort_migration_ops — CreateExtensionOp ordering
+# ---------------------------------------------------------------------------
+
+
+class TestSortMigrationOpsExtensions:
+    def test_extension_before_schema(self):
+        """CreateExtensionOp must precede CreateSchemaOp."""
+        from pgcraft.alembic.extension import CreateExtensionOp
+
+        ext_op = CreateExtensionOp("pg_uuidv7")
+        schema_op = CreateSchemaOp(Schema("s"))
+        result = sort_migration_ops([schema_op, ext_op])
+        ext_idx = next(
+            i
+            for i, op in enumerate(result)
+            if isinstance(op, CreateExtensionOp)
+        )
+        schema_idx = next(
+            i for i, op in enumerate(result) if isinstance(op, CreateSchemaOp)
+        )
+        assert ext_idx < schema_idx
+
+    def test_extension_before_table(self):
+        """CreateExtensionOp must precede CreateTableOp."""
+        from pgcraft.alembic.extension import CreateExtensionOp
+
+        ext_op = CreateExtensionOp("pg_uuidv7")
+        table_op = alembic_ops.CreateTableOp(
+            "t", [Column("id", Integer, primary_key=True)]
+        )
+        result = sort_migration_ops([table_op, ext_op])
+        ext_idx = next(
+            i
+            for i, op in enumerate(result)
+            if isinstance(op, CreateExtensionOp)
+        )
+        table_idx = next(
+            i
+            for i, op in enumerate(result)
+            if isinstance(op, alembic_ops.CreateTableOp)
+        )
+        assert ext_idx < table_idx
+
+    def test_multiple_extensions_all_before_tables(self):
+        """All CreateExtensionOps appear before any table op."""
+        from pgcraft.alembic.extension import CreateExtensionOp
+
+        ext_a = CreateExtensionOp("ext_a")
+        ext_b = CreateExtensionOp("ext_b")
+        table_op = alembic_ops.CreateTableOp(
+            "t", [Column("id", Integer, primary_key=True)]
+        )
+        result = sort_migration_ops([table_op, ext_b, ext_a])
+        first_table = next(
+            i
+            for i, op in enumerate(result)
+            if isinstance(op, alembic_ops.CreateTableOp)
+        )
+        for i, op in enumerate(result):
+            if isinstance(op, CreateExtensionOp):
+                assert i < first_table

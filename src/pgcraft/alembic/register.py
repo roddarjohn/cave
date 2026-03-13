@@ -1,6 +1,7 @@
 from sqlalchemy import MetaData
 from sqlalchemy_declarative_extensions.alembic import register_alembic_events
 
+from pgcraft.alembic.extension import register_extension_comparator
 from pgcraft.alembic.renderer import register_renderers
 from pgcraft.alembic.rewriter import pgcraft_process_revision_directives
 from pgcraft.alembic.schema import register_schemas
@@ -36,6 +37,7 @@ def pgcraft_alembic_hook() -> None:
     """
     register_alembic_events()
     register_renderers()
+    register_extension_comparator()
     apply_all()
 
 

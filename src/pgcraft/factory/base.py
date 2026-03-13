@@ -126,6 +126,30 @@ def _sort_plugins(plugins: list[Plugin]) -> list[Plugin]:
     return result
 
 
+def _collect_extensions(
+    plugins: list[Plugin],
+    metadata: MetaData,
+) -> None:
+    """Merge each plugin's ``required_pg_extensions`` into *metadata.info*.
+
+    Stores the union of all declared extension names under
+    ``metadata.info["pgcraft_extensions"]`` (a ``set[str]``).  The
+    Alembic autogenerate comparator reads this key and emits
+    ``CREATE EXTENSION IF NOT EXISTS`` for any extensions not yet
+    installed in the database.
+
+    Args:
+        plugins: Resolved plugin list to inspect.
+        metadata: SQLAlchemy MetaData to annotate.
+
+    """
+    extensions: set[str] = set()
+    for p in plugins:
+        extensions |= type(p).required_pg_extensions
+    if extensions:
+        metadata.info.setdefault("pgcraft_extensions", set()).update(extensions)
+
+
 class ResourceFactory:
     """Core factory: resolves plugins and runs them in dependency order.
 
@@ -188,6 +212,8 @@ class ResourceFactory:
             config, plugins, extra_plugins, self.DEFAULT_PLUGINS
         )
         _run_plugin_validators(resolved)
+
+        _collect_extensions(resolved, metadata)
 
         ctx = FactoryContext(
             tablename=tablename,

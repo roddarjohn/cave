@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from pgcraft.errors import PGCraftValidationError
 
@@ -226,7 +226,21 @@ class Plugin:
     Plugins communicate through ``ctx`` using string keys.
     Use the :func:`singleton` decorator to declare that at most one
     plugin of a given group may appear in any resolved plugin list.
+
+    Plugins that require PostgreSQL extensions should set
+    ``required_pg_extensions`` on the class.  The factory propagates
+    these to ``metadata.info["pgcraft_extensions"]`` so the Alembic
+    autogenerate comparator can emit ``CREATE EXTENSION`` ops
+    automatically::
+
+        class MyPlugin(Plugin):
+            required_pg_extensions: ClassVar[frozenset[str]] = frozenset(
+                {"my_ext"}
+            )
+
     """
+
+    required_pg_extensions: ClassVar[frozenset[str]] = frozenset()
 
     def resolved_produces(self) -> list[str]:
         """Return the ctx keys this plugin writes, with Dynamic refs resolved.
