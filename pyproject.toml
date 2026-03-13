@@ -1,7 +1,7 @@
 [project]
 name = "pgcraft"
 version = "0.1.2"
-description = "Configuration-driven PostgreSQL dimension tables, migrations, and APIs."
+description = "Configuration-driven PostgreSQL framework."
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Rodda John", email = "roddarjohn@protonmail.com" }]

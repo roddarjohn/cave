@@ -2,9 +2,9 @@
 
 ## What is pgcraft?
 
-A configuration-driven PostgreSQL dimension/data warehouse framework.
-Generates SQLAlchemy models, Alembic migrations, and PostgREST APIs from
-declarative dimension configurations. See `PLAN.md` for design philosophy.
+A configuration-driven PostgreSQL framework.  Generates SQLAlchemy
+models, Alembic migrations, and PostgREST APIs from declarative
+dimension configurations. See `PLAN.md` for design philosophy.
 
 ## Tooling
 
