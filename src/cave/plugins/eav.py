@@ -224,9 +224,9 @@ class EAVTablePlugin(Plugin):
             Column(name, col_type, nullable=True)
             for name, col_type in value_cols.items()
         ]
-        check_expr = " + ".join(f"({vc} IS NOT NULL)::int" for vc in value_cols)
+        cols_list = ", ".join(value_cols)
         check = CheckConstraint(
-            f"{check_expr} = 1",
+            f"num_nonnulls({cols_list}) = 1",
             name=f"{attr_name}_one_value_ck",
         )
         entity_fq = f"{ctx.schemaname}.{entity_name}.{pk_col_name}"
