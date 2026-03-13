@@ -210,3 +210,38 @@ class TestTriggerCheckPlugin:
         assert "insert" in ops
         assert "update" in ops
         assert "delete" not in ops
+
+    def test_ordering_valid_with_later_eav_triggers(self):
+        """Check triggers (00_) sort before EAV triggers (dim_)."""
+        from cave.plugins.eav import EAVTriggerPlugin
+
+        ctx = self._ctx_with_eav()
+        # Register check triggers first (00_check_...)
+        TriggerCheckPlugin(view_key="primary").run(ctx)
+        # Then register EAV triggers (dim_product_...)
+        EAVTriggerPlugin(view_key="nonexistent").run(ctx)
+        # No error — 00_ sorts before dim_
+
+    def test_ordering_invalid_raises(self):
+        """Check triggers that sort after existing triggers raise."""
+        from sqlalchemy_declarative_extensions import register_trigger
+        from sqlalchemy_declarative_extensions.dialects.postgresql import (
+            Trigger,
+        )
+
+        ctx = self._ctx_with_eav()
+        view_fullname = f"{ctx.schemaname}.{ctx.tablename}"
+        # Pre-register a trigger that sorts BEFORE 00_check_
+        register_trigger(
+            ctx.metadata,
+            Trigger.instead_of(
+                "insert",
+                on=view_fullname,
+                execute=f"{ctx.schemaname}.00_aaa_product_insert",
+                name="00_aaa_product_insert",
+            ).for_each_row(),
+        )
+        # Now the check plugin registers 00_check_dim_product_insert
+        # which sorts AFTER 00_aaa_, so validation should raise.
+        with pytest.raises(CaveValidationError, match="alphabetical"):
+            TriggerCheckPlugin(view_key="primary").run(ctx)
