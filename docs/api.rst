@@ -16,6 +16,9 @@ Plugin system
 .. automodule:: cave.config
    :members:
 
+.. automodule:: cave.check
+   :members:
+
 .. automodule:: cave.errors
    :members:
 
@@ -47,6 +50,9 @@ Built-in plugins
    :members:
 
 .. automodule:: cave.plugins.append_only
+   :members:
+
+.. automodule:: cave.plugins.check
    :members:
 
 .. automodule:: cave.plugins.eav
