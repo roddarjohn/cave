@@ -215,7 +215,14 @@ so two independent pipelines can coexist in one factory without colliding.
 
 ``APIPlugin``
     Reads ``"primary"`` (via ``table_key``).  Writes ``"api"`` (via
-    ``view_key``).
+    ``view_key``).  Optionally reads ``"statistics_views"`` (via
+    ``stats_key``) to LEFT JOIN statistics views into the API view.
+    Accepts ``columns`` to expose a subset of table columns.
+
+``StatisticsViewPlugin``
+    Reads ``"primary"`` (via ``table_key``) and ``"pk_columns"``.  Writes
+    ``"statistics_views"`` (via ``stats_key``).  Creates views from
+    :class:`~pgcraft.statistics.PGCraftStatistics` schema items.
 
 ``SimpleTriggerPlugin``
     Reads ``"primary"`` (via ``table_key``) and ``"api"`` (via ``view_key``).

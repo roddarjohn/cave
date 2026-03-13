@@ -19,6 +19,9 @@ Plugin system
 .. automodule:: pgcraft.check
    :members:
 
+.. automodule:: pgcraft.statistics
+   :members:
+
 .. automodule:: pgcraft.errors
    :members:
 
@@ -56,6 +59,9 @@ Built-in plugins
    :members:
 
 .. automodule:: pgcraft.plugins.eav
+   :members:
+
+.. automodule:: pgcraft.plugins.statistics
    :members:
 
 Alembic integration

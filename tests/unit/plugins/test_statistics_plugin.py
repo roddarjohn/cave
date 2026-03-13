@@ -1,19 +1,47 @@
 """Unit tests for StatisticsViewPlugin in isolation."""
 
-from sqlalchemy import Column, Integer, MetaData, String, Table
+from sqlalchemy import (
+    Column,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    func,
+    select,
+)
 
 from pgcraft.plugins.statistics import StatisticsViewPlugin
 from pgcraft.statistics import PGCraftStatistics
 from tests.unit.plugins.conftest import make_ctx
+
+_md = MetaData()
+_orders = Table(
+    "orders",
+    _md,
+    Column("id", Integer, primary_key=True),
+    Column("customer_id", Integer),
+    Column("total", Integer),
+)
+_invoices = Table(
+    "invoices",
+    _md,
+    Column("id", Integer, primary_key=True),
+    Column("customer_id", Integer),
+    Column("amount", Integer),
+)
 
 
 def _ctx_with_stats(stats_items=None):
     """Return a ctx with a Table and PGCraftStatistics items."""
     schema_items = list(stats_items or [])
     schema_items.append(Column("name", String))
-    ctx = make_ctx(schemaname="dim", schema_items=schema_items)
+    ctx = make_ctx(
+        tablename="customer",
+        schemaname="dim",
+        schema_items=schema_items,
+    )
     table = Table(
-        "product",
+        "customer",
         MetaData(),
         Column("id", Integer, primary_key=True),
         Column("name", String),
@@ -23,12 +51,26 @@ def _ctx_with_stats(stats_items=None):
     return ctx
 
 
+def _order_stats_query():
+    return select(
+        _orders.c.customer_id,
+        func.count().label("order_count"),
+    ).group_by(_orders.c.customer_id)
+
+
+def _invoice_stats_query():
+    return select(
+        _invoices.c.customer_id,
+        func.sum(_invoices.c.amount).label("total_invoiced"),
+    ).group_by(_invoices.c.customer_id)
+
+
 class TestStatisticsViewPlugin:
     def test_creates_view_in_metadata(self):
         stat = PGCraftStatistics(
-            name="statistics",
-            query="SELECT id, COUNT(*) AS cnt FROM orders GROUP BY id",
-            columns=[("cnt", Integer())],
+            name="orders",
+            query=_order_stats_query(),
+            join_key="customer_id",
         )
         plugin = StatisticsViewPlugin()
         ctx = _ctx_with_stats([stat])
@@ -37,22 +79,23 @@ class TestStatisticsViewPlugin:
         assert views is not None
         assert len(views.views) == 1
 
-    def test_view_name_includes_suffix(self):
+    def test_view_name_follows_convention(self):
         stat = PGCraftStatistics(
-            name="statistics",
-            query="SELECT 1",
-            columns=[("cnt", Integer())],
+            name="orders",
+            query=_order_stats_query(),
+            join_key="customer_id",
         )
         plugin = StatisticsViewPlugin()
         ctx = _ctx_with_stats([stat])
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
-        assert view.name == "product_statistics"
+        assert view.name == "customer_orders_statistics"
 
     def test_view_schema_matches_ctx(self):
         stat = PGCraftStatistics(
-            name="stats",
-            query="SELECT 1",
+            name="orders",
+            query=_order_stats_query(),
+            join_key="customer_id",
         )
         plugin = StatisticsViewPlugin()
         ctx = _ctx_with_stats([stat])
@@ -62,39 +105,52 @@ class TestStatisticsViewPlugin:
 
     def test_stores_info_in_ctx(self):
         stat = PGCraftStatistics(
-            name="statistics",
-            query="SELECT id, COUNT(*) AS cnt FROM t GROUP BY id",
-            columns=[("cnt", Integer())],
-        )
-        plugin = StatisticsViewPlugin()
-        ctx = _ctx_with_stats([stat])
-        plugin.run(ctx)
-        info = ctx["statistics_views"]
-        assert "statistics" in info
-        assert info["statistics"].view_name == "dim.product_statistics"
-        assert info["statistics"].join_key == "id"
-        assert info["statistics"].column_names == ["cnt"]
-
-    def test_custom_join_key(self):
-        stat = PGCraftStatistics(
-            name="stats",
-            query=(
-                "SELECT customer_id, COUNT(*) AS cnt"
-                " FROM t GROUP BY customer_id"
-            ),
-            columns=[("cnt", Integer())],
+            name="orders",
+            query=_order_stats_query(),
             join_key="customer_id",
         )
         plugin = StatisticsViewPlugin()
         ctx = _ctx_with_stats([stat])
         plugin.run(ctx)
         info = ctx["statistics_views"]
-        assert info["stats"].join_key == "customer_id"
+        assert "orders" in info
+        si = info["orders"]
+        assert si.view_name == "dim.customer_orders_statistics"
+        assert si.join_key == "customer_id"
+        assert si.column_names == ["order_count"]
+
+    def test_join_key_excluded_from_column_names(self):
+        stat = PGCraftStatistics(
+            name="orders",
+            query=_order_stats_query(),
+            join_key="customer_id",
+        )
+        plugin = StatisticsViewPlugin()
+        ctx = _ctx_with_stats([stat])
+        plugin.run(ctx)
+        info = ctx["statistics_views"]
+        assert "customer_id" not in info["orders"].column_names
+
+    def test_join_key_defaults_to_pk(self):
+        stat = PGCraftStatistics(
+            name="orders",
+            query=select(
+                _orders.c.id,
+                func.count().label("cnt"),
+            ).group_by(_orders.c.id),
+        )
+        plugin = StatisticsViewPlugin()
+        ctx = _ctx_with_stats([stat])
+        plugin.run(ctx)
+        info = ctx["statistics_views"]
+        assert info["orders"].join_key == "id"
+        assert info["orders"].column_names == ["cnt"]
 
     def test_custom_stats_key(self):
         stat = PGCraftStatistics(
-            name="stats",
-            query="SELECT 1",
+            name="orders",
+            query=_order_stats_query(),
+            join_key="customer_id",
         )
         plugin = StatisticsViewPlugin(stats_key="my_stats")
         ctx = _ctx_with_stats([stat])
@@ -109,8 +165,9 @@ class TestStatisticsViewPlugin:
 
     def test_materialized_view(self):
         stat = PGCraftStatistics(
-            name="summary",
-            query="SELECT 1",
+            name="orders",
+            query=_order_stats_query(),
+            join_key="customer_id",
             materialized=True,
         )
         plugin = StatisticsViewPlugin()
@@ -122,14 +179,14 @@ class TestStatisticsViewPlugin:
     def test_multiple_stats_views(self):
         stats = [
             PGCraftStatistics(
-                name="counts",
-                query="SELECT id, COUNT(*) AS cnt FROM t GROUP BY id",
-                columns=[("cnt", Integer())],
+                name="orders",
+                query=_order_stats_query(),
+                join_key="customer_id",
             ),
             PGCraftStatistics(
-                name="totals",
-                query="SELECT id, SUM(x) AS total FROM t GROUP BY id",
-                columns=[("total", Integer())],
+                name="invoices",
+                query=_invoice_stats_query(),
+                join_key="customer_id",
             ),
         ]
         plugin = StatisticsViewPlugin()
@@ -138,5 +195,23 @@ class TestStatisticsViewPlugin:
         views = ctx.metadata.info["views"]
         assert len(views.views) == 2
         info = ctx["statistics_views"]
-        assert "counts" in info
-        assert "totals" in info
+        assert "orders" in info
+        assert "invoices" in info
+        assert info["orders"].column_names == ["order_count"]
+        assert info["invoices"].column_names == ["total_invoiced"]
+        view_names = {v.name for v in views.views}
+        assert "customer_orders_statistics" in view_names
+        assert "customer_invoices_statistics" in view_names
+
+    def test_view_definition_contains_compiled_sql(self):
+        stat = PGCraftStatistics(
+            name="orders",
+            query=_order_stats_query(),
+            join_key="customer_id",
+        )
+        plugin = StatisticsViewPlugin()
+        ctx = _ctx_with_stats([stat])
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert "customer_id" in view.definition
+        assert "count" in view.definition.lower()

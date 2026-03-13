@@ -14,6 +14,7 @@ from pgcraft.statistics import (
     StatisticsViewInfo,
     collect_statistics,
 )
+from pgcraft.utils.query import compile_query
 
 
 @produces(Dynamic("stats_key"))
@@ -50,21 +51,22 @@ class StatisticsViewPlugin(Plugin):
         info: dict[str, StatisticsViewInfo] = {}
 
         for stat in stats_items:
-            view_name = f"{ctx.tablename}_{stat.name}"
+            view_name = f"{ctx.tablename}_{stat.view_suffix}"
             join_key = (
                 stat.join_key if stat.join_key is not None else pk_col_name
             )
             view = View(
                 view_name,
-                stat.query,
+                compile_query(stat.query),
                 schema=ctx.schemaname,
                 materialized=stat.materialized,
             )
             register_view(ctx.metadata, view)
+            exposed_cols = [c for c in stat.column_names if c != join_key]
             info[stat.name] = StatisticsViewInfo(
-                view_name=(f"{ctx.schemaname}.{view_name}"),
+                view_name=f"{ctx.schemaname}.{view_name}",
                 join_key=join_key,
-                column_names=stat.column_names,
+                column_names=exposed_cols,
             )
 
         ctx[self.stats_key] = info
