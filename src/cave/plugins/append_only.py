@@ -54,7 +54,7 @@ def _resolve_attributes_name(ctx: FactoryContext) -> str:
 
 
 def _dim_column_names(ctx: FactoryContext) -> list[str]:
-    return [col.key for col in ctx.columns]
+    return [col.key for col in ctx.columns if not col.computed]
 
 
 @produces(Dynamic("root_key"), Dynamic("attributes_key"))

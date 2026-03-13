@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 _TEMPLATES = Path(__file__).resolve().parent / "templates" / "check"
 
 _NAMING_DEFAULTS = {
-    "check_function": ("00_check_%(schema)s_%(table_name)s_%(op)s"),
-    "check_trigger": ("00_check_%(schema)s_%(table_name)s_%(op)s"),
+    "check_function": ("_check_%(schema)s_%(table_name)s_%(op)s"),
+    "check_trigger": ("_check_%(schema)s_%(table_name)s_%(op)s"),
 }
 
 
@@ -73,7 +73,7 @@ class TriggerCheckPlugin(Plugin):
 
     Generates a single trigger function per view per operation
     (INSERT/UPDATE) that validates all :class:`~cave.check.CaveCheck`
-    items.  Triggers use a ``00_check_`` prefix to fire before the
+    items.  Triggers use a ``_check_`` prefix to fire before the
     main dimension triggers (Postgres fires multiple INSTEAD OF
     triggers in alphabetical order by name).
 
@@ -191,7 +191,7 @@ def _validate_trigger_ordering(
         if t.on != view_fullname:
             continue
         name = t.name
-        if name.startswith("00_check_"):
+        if name.startswith("_check_"):
             check_triggers.append(name)
         else:
             other_triggers.append(name)
@@ -212,6 +212,6 @@ def _validate_trigger_ordering(
                     f"the check or using a naming "
                     f"convention that ensures the "
                     f"check trigger sorts first "
-                    f"(e.g. a '00_' prefix)."
+                    f"(e.g. a '_check_' prefix)."
                 )
                 raise CaveValidationError(msg)

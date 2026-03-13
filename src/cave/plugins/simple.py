@@ -23,8 +23,12 @@ _NAMING_DEFAULTS = {
 
 
 def _dim_column_names(ctx: FactoryContext) -> list[str]:
-    """Extract non-PK column names from schema_items."""
-    return [col.key for col in ctx.columns if not col.primary_key]
+    """Extract writable (non-PK, non-computed) column names."""
+    return [
+        col.key
+        for col in ctx.columns
+        if not col.primary_key and not col.computed
+    ]
 
 
 @produces(Dynamic("table_key"), "__root__")

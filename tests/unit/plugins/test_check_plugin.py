@@ -142,12 +142,12 @@ class TestTriggerCheckPlugin:
         assert triggers is not None
         assert len(triggers.triggers) == 2
 
-    def test_trigger_names_have_00_check_prefix(self):
+    def test_trigger_names_have_check_prefix(self):
         ctx = self._ctx_with_eav()
         TriggerCheckPlugin(view_key="primary").run(ctx)
         triggers = ctx.metadata.info["triggers"].triggers
         for t in triggers:
-            assert t.name.startswith("00_check_")
+            assert t.name.startswith("_check_")
 
     def test_function_body_contains_new_prefix(self):
         ctx = self._ctx_with_eav()
@@ -212,15 +212,15 @@ class TestTriggerCheckPlugin:
         assert "delete" not in ops
 
     def test_ordering_valid_with_later_eav_triggers(self):
-        """Check triggers (00_) sort before EAV triggers (dim_)."""
+        """Check triggers (_check_) sort before EAV triggers (dim_)."""
         from cave.plugins.eav import EAVTriggerPlugin
 
         ctx = self._ctx_with_eav()
-        # Register check triggers first (00_check_...)
+        # Register check triggers first (_check_...)
         TriggerCheckPlugin(view_key="primary").run(ctx)
         # Then register EAV triggers (dim_product_...)
         EAVTriggerPlugin(view_key="nonexistent").run(ctx)
-        # No error — 00_ sorts before dim_
+        # No error — _check_ sorts before dim_
 
     def test_ordering_invalid_raises(self):
         """Check triggers that sort after existing triggers raise."""
@@ -231,17 +231,17 @@ class TestTriggerCheckPlugin:
 
         ctx = self._ctx_with_eav()
         view_fullname = f"{ctx.schemaname}.{ctx.tablename}"
-        # Pre-register a trigger that sorts BEFORE 00_check_
+        # Pre-register a trigger that sorts BEFORE _check_
         register_trigger(
             ctx.metadata,
             Trigger.instead_of(
                 "insert",
                 on=view_fullname,
-                execute=f"{ctx.schemaname}.00_aaa_product_insert",
-                name="00_aaa_product_insert",
+                execute=f"{ctx.schemaname}._aaa_product_insert",
+                name="_aaa_product_insert",
             ).for_each_row(),
         )
-        # Now the check plugin registers 00_check_dim_product_insert
-        # which sorts AFTER 00_aaa_, so validation should raise.
+        # Now the check plugin registers _check_dim_product_insert
+        # which sorts AFTER _aaa_, so validation should raise.
         with pytest.raises(CaveValidationError, match="alphabetical"):
             TriggerCheckPlugin(view_key="primary").run(ctx)

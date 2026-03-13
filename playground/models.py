@@ -70,7 +70,10 @@ EAVDimensionResourceFactory(
         Column("price", Integer),
         CaveCheck("{price} > 0", name="positive_product_price"),
     ],
-    extra_plugins=[TriggerCheckPlugin()],
+    extra_plugins=[
+        TriggerCheckPlugin(),
+        TriggerCheckPlugin(view_key="api"),
+    ],
 )
 
 # -- Declarative models -------------------------------------------------
