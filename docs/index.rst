@@ -1,8 +1,6 @@
 pgcraft
 =====================
 
-Awesome Portal Gun CLI.
-
 .. toctree::
    :maxdepth: 2
 
