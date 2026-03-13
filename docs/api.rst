@@ -37,10 +37,22 @@ Dimension resource factories
 .. automodule:: pgcraft.factory.dimension.eav
    :members:
 
+Ledger resource factory
+-----------------------
+
+.. automodule:: pgcraft.factory.ledger
+   :members:
+
 Built-in plugins
 ----------------
 
 .. automodule:: pgcraft.plugins.pk
+   :members:
+
+.. automodule:: pgcraft.plugins.created_at
+   :members:
+
+.. automodule:: pgcraft.plugins.entry_id
    :members:
 
 .. automodule:: pgcraft.plugins.simple
@@ -56,6 +68,9 @@ Built-in plugins
    :members:
 
 .. automodule:: pgcraft.plugins.eav
+   :members:
+
+.. automodule:: pgcraft.plugins.ledger
    :members:
 
 Alembic integration

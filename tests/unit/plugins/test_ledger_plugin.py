@@ -1,4 +1,4 @@
-"""Unit tests for LedgerTablePlugin and LedgerTriggerPlugin."""
+"""Unit tests for ledger plugins."""
 
 import pytest
 from sqlalchemy import Column, Integer, Numeric, String, Table
@@ -7,6 +7,9 @@ from sqlalchemy.dialects.postgresql import UUID
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
 from pgcraft.plugins.ledger import (
+    DoubleEntryPlugin,
+    DoubleEntryTriggerPlugin,
+    LedgerBalanceViewPlugin,
     LedgerTablePlugin,
     LedgerTriggerPlugin,
 )
@@ -157,3 +160,126 @@ class TestLedgerTriggerPlugin:
         LedgerTablePlugin().run(ctx)
         with pytest.raises(KeyError):
             plugin.run(ctx)
+
+
+class TestLedgerBalanceViewPlugin:
+    def _ctx_with_table(self, **kwargs):
+        ctx = _ledger_ctx(**kwargs)
+        LedgerTablePlugin().run(ctx)
+        return ctx
+
+    def test_registers_balance_view(self):
+        ctx = self._ctx_with_table(schema_items=[Column("category", String)])
+        plugin = LedgerBalanceViewPlugin(dimensions=["category"])
+        plugin.run(ctx)
+        views = ctx.metadata.info.get("views")
+        assert views is not None
+        assert len(views.views) == 1
+
+    def test_stores_view_name_in_ctx(self):
+        ctx = self._ctx_with_table(schema_items=[Column("category", String)])
+        plugin = LedgerBalanceViewPlugin(dimensions=["category"])
+        plugin.run(ctx)
+        assert "balance_view" in ctx
+
+    def test_custom_balance_view_key(self):
+        ctx = self._ctx_with_table(schema_items=[Column("category", String)])
+        plugin = LedgerBalanceViewPlugin(
+            dimensions=["category"], balance_view_key="my_bv"
+        )
+        plugin.run(ctx)
+        assert "my_bv" in ctx
+
+    def test_multiple_dimensions(self):
+        ctx = self._ctx_with_table(
+            schema_items=[
+                Column("category", String),
+                Column("region", String),
+            ]
+        )
+        plugin = LedgerBalanceViewPlugin(dimensions=["category", "region"])
+        plugin.run(ctx)
+        assert "balance_view" in ctx
+
+    def test_empty_dimensions_raises(self):
+        with pytest.raises(PGCraftValidationError, match="non-empty"):
+            LedgerBalanceViewPlugin(dimensions=[])
+
+    def test_produces_balance_view_key(self):
+        plugin = LedgerBalanceViewPlugin(dimensions=["x"])
+        assert "balance_view" in plugin.resolved_produces()
+
+    def test_requires_table_key(self):
+        plugin = LedgerBalanceViewPlugin(dimensions=["x"])
+        assert "primary" in plugin.resolved_requires()
+
+
+class TestDoubleEntryPlugin:
+    def test_adds_direction_to_schema_items(self):
+        ctx = _ledger_ctx()
+        DoubleEntryPlugin().run(ctx)
+        col_names = [c.name for c in ctx.columns]
+        assert "direction" in col_names
+
+    def test_direction_column_is_not_nullable(self):
+        ctx = _ledger_ctx()
+        DoubleEntryPlugin().run(ctx)
+        direction = next(c for c in ctx.columns if c.name == "direction")
+        assert not direction.nullable
+
+    def test_stores_column_name_in_ctx(self):
+        ctx = _ledger_ctx()
+        DoubleEntryPlugin().run(ctx)
+        assert ctx["double_entry_columns"] == "direction"
+
+    def test_custom_column_name(self):
+        ctx = _ledger_ctx()
+        DoubleEntryPlugin(column_name="side").run(ctx)
+        assert ctx["double_entry_columns"] == "side"
+        col_names = [c.name for c in ctx.columns]
+        assert "side" in col_names
+
+    def test_singleton_group(self):
+        assert DoubleEntryPlugin.singleton_group == "__double_entry__"
+
+    def test_table_includes_direction_column(self):
+        ctx = _ledger_ctx()
+        DoubleEntryPlugin().run(ctx)
+        LedgerTablePlugin().run(ctx)
+        table = ctx["primary"]
+        assert "direction" in {c.name for c in table.columns}
+
+
+class TestDoubleEntryTriggerPlugin:
+    def _ctx_with_double_entry_table(self):
+        ctx = _ledger_ctx()
+        DoubleEntryPlugin().run(ctx)
+        LedgerTablePlugin().run(ctx)
+        return ctx
+
+    def test_registers_function(self):
+        ctx = self._ctx_with_double_entry_table()
+        DoubleEntryTriggerPlugin().run(ctx)
+        functions = ctx.metadata.info.get("functions")
+        assert functions is not None
+        assert len(functions.functions) == 1
+
+    def test_registers_trigger(self):
+        ctx = self._ctx_with_double_entry_table()
+        DoubleEntryTriggerPlugin().run(ctx)
+        triggers = ctx.metadata.info.get("triggers")
+        assert triggers is not None
+        assert len(triggers.triggers) == 1
+
+    def test_trigger_is_statement_level(self):
+        ctx = self._ctx_with_double_entry_table()
+        DoubleEntryTriggerPlugin().run(ctx)
+        trigger = ctx.metadata.info["triggers"].triggers[0]
+        assert trigger.for_each.value == "STATEMENT"
+
+    def test_requires_table_and_double_entry(self):
+        plugin = DoubleEntryTriggerPlugin()
+        reqs = plugin.resolved_requires()
+        assert "primary" in reqs
+        assert "double_entry_columns" in reqs
+        assert "entry_id_column" in reqs

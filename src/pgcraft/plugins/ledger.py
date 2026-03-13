@@ -5,13 +5,35 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, DateTime, Integer, Numeric, Table
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Integer,
+    Numeric,
+    String,
+    Table,
+    func,
+    select,
+)
+from sqlalchemy_declarative_extensions import (
+    View,
+    register_function,
+    register_trigger,
+    register_view,
+)
+from sqlalchemy_declarative_extensions.dialects.postgresql import (
+    Function,
+    FunctionSecurity,
+    Trigger,
+)
 
 if TYPE_CHECKING:
     from pgcraft.factory.context import FactoryContext
 
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.plugin import Dynamic, Plugin, produces, requires, singleton
+from pgcraft.utils.naming import resolve_name
+from pgcraft.utils.query import compile_query
 from pgcraft.utils.template import load_template
 from pgcraft.utils.trigger import register_view_triggers
 
@@ -157,4 +179,215 @@ class LedgerTriggerPlugin(Plugin):
             naming_defaults=_NAMING_DEFAULTS,
             function_key="ledger_function",
             trigger_key="ledger_trigger",
+        )
+
+
+_BALANCE_NAMING_DEFAULTS = {
+    "ledger_balance_view": "%(table_name)s_balances",
+}
+
+
+@produces(Dynamic("balance_view_key"))
+@requires(Dynamic("table_key"))
+class LedgerBalanceViewPlugin(Plugin):
+    """Create a view that shows current balances per dimension group.
+
+    Generates ``SELECT dim_cols, SUM(value) AS balance FROM ledger
+    GROUP BY dim_cols`` and registers it as a view.
+
+    Args:
+        dimensions: Column names to group by.  Must be a
+            non-empty list of column names present on the
+            ledger table.
+        table_key: Key in ``ctx`` for the backing table
+            (default ``"primary"``).
+        balance_view_key: Key in ``ctx`` to store the balance
+            view name under (default ``"balance_view"``).
+
+    Raises:
+        PGCraftValidationError: If *dimensions* is empty.
+
+    """
+
+    def __init__(
+        self,
+        dimensions: list[str],
+        table_key: str = "primary",
+        balance_view_key: str = "balance_view",
+    ) -> None:
+        """Store configuration."""
+        if not dimensions:
+            msg = "dimensions must be a non-empty list"
+            raise PGCraftValidationError(msg)
+        self.dimensions = list(dimensions)
+        self.table_key = table_key
+        self.balance_view_key = balance_view_key
+
+    def run(self, ctx: FactoryContext) -> None:
+        """Create and register the balance view."""
+        table = ctx[self.table_key]
+        dim_columns = [table.c[d] for d in self.dimensions]
+
+        query = (
+            select(
+                *[c.label(c.key) for c in dim_columns],
+                func.sum(table.c["value"]).label("balance"),
+            )
+            .select_from(table)
+            .group_by(*dim_columns)
+        )
+
+        view_name = resolve_name(
+            ctx.metadata,
+            "ledger_balance_view",
+            {
+                "table_name": ctx.tablename,
+                "schema": ctx.schemaname,
+            },
+            _BALANCE_NAMING_DEFAULTS,
+        )
+
+        register_view(
+            ctx.metadata,
+            View(
+                view_name,
+                compile_query(query),
+                schema=ctx.schemaname,
+            ),
+        )
+        ctx[self.balance_view_key] = view_name
+
+
+_DOUBLE_ENTRY_NAMING_DEFAULTS = {
+    "double_entry_function": ("%(schema)s_%(table_name)s_%(op)s"),
+    "double_entry_trigger": ("%(schema)s_%(table_name)s_%(op)s"),
+}
+
+
+@produces("double_entry_columns")
+@singleton("__double_entry__")
+class DoubleEntryPlugin(Plugin):
+    """Add debit/credit semantics to a ledger table.
+
+    Adds a ``direction`` column (``'debit'`` or ``'credit'``)
+    to the schema items so that ``LedgerTablePlugin`` includes
+    it in the table.  Also registers an AFTER INSERT constraint
+    trigger that validates all rows sharing an ``entry_id``
+    have equal total debits and credits.
+
+    This plugin must appear **before** ``LedgerTablePlugin`` in
+    the plugin list so its column is included in the table
+    definition.
+
+    Args:
+        column_name: Name of the direction column
+            (default ``"direction"``).
+
+    """
+
+    def __init__(
+        self,
+        column_name: str = "direction",
+    ) -> None:
+        """Store configuration."""
+        self._column_name = column_name
+
+    def run(self, ctx: FactoryContext) -> None:
+        """Add the direction column to schema_items."""
+        ctx.schema_items.insert(
+            0,
+            Column(
+                self._column_name,
+                String(6),
+                nullable=False,
+            ),
+        )
+        ctx["double_entry_columns"] = self._column_name
+
+
+@requires(Dynamic("table_key"), "double_entry_columns", "entry_id_column")
+class DoubleEntryTriggerPlugin(Plugin):
+    """Register an AFTER INSERT trigger enforcing balanced entries.
+
+    Validates that for every ``entry_id`` in the inserted batch,
+    the sum of debit values equals the sum of credit values.
+    Raises a PostgreSQL exception if any entry is unbalanced.
+
+    Uses a statement-level trigger with a ``REFERENCING NEW TABLE``
+    transition table so that multi-row inserts are checked as a
+    whole, not row-by-row.
+
+    Must run **after** ``LedgerTablePlugin`` (needs the table)
+    and **after** ``DoubleEntryPlugin`` (needs column name).
+
+    Args:
+        table_key: Key in ``ctx`` for the backing table
+            (default ``"primary"``).
+
+    """
+
+    def __init__(
+        self,
+        table_key: str = "primary",
+    ) -> None:
+        """Store the context key."""
+        self.table_key = table_key
+
+    def run(self, ctx: FactoryContext) -> None:
+        """Register the constraint trigger on the ledger table."""
+        table = ctx[self.table_key]
+        direction_col = ctx["double_entry_columns"]
+        entry_id_col = ctx["entry_id_column"]
+        table_fullname = f"{ctx.schemaname}.{table.name}"
+
+        template = load_template(_TEMPLATES / "double_entry_check.mako")
+        body = template.render(
+            table=table_fullname,
+            direction_col=direction_col,
+            entry_id_col=entry_id_col.name,
+        )
+
+        fn_name = resolve_name(
+            ctx.metadata,
+            "double_entry_function",
+            {
+                "table_name": ctx.tablename,
+                "schema": ctx.schemaname,
+                "op": "double_entry_check",
+            },
+            _DOUBLE_ENTRY_NAMING_DEFAULTS,
+        )
+        trigger_name = resolve_name(
+            ctx.metadata,
+            "double_entry_trigger",
+            {
+                "table_name": ctx.tablename,
+                "schema": ctx.schemaname,
+                "op": "double_entry_check",
+            },
+            _DOUBLE_ENTRY_NAMING_DEFAULTS,
+        )
+
+        register_function(
+            ctx.metadata,
+            Function(
+                fn_name,
+                body,
+                returns="trigger",
+                language="plpgsql",
+                schema=ctx.schemaname,
+                security=FunctionSecurity.definer,
+            ),
+        )
+
+        register_trigger(
+            ctx.metadata,
+            Trigger.after(
+                "insert",
+                on=table_fullname,
+                execute=f"{ctx.schemaname}.{fn_name}",
+                name=trigger_name,
+            )
+            .for_each_statement()
+            .referencing_new_table_as("new_entries"),
         )

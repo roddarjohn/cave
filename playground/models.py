@@ -16,8 +16,14 @@ from pgcraft.factory.dimension import (
     EAVDimensionResourceFactory,
     SimpleDimensionResourceFactory,
 )
+from pgcraft.factory.ledger import LedgerResourceFactory
 from pgcraft.plugins.api import APIPlugin
 from pgcraft.plugins.check import TableCheckPlugin, TriggerCheckPlugin
+from pgcraft.plugins.ledger import (
+    DoubleEntryPlugin,
+    DoubleEntryTriggerPlugin,
+    LedgerBalanceViewPlugin,
+)
 from pgcraft.plugins.pk import SerialPKPlugin
 from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 from pgcraft.utils.naming_convention import build_naming_convention
@@ -73,6 +79,34 @@ EAVDimensionResourceFactory(
     extra_plugins=[
         TriggerCheckPlugin(),
         TriggerCheckPlugin(view_key="api"),
+    ],
+)
+
+# -- Ledger models ------------------------------------------------------
+
+LedgerResourceFactory(
+    tablename="transactions",
+    schemaname="private",
+    metadata=metadata,
+    schema_items=[
+        Column("account", String, nullable=False),
+        Column("category", String),
+    ],
+    extra_plugins=[
+        LedgerBalanceViewPlugin(dimensions=["account"]),
+    ],
+)
+
+LedgerResourceFactory(
+    tablename="journal",
+    schemaname="private",
+    metadata=metadata,
+    schema_items=[
+        Column("account", String, nullable=False),
+    ],
+    extra_plugins=[
+        DoubleEntryPlugin(),
+        DoubleEntryTriggerPlugin(),
     ],
 )
 

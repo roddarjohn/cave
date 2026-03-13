@@ -322,6 +322,8 @@ _EXAMPLES_LIST = [
     ("simple", "simple.py"),
     ("append_only", "append_only.py"),
     ("eav", "eav.py"),
+    ("ledger", "ledger.py"),
+    ("double_entry", "double_entry.py"),
 ]
 
 

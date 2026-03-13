@@ -10,6 +10,7 @@ pgcraft
 
    setup
    dimensions
+   ledgers
    plugins
    api
    development

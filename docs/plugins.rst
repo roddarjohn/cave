@@ -195,9 +195,10 @@ plugins share the same group.
    class MyPKPlugin(Plugin):
        ...
 
-The built-in groups are ``"__pk__"`` (one PK plugin) and ``"__table__"``
-(one table-layout plugin).  You can define your own group names for custom
-plugins.
+The built-in groups are ``"__pk__"`` (one PK plugin), ``"__table__"``
+(one table-layout plugin), ``"__entry_id__"`` (one entry ID plugin),
+and ``"__double_entry__"`` (one double-entry plugin).  You can define
+your own group names for custom plugins.
 
 
 Context keys
@@ -240,6 +241,29 @@ so two independent pipelines can coexist in one factory without colliding.
 ``EAVTriggerPlugin``
     Reads ``"entity"``, ``"attribute"``, ``"eav_mappings"``, and ``"api"``
     (optional; skipped if absent from ``ctx``).
+
+``UUIDEntryIDPlugin``
+    Writes ``"entry_id_column"`` (a ``Column`` object).
+
+``LedgerTablePlugin``
+    Reads ``"pk_columns"``, ``"entry_id_column"``,
+    ``"created_at_column"``.  Writes ``"primary"`` (the table) and
+    ``"__root__"``.
+
+``LedgerTriggerPlugin``
+    Reads ``"primary"`` (via ``table_key``), ``"api"`` (via
+    ``view_key``), and ``"entry_id_column"``.
+
+``LedgerBalanceViewPlugin``
+    Reads ``"primary"`` (via ``table_key``).  Writes
+    ``"balance_view"`` (via ``balance_view_key``).
+
+``DoubleEntryPlugin``
+    Writes ``"double_entry_columns"`` (the direction column name).
+
+``DoubleEntryTriggerPlugin``
+    Reads ``"primary"`` (via ``table_key``),
+    ``"double_entry_columns"``, and ``"entry_id_column"``.
 
 All key names are overridable via constructor arguments, which means you can
 wire plugins together in non-standard ways or run multiple pipelines within

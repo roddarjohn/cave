@@ -142,3 +142,5 @@ Source of truth tables should be very very clear.
 - How to store currency?
 
 - Other ways to use a ledger
+
+- Add constraints that prevent updating or deleting unless yo uknow what you're doing on tables that are supposed to be updated via trigger.
