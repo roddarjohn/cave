@@ -31,7 +31,7 @@ def _dim_column_names(ctx: FactoryContext) -> list[str]:
     ]
 
 
-@produces(Dynamic("table_key"))
+@produces(Dynamic("table_key"), "__root__")
 @requires("pk_columns")
 @singleton("__table__")
 class SimpleTablePlugin(Plugin):
@@ -61,6 +61,7 @@ class SimpleTablePlugin(Plugin):
             schema=ctx.schemaname,
         )
         ctx[self.table_key] = table
+        ctx["__root__"] = table
 
 
 @requires(Dynamic("table_key"), Dynamic("view_key"))

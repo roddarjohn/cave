@@ -252,7 +252,7 @@ class EAVTablePlugin(Plugin):
         ctx[self.attribute_key] = attribute_table
 
 
-@produces(Dynamic("primary_key"))
+@produces(Dynamic("primary_key"), "__root__")
 @requires(
     Dynamic("entity_key"),
     Dynamic("attribute_key"),
@@ -315,6 +315,7 @@ class EAVViewPlugin(Plugin):
             schema=ctx.schemaname,
         )
         ctx[self.primary_key] = proxy
+        ctx["__root__"] = proxy
 
 
 @requires(

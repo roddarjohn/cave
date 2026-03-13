@@ -8,6 +8,7 @@ from sqlalchemy import (
     String,
 )
 
+from cave.declarative import register
 from cave.factory.dimension import (
     AppendOnlyDimensionResourceFactory,
     EAVDimensionResourceFactory,
@@ -21,6 +22,8 @@ from cave.utils.naming_convention import build_naming_convention
 metadata = MetaData(
     naming_convention=build_naming_convention(),
 )
+
+# -- Factory-based models -----------------------------------------------
 
 SimpleDimensionResourceFactory(
     tablename="users",
@@ -58,3 +61,23 @@ EAVDimensionResourceFactory(
         Column("price", Integer),
     ],
 )
+
+# -- Declarative models -------------------------------------------------
+
+
+@register(
+    metadata=metadata,
+    plugins=[
+        SerialPKPlugin(),
+        SimpleTablePlugin(),
+        APIPlugin(grants=["select", "insert", "update"]),
+        SimpleTriggerPlugin(),
+    ],
+)
+class Locations:
+    __tablename__ = "locations"
+    __table_args__ = {"schema": "public"}
+
+    name = Column(String, nullable=False)
+    city = Column(String)
+    country = Column(String)

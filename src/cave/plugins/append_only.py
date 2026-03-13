@@ -119,7 +119,7 @@ class AppendOnlyTablePlugin(Plugin):
         ctx[self.root_key] = root_table
 
 
-@produces(Dynamic("primary_key"))
+@produces(Dynamic("primary_key"), "__root__")
 @requires(
     Dynamic("root_key"),
     Dynamic("attributes_key"),
@@ -200,6 +200,7 @@ class AppendOnlyViewPlugin(Plugin):
             schema=ctx.schemaname,
         )
         ctx[self.primary_key] = proxy
+        ctx["__root__"] = proxy
 
 
 @requires(
