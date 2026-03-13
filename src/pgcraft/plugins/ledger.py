@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    CheckConstraint,
     Column,
     Integer,
     Numeric,
@@ -47,6 +48,10 @@ _VALUE_TYPES = {
     "integer": Integer,
     "numeric": Numeric,
 }
+
+DIRECTION_DEBIT = "debit"
+DIRECTION_CREDIT = "credit"
+_VALID_DIRECTIONS = (DIRECTION_DEBIT, DIRECTION_CREDIT)
 
 
 def _dim_column_names(ctx: FactoryContext) -> list[str]:
@@ -354,8 +359,8 @@ class LedgerLatestViewPlugin(Plugin):
 
 
 _BALANCE_CHECK_NAMING_DEFAULTS = {
-    "balance_check_function": ("%(schema)s_%(table_name)s_%(op)s"),
-    "balance_check_trigger": ("%(schema)s_%(table_name)s_%(op)s"),
+    "balance_check_function": "%(schema)s_%(table_name)s_%(op)s",
+    "balance_check_trigger": "%(schema)s_%(table_name)s_%(op)s",
 }
 
 
@@ -465,8 +470,8 @@ class LedgerBalanceCheckPlugin(Plugin):
 
 
 _DOUBLE_ENTRY_NAMING_DEFAULTS = {
-    "double_entry_function": ("%(schema)s_%(table_name)s_%(op)s"),
-    "double_entry_trigger": ("%(schema)s_%(table_name)s_%(op)s"),
+    "double_entry_function": "%(schema)s_%(table_name)s_%(op)s",
+    "double_entry_trigger": "%(schema)s_%(table_name)s_%(op)s",
 }
 
 
@@ -500,10 +505,14 @@ class DoubleEntryPlugin(Plugin):
 
     def run(self, ctx: FactoryContext) -> None:
         """Inject the direction column and store its name."""
+        valid = ", ".join(f"'{v}'" for v in _VALID_DIRECTIONS)
         ctx.injected_columns.append(
             Column(
                 self._column_name,
-                String(6),
+                String,
+                CheckConstraint(
+                    f"{self._column_name} IN ({valid})",
+                ),
                 nullable=False,
             ),
         )
@@ -550,6 +559,8 @@ class DoubleEntryTriggerPlugin(Plugin):
             table=table_fullname,
             direction_col=direction_col,
             entry_id_col=entry_id_col.name,
+            debit=DIRECTION_DEBIT,
+            credit=DIRECTION_CREDIT,
         )
 
         fn_name = resolve_name(

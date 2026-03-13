@@ -12,7 +12,10 @@ BEGIN
     LIMIT 1;
 
     IF FOUND THEN
-        RAISE EXCEPTION 'ledger balance violation on ${table}: balance % is below minimum ${min_balance} for (${dim_cols}) = (${dim_format})',
+        RAISE EXCEPTION
+            'ledger balance violation on ${table}:'
+            ' balance % is below minimum ${min_balance}'
+            ' for (${dim_cols}) = (${dim_format})',
             _bad.balance, ${dim_values};
     END IF;
 

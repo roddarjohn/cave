@@ -253,6 +253,17 @@ class TestDoubleEntryPlugin:
         table = ctx["primary"]
         assert "direction" in {c.name for c in table.columns}
 
+    def test_direction_column_has_check_constraint(self):
+        ctx = _ledger_ctx()
+        DoubleEntryPlugin().run(ctx)
+        LedgerTablePlugin().run(ctx)
+        table = ctx["primary"]
+        constraints = [c for c in table.constraints if hasattr(c, "sqltext")]
+        assert any(
+            "debit" in str(c.sqltext) and "credit" in str(c.sqltext)
+            for c in constraints
+        )
+
 
 class TestDoubleEntryTriggerPlugin:
     def _ctx_with_double_entry_table(self):

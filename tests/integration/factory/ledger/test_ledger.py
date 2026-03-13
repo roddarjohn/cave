@@ -317,7 +317,7 @@ def _setup_double_entry_ledger(conn, schema, tablename):
             entry_id UUID NOT NULL DEFAULT gen_random_uuid(),
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             value INTEGER NOT NULL,
-            direction VARCHAR(6) NOT NULL,
+            direction VARCHAR NOT NULL CHECK (direction IN ('debit', 'credit')),
             account TEXT NOT NULL
         )
     """)
