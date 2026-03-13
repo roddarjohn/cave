@@ -1,10 +1,12 @@
-"""Unit tests for AppendOnlyDimensionFactory (no DB required)."""
+"""Unit tests for AppendOnlyDimensionResourceFactory (no DB required)."""
 
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 
 from cave.errors import CaveValidationError
-from cave.factory.dimension.append_only import AppendOnlyDimensionFactory
+from cave.factory.dimension.append_only import (
+    AppendOnlyDimensionResourceFactory,
+)
 from cave.plugins.api import APIPlugin
 from cave.plugins.append_only import (
     AppendOnlyTablePlugin,
@@ -14,10 +16,10 @@ from cave.plugins.append_only import (
 from cave.plugins.pk import SerialPKPlugin
 
 
-class TestAppendOnlyDimensionFactoryTables:
+class TestAppendOnlyDimensionResourceFactoryTables:
     def test_attributes_table_created(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         keys = list(metadata.tables.keys())
@@ -25,7 +27,7 @@ class TestAppendOnlyDimensionFactoryTables:
 
     def test_root_table_created(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         keys = list(metadata.tables.keys())
@@ -33,28 +35,28 @@ class TestAppendOnlyDimensionFactoryTables:
 
     def test_attributes_table_default_name(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert "dim.product_attributes" in metadata.tables
 
     def test_root_table_default_name(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert "dim.product_root" in metadata.tables
 
     def test_exactly_two_tables(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert len(metadata.tables) == 2
 
     def test_attributes_table_has_user_columns(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         table = metadata.tables["dim.product_attributes"]
@@ -63,7 +65,7 @@ class TestAppendOnlyDimensionFactoryTables:
 
     def test_root_table_has_created_at(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         table = metadata.tables["dim.product_root"]
@@ -72,7 +74,7 @@ class TestAppendOnlyDimensionFactoryTables:
 
     def test_root_has_fk_to_attributes(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         root = metadata.tables["dim.product_root"]
@@ -81,17 +83,17 @@ class TestAppendOnlyDimensionFactoryTables:
 
     def test_schema_applied_to_tables(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "myschema", metadata, [Column("name", String)]
         )
         assert "myschema.product_attributes" in metadata.tables
         assert "myschema.product_root" in metadata.tables
 
 
-class TestAppendOnlyDimensionFactoryViews:
+class TestAppendOnlyDimensionResourceFactoryViews:
     def test_join_view_registered(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info.get("views")
@@ -99,7 +101,7 @@ class TestAppendOnlyDimensionFactoryViews:
 
     def test_join_view_in_dim_schema(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info["views"].views
@@ -109,7 +111,7 @@ class TestAppendOnlyDimensionFactoryViews:
 
     def test_api_view_in_api_schema(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info["views"].views
@@ -119,14 +121,14 @@ class TestAppendOnlyDimensionFactoryViews:
 
     def test_exactly_two_views(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert len(metadata.info["views"].views) == 2
 
     def test_api_view_schema_respects_configuration(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product",
             "dim",
             metadata,
@@ -145,7 +147,7 @@ class TestAppendOnlyDimensionFactoryViews:
 
     def test_join_view_definition_references_tables(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info["views"].views
@@ -156,10 +158,10 @@ class TestAppendOnlyDimensionFactoryViews:
         assert "product_attributes" in join_view.definition
 
 
-class TestAppendOnlyDimensionFactoryTriggers:
+class TestAppendOnlyDimensionResourceFactoryTriggers:
     def test_functions_registered(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         functions = metadata.info.get("functions")
@@ -169,7 +171,7 @@ class TestAppendOnlyDimensionFactoryTriggers:
 
     def test_triggers_registered(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         triggers = metadata.info.get("triggers")
@@ -178,7 +180,7 @@ class TestAppendOnlyDimensionFactoryTriggers:
 
     def test_function_names_include_op(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
@@ -187,10 +189,10 @@ class TestAppendOnlyDimensionFactoryTriggers:
         assert len(insert_fns) == 2
 
 
-class TestAppendOnlyDimensionFactoryAPIResource:
+class TestAppendOnlyDimensionResourceFactoryAPIResource:
     def test_api_resource_registered(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         resources = metadata.info.get("api_resources", [])
@@ -198,17 +200,17 @@ class TestAppendOnlyDimensionFactoryAPIResource:
 
     def test_api_resource_name(self):
         metadata = MetaData()
-        AppendOnlyDimensionFactory(
+        AppendOnlyDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert metadata.info["api_resources"][0].name == "product"
 
 
-class TestAppendOnlyDimensionFactoryValidation:
+class TestAppendOnlyDimensionResourceFactoryValidation:
     def test_pk_column_raises(self):
         metadata = MetaData()
         with pytest.raises(CaveValidationError):
-            AppendOnlyDimensionFactory(
+            AppendOnlyDimensionResourceFactory(
                 "product",
                 "dim",
                 metadata,

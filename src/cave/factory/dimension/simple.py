@@ -1,15 +1,15 @@
-"""Simple dimension factory convenience class."""
+"""Simple dimension resource factory convenience class."""
 
 from typing import ClassVar
 
-from cave.factory.base import DimensionFactory
+from cave.factory.base import ResourceFactory
 from cave.plugin import Plugin
 from cave.plugins.api import APIPlugin
 from cave.plugins.pk import SerialPKPlugin
 from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 
 
-class SimpleDimensionFactory(DimensionFactory):
+class SimpleDimensionResourceFactory(ResourceFactory):
     """Create a simple dimension: one table, one API view, CRUD triggers.
 
     Default plugins:

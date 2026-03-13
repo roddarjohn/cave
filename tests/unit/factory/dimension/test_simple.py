@@ -1,4 +1,4 @@
-"""Unit tests for SimpleDimensionFactory (no DB required)."""
+"""Unit tests for SimpleDimensionResourceFactory (no DB required)."""
 
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String
@@ -7,7 +7,7 @@ from sqlalchemy_declarative_extensions.dialects.postgresql.trigger import (
 )
 
 from cave.errors import CaveValidationError
-from cave.factory.dimension.simple import SimpleDimensionFactory
+from cave.factory.dimension.simple import SimpleDimensionResourceFactory
 from cave.plugins.api import APIPlugin
 from cave.plugins.pk import SerialPKPlugin
 from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
@@ -15,17 +15,17 @@ from cave.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 _CRUD_OPS = ("insert", "update", "delete")
 
 
-class TestSimpleDimensionFactoryTables:
+class TestSimpleDimensionResourceFactoryTables:
     def test_base_table_created_in_metadata(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert "dim.product" in metadata.tables
 
     def test_base_table_has_pk_column(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         table = metadata.tables["dim.product"]
@@ -34,7 +34,7 @@ class TestSimpleDimensionFactoryTables:
 
     def test_base_table_pk_column_is_auto_id(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product",
             "dim",
             metadata,
@@ -52,7 +52,7 @@ class TestSimpleDimensionFactoryTables:
 
     def test_base_table_has_user_columns(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product",
             "dim",
             metadata,
@@ -65,7 +65,7 @@ class TestSimpleDimensionFactoryTables:
 
     def test_schema_applied_to_table(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "myschema", metadata, [Column("name", String)]
         )
         assert "myschema.product" in metadata.tables
@@ -73,16 +73,16 @@ class TestSimpleDimensionFactoryTables:
     def test_no_extra_tables_created(self):
         """Simple factory should create exactly one table."""
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert len(metadata.tables) == 1
 
 
-class TestSimpleDimensionFactoryViews:
+class TestSimpleDimensionResourceFactoryViews:
     def test_api_view_registered(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info.get("views")
@@ -90,7 +90,7 @@ class TestSimpleDimensionFactoryViews:
 
     def test_api_view_has_correct_name(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info["views"]
@@ -99,7 +99,7 @@ class TestSimpleDimensionFactoryViews:
 
     def test_api_view_schema_defaults_to_api(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info["views"]
@@ -108,7 +108,7 @@ class TestSimpleDimensionFactoryViews:
 
     def test_api_view_schema_respects_configuration(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product",
             "dim",
             metadata,
@@ -126,7 +126,7 @@ class TestSimpleDimensionFactoryViews:
 
     def test_view_definition_references_base_table(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info["views"]
@@ -136,17 +136,17 @@ class TestSimpleDimensionFactoryViews:
 
     def test_exactly_one_view_created(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info["views"]
         assert len(views.views) == 1
 
 
-class TestSimpleDimensionFactoryTriggers:
+class TestSimpleDimensionResourceFactoryTriggers:
     def test_functions_registered(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         functions = metadata.info.get("functions")
@@ -155,7 +155,7 @@ class TestSimpleDimensionFactoryTriggers:
 
     def test_triggers_registered(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         triggers = metadata.info.get("triggers")
@@ -164,7 +164,7 @@ class TestSimpleDimensionFactoryTriggers:
 
     def test_insert_function_exists(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
@@ -172,7 +172,7 @@ class TestSimpleDimensionFactoryTriggers:
 
     def test_update_function_exists(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
@@ -180,7 +180,7 @@ class TestSimpleDimensionFactoryTriggers:
 
     def test_delete_function_exists(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
@@ -188,7 +188,7 @@ class TestSimpleDimensionFactoryTriggers:
 
     def test_insert_trigger_is_instead_of(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         triggers = metadata.info["triggers"].triggers
@@ -196,10 +196,10 @@ class TestSimpleDimensionFactoryTriggers:
         assert insert_tr.time == TriggerTimes.instead_of
 
 
-class TestSimpleDimensionFactoryAPIResource:
+class TestSimpleDimensionResourceFactoryAPIResource:
     def test_api_resource_registered(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         resources = metadata.info.get("api_resources", [])
@@ -207,7 +207,7 @@ class TestSimpleDimensionFactoryAPIResource:
 
     def test_api_resource_name_is_tablename(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         resource = metadata.info["api_resources"][0]
@@ -215,18 +215,18 @@ class TestSimpleDimensionFactoryAPIResource:
 
     def test_api_resource_schema_defaults_to_api(self):
         metadata = MetaData()
-        SimpleDimensionFactory(
+        SimpleDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         resource = metadata.info["api_resources"][0]
         assert resource.schema == "api"
 
 
-class TestSimpleDimensionFactoryValidation:
+class TestSimpleDimensionResourceFactoryValidation:
     def test_pk_column_raises(self):
         metadata = MetaData()
         with pytest.raises(CaveValidationError):
-            SimpleDimensionFactory(
+            SimpleDimensionResourceFactory(
                 "product",
                 "dim",
                 metadata,

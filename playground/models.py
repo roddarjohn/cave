@@ -9,9 +9,9 @@ from sqlalchemy import (
 )
 
 from cave.factory.dimension import (
-    AppendOnlyDimensionFactory,
-    EAVDimensionFactory,
-    SimpleDimensionFactory,
+    AppendOnlyDimensionResourceFactory,
+    EAVDimensionResourceFactory,
+    SimpleDimensionResourceFactory,
 )
 from cave.plugins.api import APIPlugin
 from cave.plugins.pk import SerialPKPlugin
@@ -22,11 +22,11 @@ metadata = MetaData(
     naming_convention=build_naming_convention(),
 )
 
-SimpleDimensionFactory(
+SimpleDimensionResourceFactory(
     tablename="users",
     schemaname="public",
     metadata=metadata,
-    dimensions=[
+    schema_items=[
         Column("name", Integer),
     ],
     plugins=[
@@ -37,21 +37,21 @@ SimpleDimensionFactory(
     ],
 )
 
-AppendOnlyDimensionFactory(
+AppendOnlyDimensionResourceFactory(
     tablename="students",
     schemaname="private",
     metadata=metadata,
-    dimensions=[
+    schema_items=[
         Column("name", String),
         Column("user_id", ForeignKey("public.users.id")),
     ],
 )
 
-EAVDimensionFactory(
+EAVDimensionResourceFactory(
     tablename="products",
     schemaname="private",
     metadata=metadata,
-    dimensions=[
+    schema_items=[
         Column("color", String),
         Column("weight", Float),
         Column("is_active", Boolean),

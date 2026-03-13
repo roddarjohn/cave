@@ -10,7 +10,7 @@ from sqlalchemy import Column, Table
 if TYPE_CHECKING:
     from cave.factory.context import FactoryContext
 
-from cave.plugin import Plugin, singleton
+from cave.plugin import Dynamic, Plugin, produces, requires, singleton
 from cave.utils.template import load_template
 from cave.utils.trigger import register_view_triggers
 
@@ -23,24 +23,25 @@ _NAMING_DEFAULTS = {
 
 
 def _dim_column_names(ctx: FactoryContext) -> list[str]:
-    """Extract non-PK column names from dimensions."""
+    """Extract non-PK column names from schema_items."""
     return [
         col.key
-        for col in ctx.dimensions
+        for col in ctx.schema_items
         if isinstance(col, Column) and not col.primary_key
     ]
 
 
+@produces(Dynamic("table_key"))
 @singleton("__table__")
 class SimpleTablePlugin(Plugin):
     """Create a single backing table for a simple dimension.
 
     Combines ``ctx.pk_columns``, ``ctx.extra_columns``, and
-    ``ctx.dimensions`` into one table.
+    ``ctx.schema_items`` into one table.
 
     Args:
-        table_key: Key in ``ctx.tables`` to store the created table
-            under (default ``"primary"``).
+        table_key: Key under which the created table is stored in
+            ``ctx`` (default ``"primary"``).
 
     """
 
@@ -48,26 +49,27 @@ class SimpleTablePlugin(Plugin):
         """Store the context key."""
         self.table_key = table_key
 
-    def create_tables(self, ctx: FactoryContext) -> None:
-        """Create the dimension table."""
+    def run(self, ctx: FactoryContext) -> None:
+        """Create the dimension table and store it in ctx."""
         table = Table(
             ctx.tablename,
             ctx.metadata,
             *ctx.pk_columns,
             *ctx.extra_columns,
-            *ctx.dimensions,
+            *ctx.schema_items,
             schema=ctx.schemaname,
         )
         ctx[self.table_key] = table
 
 
+@requires(Dynamic("table_key"), Dynamic("view_key"))
 class SimpleTriggerPlugin(Plugin):
     """Register INSERT/UPDATE/DELETE INSTEAD OF triggers on a view.
 
     Args:
-        table_key: Key in ``ctx.tables`` for the backing table
+        table_key: Key in ``ctx`` for the backing table
             (default ``"primary"``).
-        view_key: Key in ``ctx.views`` for the trigger target
+        view_key: Key in ``ctx`` for the trigger target view
             (default ``"api"``).
 
     """
@@ -79,7 +81,7 @@ class SimpleTriggerPlugin(Plugin):
         self.table_key = table_key
         self.view_key = view_key
 
-    def create_triggers(self, ctx: FactoryContext) -> None:
+    def run(self, ctx: FactoryContext) -> None:
         """Register INSTEAD OF triggers on the target view."""
         api_view = ctx[self.view_key]
         primary = ctx[self.table_key]

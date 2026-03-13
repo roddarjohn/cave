@@ -1,15 +1,15 @@
-"""EAV dimension factory convenience class."""
+"""EAV dimension resource factory convenience class."""
 
 from typing import ClassVar
 
-from cave.factory.base import DimensionFactory
+from cave.factory.base import ResourceFactory
 from cave.plugin import Plugin
 from cave.plugins.api import APIPlugin
 from cave.plugins.eav import EAVTablePlugin, EAVTriggerPlugin, EAVViewPlugin
 from cave.plugins.pk import SerialPKPlugin
 
 
-class EAVDimensionFactory(DimensionFactory):
+class EAVDimensionResourceFactory(ResourceFactory):
     """Create an EAV (Entity-Attribute-Value) dimension.
 
     Default plugins:

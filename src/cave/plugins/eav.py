@@ -29,7 +29,7 @@ from sqlalchemy_declarative_extensions import View, register_view
 if TYPE_CHECKING:
     from cave.factory.context import FactoryContext
 
-from cave.plugin import Plugin, singleton
+from cave.plugin import Dynamic, Plugin, produces, requires, singleton
 from cave.utils.naming import resolve_name
 from cave.utils.query import compile_query
 from cave.utils.template import load_template
@@ -141,16 +141,19 @@ def _build_pivot_query(
     )
 
 
+@produces(
+    Dynamic("entity_key"), Dynamic("attribute_key"), Dynamic("mappings_key")
+)
 @singleton("__table__")
 class EAVTablePlugin(Plugin):
     """Create the entity and attribute tables for an EAV dimension.
 
     Args:
-        entity_key: Key in ``ctx.tables`` for the entity root table
+        entity_key: Key in ``ctx`` for the entity root table
             (default ``"entity"``).
-        attribute_key: Key in ``ctx.tables`` for the attribute log
+        attribute_key: Key in ``ctx`` for the attribute log
             (default ``"attribute"``).
-        mappings_key: Key in ``ctx.state`` for the EAV mappings list,
+        mappings_key: Key in ``ctx`` for the EAV mappings list,
             shared with the view and trigger plugins
             (default ``"eav_mappings"``).
 
@@ -167,10 +170,10 @@ class EAVTablePlugin(Plugin):
         self.attribute_key = attribute_key
         self.mappings_key = mappings_key
 
-    def create_tables(self, ctx: FactoryContext) -> None:
+    def run(self, ctx: FactoryContext) -> None:
         """Create entity and attribute tables."""
         pk_col_name = ctx.pk_columns[0].key if ctx.pk_columns else _PK_COL
-        mappings = _build_eav_mappings(ctx.dimensions)
+        mappings = _build_eav_mappings(ctx.schema_items)
         ctx[self.mappings_key] = mappings
 
         entity_name = resolve_name(
@@ -231,18 +234,22 @@ class EAVTablePlugin(Plugin):
         ctx[self.attribute_key] = attribute_table
 
 
+@produces(Dynamic("primary_key"))
+@requires(
+    Dynamic("entity_key"), Dynamic("attribute_key"), Dynamic("mappings_key")
+)
 class EAVViewPlugin(Plugin):
     """Create the pivot view for an EAV dimension.
 
     Args:
-        entity_key: Key in ``ctx.tables`` for the entity root table
+        entity_key: Key in ``ctx`` for the entity root table
             (default ``"entity"``).
-        attribute_key: Key in ``ctx.tables`` for the attribute log
+        attribute_key: Key in ``ctx`` for the attribute log
             (default ``"attribute"``).
-        mappings_key: Key in ``ctx.state`` for the EAV mappings list
+        mappings_key: Key in ``ctx`` for the EAV mappings list
             (default ``"eav_mappings"``).
-        primary_key: Key in ``ctx.tables`` to store the view proxy
-            under (default ``"primary"``).
+        primary_key: Key in ``ctx`` to store the view proxy under
+            (default ``"primary"``).
 
     """
 
@@ -259,8 +266,8 @@ class EAVViewPlugin(Plugin):
         self.mappings_key = mappings_key
         self.primary_key = primary_key
 
-    def create_views(self, ctx: FactoryContext) -> None:
-        """Register the pivot view and store the proxy in ctx.tables."""
+    def run(self, ctx: FactoryContext) -> None:
+        """Register the pivot view and store the proxy in ctx."""
         mappings: list[_EAVMapping] = ctx[self.mappings_key]
         entity_table = ctx[self.entity_key]
         attribute_table = ctx[self.attribute_key]
@@ -285,6 +292,12 @@ class EAVViewPlugin(Plugin):
         ctx[self.primary_key] = proxy
 
 
+@requires(
+    Dynamic("entity_key"),
+    Dynamic("attribute_key"),
+    Dynamic("mappings_key"),
+    Dynamic("view_key"),
+)
 class EAVTriggerPlugin(Plugin):
     """Register INSTEAD OF triggers for an EAV dimension.
 
@@ -292,14 +305,14 @@ class EAVTriggerPlugin(Plugin):
     ``view_key``.
 
     Args:
-        entity_key: Key in ``ctx.tables`` for the entity root table
+        entity_key: Key in ``ctx`` for the entity root table
             (default ``"entity"``).
-        attribute_key: Key in ``ctx.tables`` for the attribute log
+        attribute_key: Key in ``ctx`` for the attribute log
             (default ``"attribute"``).
-        mappings_key: Key in ``ctx.state`` for the EAV mappings list
+        mappings_key: Key in ``ctx`` for the EAV mappings list
             (default ``"eav_mappings"``).
-        view_key: Key in ``ctx.views`` for the additional trigger
-            target (default ``"api"``).  Skipped if absent.
+        view_key: Key in ``ctx`` for the additional trigger target
+            (default ``"api"``).  Skipped if absent.
 
     """
 
@@ -316,7 +329,7 @@ class EAVTriggerPlugin(Plugin):
         self.mappings_key = mappings_key
         self.view_key = view_key
 
-    def create_triggers(self, ctx: FactoryContext) -> None:
+    def run(self, ctx: FactoryContext) -> None:
         """Register INSTEAD OF triggers on the pivot view and API view."""
         mappings: list[_EAVMapping] = ctx[self.mappings_key]
         entity_table = ctx[self.entity_key]

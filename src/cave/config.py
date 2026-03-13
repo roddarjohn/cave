@@ -21,8 +21,12 @@ class CaveConfig:
         cave = CaveConfig()
         cave.register(TimestampPlugin(), TenantPlugin())
 
-        SimpleDimensionFactory("users", "public", metadata, ..., cave=cave)
-        AppendOnlyDimensionFactory("events", "public", metadata, ..., cave=cave)
+        SimpleDimensionResourceFactory(
+            "users", "public", metadata, ..., cave=cave
+        )
+        AppendOnlyDimensionResourceFactory(
+            "events", "public", metadata, ..., cave=cave
+        )
     """
 
     plugins: list[Plugin] = field(default_factory=list)

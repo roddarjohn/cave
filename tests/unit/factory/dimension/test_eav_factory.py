@@ -1,4 +1,4 @@
-"""Unit tests for EAVDimensionFactory and EAV helper functions."""
+"""Unit tests for EAVDimensionResourceFactory and EAV helper functions."""
 
 import pytest
 from sqlalchemy import (
@@ -16,7 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.sql.expression import Label
 
 from cave.errors import CaveValidationError
-from cave.factory.dimension.eav import EAVDimensionFactory
+from cave.factory.dimension.eav import EAVDimensionResourceFactory
 from cave.plugins.api import APIPlugin
 from cave.plugins.eav import (
     EAVTablePlugin,
@@ -182,35 +182,35 @@ class TestPivotAggregate:
 
 
 # ---------------------------------------------------------------------------
-# EAVDimensionFactory — metadata-level checks
+# EAVDimensionResourceFactory — metadata-level checks
 # ---------------------------------------------------------------------------
 
 
-class TestEAVDimensionFactoryTables:
+class TestEAVDimensionResourceFactoryTables:
     def test_entity_table_created(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert "dim.product_entity" in metadata.tables
 
     def test_attribute_table_created(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert "dim.product_attribute" in metadata.tables
 
     def test_exactly_two_tables(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert len(metadata.tables) == 2
 
     def test_entity_table_has_pk(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         entity = metadata.tables["dim.product_entity"]
@@ -219,7 +219,7 @@ class TestEAVDimensionFactoryTables:
 
     def test_attribute_table_has_entity_fk(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         attr = metadata.tables["dim.product_attribute"]
@@ -228,7 +228,7 @@ class TestEAVDimensionFactoryTables:
 
     def test_attribute_table_has_value_column(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         attr = metadata.tables["dim.product_attribute"]
@@ -237,7 +237,7 @@ class TestEAVDimensionFactoryTables:
 
     def test_attribute_table_has_attribute_name_column(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         attr = metadata.tables["dim.product_attribute"]
@@ -246,7 +246,7 @@ class TestEAVDimensionFactoryTables:
 
     def test_multiple_column_types_create_separate_value_columns(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product",
             "dim",
             metadata,
@@ -259,17 +259,17 @@ class TestEAVDimensionFactoryTables:
 
     def test_schema_applied(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "myschema", metadata, [Column("name", String)]
         )
         assert "myschema.product_entity" in metadata.tables
         assert "myschema.product_attribute" in metadata.tables
 
 
-class TestEAVDimensionFactoryViews:
+class TestEAVDimensionResourceFactoryViews:
     def test_pivot_view_registered(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info.get("views")
@@ -277,7 +277,7 @@ class TestEAVDimensionFactoryViews:
 
     def test_pivot_view_in_dim_schema(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info["views"].views
@@ -286,7 +286,7 @@ class TestEAVDimensionFactoryViews:
 
     def test_api_view_in_api_schema(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info["views"].views
@@ -296,14 +296,14 @@ class TestEAVDimensionFactoryViews:
 
     def test_exactly_two_views(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         assert len(metadata.info["views"].views) == 2
 
     def test_api_view_schema_respects_configuration(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product",
             "dim",
             metadata,
@@ -321,7 +321,7 @@ class TestEAVDimensionFactoryViews:
 
     def test_pivot_view_definition_contains_entity_table(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         views = metadata.info["views"].views
@@ -331,10 +331,10 @@ class TestEAVDimensionFactoryViews:
         assert "product_entity" in pivot_view.definition
 
 
-class TestEAVDimensionFactoryTriggers:
+class TestEAVDimensionResourceFactoryTriggers:
     def test_functions_registered(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         functions = metadata.info.get("functions")
@@ -343,7 +343,7 @@ class TestEAVDimensionFactoryTriggers:
 
     def test_triggers_registered(self):
         metadata = MetaData()
-        EAVDimensionFactory(
+        EAVDimensionResourceFactory(
             "product", "dim", metadata, [Column("name", String)]
         )
         triggers = metadata.info.get("triggers")
@@ -351,11 +351,11 @@ class TestEAVDimensionFactoryTriggers:
         assert len(triggers.triggers) == 6
 
 
-class TestEAVDimensionFactoryValidation:
+class TestEAVDimensionResourceFactoryValidation:
     def test_pk_column_raises(self):
         metadata = MetaData()
         with pytest.raises(CaveValidationError):
-            EAVDimensionFactory(
+            EAVDimensionResourceFactory(
                 "product",
                 "dim",
                 metadata,

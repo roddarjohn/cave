@@ -19,7 +19,7 @@ from sqlalchemy_declarative_extensions import View, register_view
 if TYPE_CHECKING:
     from cave.factory.context import FactoryContext
 
-from cave.plugin import Plugin, singleton
+from cave.plugin import Dynamic, Plugin, produces, requires, singleton
 from cave.utils.naming import resolve_name
 from cave.utils.query import compile_query
 from cave.utils.template import load_template
@@ -56,17 +56,18 @@ def _resolve_attributes_name(ctx: FactoryContext) -> str:
 
 
 def _dim_column_names(ctx: FactoryContext) -> list[str]:
-    return [col.key for col in ctx.dimensions if isinstance(col, Column)]
+    return [col.key for col in ctx.schema_items if isinstance(col, Column)]
 
 
+@produces(Dynamic("root_key"), Dynamic("attributes_key"))
 @singleton("__table__")
 class AppendOnlyTablePlugin(Plugin):
     """Create the root and attributes tables for an append-only dimension.
 
     Args:
-        root_key: Key in ``ctx.tables`` for the entity root table
+        root_key: Key in ``ctx`` for the entity root table
             (default ``"root_table"``).
-        attributes_key: Key in ``ctx.tables`` for the append-only
+        attributes_key: Key in ``ctx`` for the append-only
             attributes log (default ``"attributes"``).
 
     """
@@ -80,7 +81,7 @@ class AppendOnlyTablePlugin(Plugin):
         self.root_key = root_key
         self.attributes_key = attributes_key
 
-    def create_tables(self, ctx: FactoryContext) -> None:
+    def run(self, ctx: FactoryContext) -> None:
         """Create root and attributes tables."""
         pk_col_name = ctx.pk_columns[0].key if ctx.pk_columns else _PK_COL
 
@@ -94,7 +95,7 @@ class AppendOnlyTablePlugin(Plugin):
                 DateTime(timezone=True),
                 server_default="now()",
             ),
-            *ctx.dimensions,
+            *ctx.schema_items,
             schema=ctx.schemaname,
         )
         ctx[self.attributes_key] = attributes_table
@@ -119,16 +120,18 @@ class AppendOnlyTablePlugin(Plugin):
         ctx[self.root_key] = root_table
 
 
+@produces(Dynamic("primary_key"))
+@requires(Dynamic("root_key"), Dynamic("attributes_key"))
 class AppendOnlyViewPlugin(Plugin):
     """Create the join view for an append-only dimension.
 
     Args:
-        root_key: Key in ``ctx.tables`` for the entity root table
+        root_key: Key in ``ctx`` for the entity root table
             (default ``"root_table"``).
-        attributes_key: Key in ``ctx.tables`` for the attributes log
+        attributes_key: Key in ``ctx`` for the attributes log
             (default ``"attributes"``).
-        primary_key: Key in ``ctx.tables`` to store the view proxy
-            under, for downstream plugins such as
+        primary_key: Key in ``ctx`` to store the view proxy under,
+            for downstream plugins such as
             :class:`~cave.plugins.api.APIPlugin` (default
             ``"primary"``).
 
@@ -145,8 +148,8 @@ class AppendOnlyViewPlugin(Plugin):
         self.attributes_key = attributes_key
         self.primary_key = primary_key
 
-    def create_views(self, ctx: FactoryContext) -> None:
-        """Register the join view and store the proxy in ctx.tables."""
+    def run(self, ctx: FactoryContext) -> None:
+        """Register the join view and store the proxy in ctx."""
         pk_col_name = ctx.pk_columns[0].key if ctx.pk_columns else _PK_COL
         root_table = ctx[self.root_key]
         attribute_table = ctx[self.attributes_key]
@@ -158,7 +161,7 @@ class AppendOnlyViewPlugin(Plugin):
                 attribute_table.c["created_at"].label("updated_at"),
                 *[
                     col.label(col.key)
-                    for col in ctx.dimensions
+                    for col in ctx.schema_items
                     if isinstance(col, Column)
                 ],
             )
@@ -188,7 +191,7 @@ class AppendOnlyViewPlugin(Plugin):
             Column("updated_at", DateTime(timezone=True)),
             *[
                 Column(col.key, col.type)
-                for col in ctx.dimensions
+                for col in ctx.schema_items
                 if isinstance(col, Column)
             ],
             schema=ctx.schemaname,
@@ -196,6 +199,7 @@ class AppendOnlyViewPlugin(Plugin):
         ctx[self.primary_key] = proxy
 
 
+@requires(Dynamic("root_key"), Dynamic("attributes_key"), Dynamic("view_key"))
 class AppendOnlyTriggerPlugin(Plugin):
     """Register INSTEAD OF triggers for an append-only dimension.
 
@@ -203,14 +207,13 @@ class AppendOnlyTriggerPlugin(Plugin):
     if present, the view stored at ``view_key``.
 
     Args:
-        root_key: Key in ``ctx.tables`` for the entity root table
+        root_key: Key in ``ctx`` for the entity root table
             (default ``"root_table"``).
-        attributes_key: Key in ``ctx.tables`` for the attributes log
+        attributes_key: Key in ``ctx`` for the attributes log
             (default ``"attributes"``).
-        view_key: Key in ``ctx.views`` for the additional trigger
-            target, e.g. the API view (default ``"api"``).  If the
-            key is absent from ``ctx.views`` no second trigger is
-            registered.
+        view_key: Key in ``ctx`` for the additional trigger target,
+            e.g. the API view (default ``"api"``).  If the key is
+            absent from ``ctx`` no second trigger is registered.
 
     """
 
@@ -225,7 +228,7 @@ class AppendOnlyTriggerPlugin(Plugin):
         self.attributes_key = attributes_key
         self.view_key = view_key
 
-    def create_triggers(self, ctx: FactoryContext) -> None:
+    def run(self, ctx: FactoryContext) -> None:
         """Register INSTEAD OF triggers on the join view and API view."""
         root_table = ctx[self.root_key]
         attribute_table = ctx[self.attributes_key]

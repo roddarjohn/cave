@@ -1,7 +1,8 @@
-"""Core DimensionFactory: plugin runner."""
+"""Core ResourceFactory: plugin runner."""
 
 from __future__ import annotations
 
+from graphlib import CycleError, TopologicalSorter
 from typing import TYPE_CHECKING, ClassVar
 
 from cave.errors import CaveValidationError
@@ -68,17 +69,78 @@ def _validate_singleton_groups(plugins: list[Plugin]) -> None:
         seen[group] = name
 
 
-class DimensionFactory:
-    """Core factory: runs plugins through the six lifecycle phases.
+def _sort_plugins(plugins: list[Plugin]) -> list[Plugin]:
+    """Sort plugins topologically by their produces/requires declarations.
+
+    Plugins with no declared dependencies keep their original relative
+    order.  References to keys not produced by any plugin in this list
+    are treated as externally satisfied and ignored for ordering.
+
+    Args:
+        plugins: The resolved plugin list to sort.
+
+    Returns:
+        A new list of the same plugins in a valid execution order.
+
+    Raises:
+        CaveValidationError: If two plugins declare the same produced
+            key, or if a dependency cycle is detected.
+
+    """
+    # Last producer of a key wins for dependency resolution — if multiple
+    # plugins produce the same key, requires-edges point to the last one,
+    # meaning overriding plugins run after the ones they override.
+    producers: dict[str, Plugin] = {}
+    for p in plugins:
+        for key in p.resolved_produces():
+            producers[key] = p
+
+    # Build predecessor graph: each plugin maps to the set of plugins
+    # whose output it requires.  Only edges within this plugin list matter.
+    graph: dict[Plugin, set[Plugin]] = {p: set() for p in plugins}
+    for p in plugins:
+        for key in p.resolved_requires():
+            producer = producers.get(key)
+            if producer is not None:
+                graph[p].add(producer)
+
+    # Use original list index as tiebreaker so unrelated plugins preserve
+    # their declared order.
+    original_order = {id(p): i for i, p in enumerate(plugins)}
+    ts = TopologicalSorter(graph)
+    try:
+        ts.prepare()
+    except CycleError as exc:
+        names = ", ".join(type(p).__name__ for p in exc.args[1])
+        msg = f"Circular plugin dependency detected among: {names}"
+        raise CaveValidationError(msg) from exc
+
+    result: list[Plugin] = []
+    while ts.is_active():
+        ready = sorted(ts.get_ready(), key=lambda p: original_order[id(p)])
+        for p in ready:
+            result.append(p)
+            ts.done(p)
+
+    return result
+
+
+class ResourceFactory:
+    """Core factory: resolves plugins and runs them in dependency order.
 
     Subclasses declare ``DEFAULT_PLUGINS`` to establish their
     standard behaviour.  Callers can override or extend the plugin
     list via ``plugins`` / ``extra_plugins``, and inject global
     plugins via ``cave``.
 
+    Plugin execution order is determined by each plugin's
+    :attr:`~cave.plugin.Plugin.produces` and
+    :attr:`~cave.plugin.Plugin.requires` declarations.  Plugins with no
+    declared dependencies run in the order they appear in the list.
+
     Example::
 
-        class SimpleDimensionFactory(DimensionFactory):
+        class SimpleDimensionResourceFactory(ResourceFactory):
             DEFAULT_PLUGINS: ClassVar[list[Plugin]] = [
                 SerialPKPlugin(),
                 SimpleTablePlugin(),
@@ -90,14 +152,16 @@ class DimensionFactory:
         tablename: Name of the dimension table.
         schemaname: PostgreSQL schema for all generated objects.
         metadata: SQLAlchemy ``MetaData`` the objects are bound to.
-        dimensions: Column and constraint definitions.  Must not
+        schema_items: Column and constraint definitions.  Must not
             include a primary key column.
         cave: Optional global config supplying prepended plugins.
         plugins: If given, replaces ``DEFAULT_PLUGINS`` entirely.
         extra_plugins: Appended to the resolved plugin list.
 
     Raises:
-        CaveValidationError: If any dimension fails validation.
+        CaveValidationError: If any schema item fails validation, two
+            plugins share a singleton group, two plugins produce the
+            same ctx key, or a plugin dependency cycle is detected.
 
     """
 
@@ -108,13 +172,13 @@ class DimensionFactory:
         tablename: str,
         schemaname: str,
         metadata: MetaData,
-        dimensions: list[SchemaItem],
+        schema_items: list[SchemaItem],
         cave: object | None = None,
         plugins: list[Plugin] | None = None,
         extra_plugins: list[Plugin] | None = None,
     ) -> None:
         """Create the dimension and register it on *metadata*."""
-        validate_schema_items(dimensions)
+        validate_schema_items(schema_items)
 
         resolved = _resolve_plugins(
             cave, plugins, extra_plugins, self.DEFAULT_PLUGINS
@@ -125,11 +189,11 @@ class DimensionFactory:
             tablename=tablename,
             schemaname=schemaname,
             metadata=metadata,
-            dimensions=list(dimensions),
+            schema_items=list(schema_items),
             plugins=resolved,
         )
 
-        # Phase 0: resolve PK and extra columns before any table creation.
+        # Collect PK and extra columns before any plugin runs.
         ctx.pk_columns = next(
             (c for p in resolved if (c := p.pk_columns(ctx)) is not None),
             [],
@@ -138,11 +202,5 @@ class DimensionFactory:
             col for p in resolved for col in p.extra_columns(ctx)
         ]
 
-        for p in resolved:
-            p.create_tables(ctx)
-        for p in resolved:
-            p.create_views(ctx)
-        for p in resolved:
-            p.create_triggers(ctx)
-        for p in resolved:
-            p.post_create(ctx)
+        for p in _sort_plugins(resolved):
+            p.run(ctx)

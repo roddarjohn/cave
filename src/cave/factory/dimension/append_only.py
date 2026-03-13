@@ -1,8 +1,8 @@
-"""Append-only dimension factory convenience class."""
+"""Append-only dimension resource factory convenience class."""
 
 from typing import ClassVar
 
-from cave.factory.base import DimensionFactory
+from cave.factory.base import ResourceFactory
 from cave.plugin import Plugin
 from cave.plugins.api import APIPlugin
 from cave.plugins.append_only import (
@@ -13,7 +13,7 @@ from cave.plugins.append_only import (
 from cave.plugins.pk import SerialPKPlugin
 
 
-class AppendOnlyDimensionFactory(DimensionFactory):
+class AppendOnlyDimensionResourceFactory(ResourceFactory):
     """Create an append-only (SCD Type 2) dimension.
 
     Default plugins:

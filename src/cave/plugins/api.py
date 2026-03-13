@@ -10,26 +10,27 @@ from sqlalchemy_declarative_extensions import View, register_view
 if TYPE_CHECKING:
     from cave.factory.context import FactoryContext
 
-from cave.plugin import Plugin
+from cave.plugin import Dynamic, Plugin, produces, requires
 from cave.resource import APIResource, Grant, register_api_resource
 from cave.utils.query import compile_query
 
 
+@produces(Dynamic("view_key"))
+@requires(Dynamic("table_key"))
 class APIPlugin(Plugin):
     """Create a PostgREST-facing view and register its grants.
 
-    Reads ``ctx.tables[table_key]`` to build a ``SELECT *`` query,
-    registers the resulting view, and stores it as
-    ``ctx.views[view_key]``.  ``post_create`` registers the
-    ``APIResource`` for role/grant generation.
+    Reads ``ctx[table_key]`` to build a ``SELECT *`` query, registers
+    the resulting view, stores it as ``ctx[view_key]``, and registers
+    the :class:`~cave.resource.APIResource` for role/grant generation.
 
     Args:
         schema: Schema for the API view (default ``"api"``).
         grants: PostgREST privileges (default ``["select"]``).
-        table_key: Key in ``ctx.tables`` to read the source table
-            or view proxy from (default ``"primary"``).
-        view_key: Key in ``ctx.views`` to store the created view
-            under (default ``"api"``).
+        table_key: Key in ``ctx`` to read the source table or view
+            proxy from (default ``"primary"``).
+        view_key: Key in ``ctx`` to store the created view under
+            (default ``"api"``).
 
     """
 
@@ -46,8 +47,8 @@ class APIPlugin(Plugin):
         self.table_key = table_key
         self.view_key = view_key
 
-    def create_views(self, ctx: FactoryContext) -> None:
-        """Create the API view selecting from ``ctx[self.table_key]``."""
+    def run(self, ctx: FactoryContext) -> None:
+        """Create the API view and register the resource."""
         primary = ctx[self.table_key]
         query = select(
             *[col.label(col.key) for col in primary.columns]
@@ -60,8 +61,6 @@ class APIPlugin(Plugin):
         register_view(ctx.metadata, view)
         ctx[self.view_key] = view
 
-    def post_create(self, ctx: FactoryContext) -> None:
-        """Register the API resource for grant generation."""
         register_api_resource(
             ctx.metadata,
             APIResource(

@@ -20,11 +20,11 @@ def _ctx_with_primary(schema: str = "dim", table_key: str = "primary"):
     return ctx
 
 
-class TestAPIPluginCreateViews:
+class TestAPIPlugin:
     def test_view_registered_in_metadata(self):
         plugin = APIPlugin()
         ctx = _ctx_with_primary()
-        plugin.create_views(ctx)
+        plugin.run(ctx)
         views = ctx.metadata.info.get("views")
         assert views is not None
         assert len(views.views) == 1
@@ -32,69 +32,64 @@ class TestAPIPluginCreateViews:
     def test_view_name_matches_tablename(self):
         plugin = APIPlugin()
         ctx = _ctx_with_primary()
-        plugin.create_views(ctx)
+        plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
         assert view.name == "product"
 
     def test_view_schema_defaults_to_api(self):
         plugin = APIPlugin()
         ctx = _ctx_with_primary()
-        plugin.create_views(ctx)
+        plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
         assert view.schema == "api"
 
     def test_custom_schema(self):
         plugin = APIPlugin(schema="public_api")
         ctx = _ctx_with_primary()
-        plugin.create_views(ctx)
+        plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
         assert view.schema == "public_api"
 
     def test_view_stored_under_default_view_key(self):
         plugin = APIPlugin()
         ctx = _ctx_with_primary()
-        plugin.create_views(ctx)
+        plugin.run(ctx)
         assert "api" in ctx
 
     def test_custom_view_key(self):
         plugin = APIPlugin(view_key="my_api_view")
         ctx = _ctx_with_primary()
-        plugin.create_views(ctx)
+        plugin.run(ctx)
         assert "my_api_view" in ctx
 
     def test_custom_table_key(self):
         plugin = APIPlugin(table_key="source")
         ctx = _ctx_with_primary(table_key="source")
-        plugin.create_views(ctx)
+        plugin.run(ctx)
         assert "api" in ctx
 
     def test_view_definition_references_source_table(self):
         plugin = APIPlugin()
         ctx = _ctx_with_primary()
-        plugin.create_views(ctx)
+        plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
         assert "product" in view.definition
 
-
-class TestAPIPluginPostCreate:
     def test_registers_api_resource(self):
         plugin = APIPlugin()
         ctx = _ctx_with_primary()
-        plugin.create_views(ctx)
-        plugin.post_create(ctx)
+        plugin.run(ctx)
         resources = ctx.metadata.info.get("api_resources", [])
         assert len(resources) == 1
 
     def test_resource_name_matches_tablename(self):
         plugin = APIPlugin()
         ctx = _ctx_with_primary()
-        plugin.create_views(ctx)
-        plugin.post_create(ctx)
+        plugin.run(ctx)
         assert ctx.metadata.info["api_resources"][0].name == "product"
 
     def test_resource_schema_matches_plugin_schema(self):
         plugin = APIPlugin(schema="reporting")
         ctx = _ctx_with_primary()
-        plugin.create_views(ctx)
-        plugin.post_create(ctx)
+        plugin.run(ctx)
         assert ctx.metadata.info["api_resources"][0].schema == "reporting"

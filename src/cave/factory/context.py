@@ -20,12 +20,12 @@ class FactoryContext:
 
     **Typed input fields** (set by the factory, read-only for plugins):
 
-    - ``tablename``, ``schemaname``, ``metadata``, ``dimensions``,
+    - ``tablename``, ``schemaname``, ``metadata``, ``schema_items``,
       ``plugins`` -- as passed to the factory constructor.
     - ``pk_columns`` -- resolved from ``Plugin.pk_columns`` before any
-      ``create_tables`` call.
+      ``run`` call.
     - ``extra_columns`` -- concatenated from all ``Plugin.extra_columns``
-      calls before ``create_tables``.
+      calls before ``run``.
 
     **Plugin store** (read/write via item syntax):
 
@@ -51,10 +51,10 @@ class FactoryContext:
     tablename: str
     schemaname: str
     metadata: MetaData
-    dimensions: list[SchemaItem]
+    schema_items: list[SchemaItem]
     plugins: list[Plugin]
 
-    # Resolved by DimensionFactory before create_tables is called.
+    # Resolved by ResourceFactory before run is called.
     pk_columns: list[Column] = field(default_factory=list)
     extra_columns: list[Column] = field(default_factory=list)
 

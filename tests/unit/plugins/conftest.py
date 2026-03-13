@@ -11,7 +11,7 @@ from cave.factory.context import FactoryContext
 def make_ctx(
     tablename: str = "product",
     schemaname: str = "dim",
-    dimensions: list | None = None,
+    schema_items: list | None = None,
     pk_col_name: str = "id",
     store: dict | None = None,
 ) -> FactoryContext:
@@ -20,7 +20,7 @@ def make_ctx(
     Args:
         tablename: Table name.
         schemaname: Schema name.
-        dimensions: Dimension columns (defaults to a single String column).
+        schema_items: Schema item columns (defaults to a single String column).
         pk_col_name: Name for the pre-populated pk column.
         store: Extra keys to pre-populate in the ctx store.
 
@@ -28,13 +28,13 @@ def make_ctx(
         A FactoryContext with pk_columns and extra_columns already set.
 
     """
-    if dimensions is None:
-        dimensions = [Column("name", String)]
+    if schema_items is None:
+        schema_items = [Column("name", String)]
     ctx = FactoryContext(
         tablename=tablename,
         schemaname=schemaname,
         metadata=MetaData(),
-        dimensions=list(dimensions),
+        schema_items=list(schema_items),
         plugins=[],
         pk_columns=[Column(pk_col_name, Integer, primary_key=True)],
         extra_columns=[],

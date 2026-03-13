@@ -22,8 +22,8 @@ Plugin system
 .. automodule:: cave.validator
    :members:
 
-Dimension factories
--------------------
+Dimension resource factories
+----------------------------
 
 .. automodule:: cave.factory.dimension.simple
    :members:

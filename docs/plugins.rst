@@ -1,11 +1,11 @@
 Plugin architecture
 ===================
 
-cave's dimension factories are built entirely on a plugin system.  A factory
-is a thin runner that calls a fixed sequence of hooks on each plugin in a
-list.  All behaviour — primary keys, table layout, views, triggers, API
-exposure — is provided by plugins, so every part of it can be replaced,
-extended, or recomposed without touching the core.
+cave's resource factories are built entirely on a plugin system.  A factory
+is a thin runner that topologically sorts a list of plugins by their declared
+dependencies and calls each one in turn.  All behaviour — primary keys, table
+layout, views, triggers, API exposure — is provided by plugins, so every part
+of it can be replaced, extended, or recomposed without touching the core.
 
 Core concepts
 -------------
@@ -14,16 +14,17 @@ Plugin
 ~~~~~~
 
 A plugin is any instance of a class that inherits from
-:class:`~cave.plugin.Plugin`.  Every hook has a sensible no-op default, so a
-plugin only needs to implement the hooks it cares about.  Plugins communicate
-by writing to and reading from a shared :class:`~cave.factory.context.FactoryContext`.
+:class:`~cave.plugin.Plugin`.  The :meth:`~cave.plugin.Plugin.run` method is
+a no-op by default, so a plugin only needs to implement the hooks it cares
+about.  Plugins communicate by writing to and reading from a shared
+:class:`~cave.factory.context.FactoryContext`.
 
 FactoryContext
 ~~~~~~~~~~~~~~
 
-:class:`~cave.factory.context.FactoryContext` carries the inputs supplied to the
-factory (table name, schema, metadata, dimensions) together with a flat
-key/value store that plugins use to pass objects between phases.
+:class:`~cave.factory.context.FactoryContext` carries the inputs supplied to
+the factory (table name, schema, metadata, schema items) together with a flat
+key/value store that plugins use to pass objects between themselves.
 
 .. code-block:: python
 
@@ -40,25 +41,25 @@ key/value store that plugins use to pass objects between phases.
    # Intentional override (force=True required to prevent accidents)
    ctx.set("my_table", replacement, force=True)
 
-Writing to a key that already exists raises :class:`KeyError` immediately —
-two plugins producing the same output key is almost always a mistake.
+Writing to a key that already exists raises :class:`KeyError` immediately.
 Reading a key that has not yet been written raises :class:`KeyError` with a
-hint that the plugin responsible for writing that key must appear *earlier*
-in the plugin list.
+hint naming the missing key.
 
-DimensionFactory
-~~~~~~~~~~~~~~~~
+ResourceFactory
+~~~~~~~~~~~~~~~
 
-:class:`~cave.factory.base.DimensionFactory` is the plugin runner.  It takes
-a list of plugins, validates it for singleton conflicts, builds the context,
-and executes each lifecycle phase across all plugins in order.
+:class:`~cave.factory.base.ResourceFactory` is the plugin runner.  It takes
+a list of plugins, validates it for singleton conflicts, topologically sorts
+the plugins by their :func:`~cave.plugin.produces` /
+:func:`~cave.plugin.requires` declarations, and calls
+:meth:`~cave.plugin.Plugin.run` on each in the resolved order.
 
-Subclasses declare ``DEFAULT_PLUGINS`` to establish their standard behaviour.  All three built-in factory types are
-thin wrappers:
+Subclasses declare ``DEFAULT_PLUGINS`` to establish their standard behaviour.
+The three built-in dimension factories are thin wrappers:
 
 .. code-block:: python
 
-   class SimpleDimensionFactory(DimensionFactory):
+   class SimpleDimensionResourceFactory(ResourceFactory):
        DEFAULT_PLUGINS = [
            SerialPKPlugin(),
            SimpleTablePlugin(),
@@ -67,46 +68,76 @@ thin wrappers:
        ]
 
 
-Lifecycle phases
-----------------
+Plugin execution order
+----------------------
 
-All plugins are called in list order within each phase.  Phases run
-sequentially, so every plugin finishes phase N before any plugin starts
-phase N+1.  This is what makes inter-plugin dependencies safe: a trigger
-plugin can always read a view that a view plugin created, regardless of
-their relative order in the list, because *all* view creation finishes
-before *any* trigger creation begins.
+Execution order is determined by sorting plugins topologically using two class
+decorators: :func:`~cave.plugin.produces` and :func:`~cave.plugin.requires`.
+
+:func:`~cave.plugin.produces`
+    Declare the ``ctx`` keys this plugin's :meth:`~cave.plugin.Plugin.run`
+    method will write.
+
+:func:`~cave.plugin.requires`
+    Declare the ``ctx`` keys this plugin's :meth:`~cave.plugin.Plugin.run`
+    method needs to already be set before it runs.
+
+The factory builds a dependency graph from these declarations and calls
+:meth:`~cave.plugin.Plugin.run` in a valid topological order.  Plugins with
+no relationship to each other preserve their original list order.
+
+.. code-block:: python
+
+   from cave.plugin import Dynamic, Plugin, produces, requires
+
+   @produces(Dynamic("out_key"))
+   @requires("primary")
+   class MyTransformPlugin(Plugin):
+       """Derive a summary table from the primary table."""
+
+       def __init__(self, out_key: str = "summary") -> None:
+           self.out_key = out_key
+
+       def run(self, ctx: FactoryContext) -> None:
+           primary = ctx["primary"]
+           # ... build summary from primary ...
+           ctx[self.out_key] = summary
+
+``MyTransformPlugin`` will always run after the plugin that produces
+``"primary"``, regardless of the order they appear in the plugin list.
+
+Before any :meth:`~cave.plugin.Plugin.run` call the factory collects two
+special inputs:
 
 ``pk_columns``
-    Return the primary key column(s).  The first non-``None`` result across
-    all plugins is used; remaining plugins are skipped for this phase.
+    The first non-``None`` result across all plugins is stored in
+    ``ctx.pk_columns``.
 
 ``extra_columns``
-    Return additional columns to prepend to the user-supplied dimension list.
-    Results from all plugins are concatenated.
+    Results from all plugins are concatenated and stored in
+    ``ctx.extra_columns``.
 
-``create_tables``
-    Create backing tables and store them in ``ctx``.
+Both are available to every plugin's :meth:`~cave.plugin.Plugin.run` via the
+typed fields ``ctx.pk_columns`` and ``ctx.extra_columns``.
 
-``create_views``
-    Create views on top of the tables.  Read tables from ``ctx``, write
-    views back.
+Dynamic key references
+~~~~~~~~~~~~~~~~~~~~~~
 
-``create_triggers``
-    Register INSTEAD OF trigger functions and triggers on the views.
+When a ctx key name is a constructor parameter rather than a fixed string, use
+:class:`~cave.plugin.Dynamic` inside the decorator:
 
-``post_create``
-    Final hook.  Used for API resource registration, custom metadata,
-    anything that depends on all earlier objects existing.
+.. code-block:: python
 
-Why separate phases?
-~~~~~~~~~~~~~~~~~~~~
+   @produces(Dynamic("table_key"))
+   class SimpleTablePlugin(Plugin):
+       def __init__(self, table_key: str = "primary") -> None:
+           self.table_key = table_key
 
-PostgreSQL requires objects to be created in dependency order: tables before
-views, views before triggers.  Without phases, a plugin would have to create
-its table *and* its view in one step — but another plugin's trigger might
-depend on that view, and it might not have been created yet.  The phase model
-guarantees the global ordering regardless of which plugins appear together.
+       def run(self, ctx: FactoryContext) -> None:
+           ctx[self.table_key] = Table(...)
+
+The decorator validates at class definition time that the ``Dynamic`` attribute
+name is a real ``__init__`` parameter, so typos are caught immediately.
 
 
 Plugin resolution
@@ -116,7 +147,7 @@ Each factory call resolves its plugin list from three sources, concatenated
 in this order:
 
 1. **Global plugins** — from :class:`~cave.config.CaveConfig`, if passed via
-   the ``cave=`` argument.  Run before everything else.
+   the ``cave=`` argument.  Prepended before everything else.
 2. **Factory plugins** — ``plugins`` kwarg if supplied, otherwise
    ``DEFAULT_PLUGINS``.
 3. **Extra plugins** — always appended via ``extra_plugins``.
@@ -126,8 +157,8 @@ in this order:
    cave_cfg = CaveConfig()
    cave_cfg.register(AuditPlugin())         # prepended to every factory
 
-   SimpleDimensionFactory(
-       "users", "app", metadata, dimensions,
+   SimpleDimensionResourceFactory(
+       "users", "app", metadata, schema_items,
        cave=cave_cfg,                        # global plugins first
        extra_plugins=[TenantPlugin()],       # appended after defaults
    )
@@ -136,8 +167,8 @@ To replace the default plugin list entirely:
 
 .. code-block:: python
 
-   SimpleDimensionFactory(
-       "events", "app", metadata, dimensions,
+   SimpleDimensionResourceFactory(
+       "events", "app", metadata, schema_items,
        plugins=[                             # replaces DEFAULT_PLUGINS
            SerialPKPlugin(column_name="event_id"),
            SimpleTablePlugin(),
@@ -197,7 +228,7 @@ so two independent pipelines can coexist in one factory without colliding.
 
 ``AppendOnlyTriggerPlugin``
     Reads ``"root_table"``, ``"attributes"``, and ``"api"`` (optional;
-    skipped if absent).
+    skipped if absent from ``ctx``).
 
 ``EAVTablePlugin``
     Writes ``"entity"``, ``"attribute"``, and ``"eav_mappings"``.
@@ -208,7 +239,7 @@ so two independent pipelines can coexist in one factory without colliding.
 
 ``EAVTriggerPlugin``
     Reads ``"entity"``, ``"attribute"``, ``"eav_mappings"``, and ``"api"``
-    (optional; skipped if absent).
+    (optional; skipped if absent from ``ctx``).
 
 All key names are overridable via constructor arguments, which means you can
 wire plugins together in non-standard ways or run multiple pipelines within
@@ -218,8 +249,13 @@ a single factory.
 Writing a custom plugin
 -----------------------
 
-Implement any subset of the six lifecycle hooks.  Use ``ctx`` to pass objects
-to downstream plugins.
+Implement :meth:`~cave.plugin.Plugin.run` and declare your dependencies with
+:func:`~cave.plugin.produces` and :func:`~cave.plugin.requires`.  Use
+``ctx`` to pass objects to downstream plugins.
+
+A simple plugin that only contributes extra columns needs no dependency
+declarations at all — it implements :meth:`~cave.plugin.Plugin.extra_columns`
+instead of :meth:`~cave.plugin.Plugin.run`:
 
 .. code-block:: python
 
@@ -246,30 +282,30 @@ Register it globally so it applies to every factory in the project:
 .. code-block:: python
 
    from cave.config import CaveConfig
-   from cave.factory.dimension.simple import SimpleDimensionFactory
-   from cave.factory.dimension.append_only import AppendOnlyDimensionFactory
+   from cave.factory.dimension.simple import SimpleDimensionResourceFactory
+   from cave.factory.dimension.append_only import AppendOnlyDimensionResourceFactory
 
    cave_cfg = CaveConfig()
    cave_cfg.register(TimestampPlugin())
 
-   SimpleDimensionFactory(
-       "products", "app", metadata, dimensions, cave=cave_cfg
+   SimpleDimensionResourceFactory(
+       "products", "app", metadata, schema_items, cave=cave_cfg
    )
-   AppendOnlyDimensionFactory(
-       "orders", "app", metadata, dimensions, cave=cave_cfg
+   AppendOnlyDimensionResourceFactory(
+       "orders", "app", metadata, schema_items, cave=cave_cfg
    )
 
 Or apply it to a single factory only:
 
 .. code-block:: python
 
-   SimpleDimensionFactory(
-       "products", "app", metadata, dimensions,
+   SimpleDimensionResourceFactory(
+       "products", "app", metadata, schema_items,
        extra_plugins=[TimestampPlugin()],
    )
 
-Custom table plugin with ctx communication
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Custom plugin with ctx communication
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Here is a more involved example: a plugin that creates a shadow audit table
 and makes it available to a downstream trigger plugin via a ctx key.
@@ -277,10 +313,11 @@ and makes it available to a downstream trigger plugin via a ctx key.
 .. code-block:: python
 
    from sqlalchemy import Column, DateTime, ForeignKey, Integer, Table
-   from cave.plugin import Plugin, singleton
+   from cave.plugin import Dynamic, Plugin, produces, requires, singleton
    from cave.factory.context import FactoryContext
 
 
+   @produces(Dynamic("shadow_key"))
    @singleton("__shadow__")
    class ShadowTablePlugin(Plugin):
        """Create a shadow audit table alongside the main table."""
@@ -288,7 +325,7 @@ and makes it available to a downstream trigger plugin via a ctx key.
        def __init__(self, shadow_key: str = "shadow") -> None:
            self.shadow_key = shadow_key
 
-       def create_tables(self, ctx: FactoryContext) -> None:
+       def run(self, ctx: FactoryContext) -> None:
            shadow = Table(
                f"{ctx.tablename}_shadow",
                ctx.metadata,
@@ -301,26 +338,24 @@ and makes it available to a downstream trigger plugin via a ctx key.
            ctx[self.shadow_key] = shadow
 
 
+   @requires(Dynamic("shadow_key"))
    class ShadowTriggerPlugin(Plugin):
        """Register a trigger that writes to the shadow table on every change."""
 
        def __init__(self, shadow_key: str = "shadow") -> None:
            self.shadow_key = shadow_key
 
-       def create_triggers(self, ctx: FactoryContext) -> None:
-           shadow = ctx[self.shadow_key]   # written by ShadowTablePlugin
+       def run(self, ctx: FactoryContext) -> None:
+           shadow = ctx[self.shadow_key]   # guaranteed by @requires
            # ... register trigger using shadow.name, etc.
 
 
-   # Use them together
-   SimpleDimensionFactory(
-       "products", "app", metadata, dimensions,
-       extra_plugins=[ShadowTablePlugin(), ShadowTriggerPlugin()],
+   # Use them together — order in the list doesn't matter because the
+   # dependency declarations ensure ShadowTablePlugin runs first.
+   SimpleDimensionResourceFactory(
+       "products", "app", metadata, schema_items,
+       extra_plugins=[ShadowTriggerPlugin(), ShadowTablePlugin()],
    )
-
-Because ``ShadowTablePlugin`` appears before ``ShadowTriggerPlugin`` in the
-list and both operate in the same phase, the context key ``"shadow"`` is
-always available when ``ShadowTriggerPlugin.create_triggers`` is called.
 
 
 Global configuration
@@ -354,10 +389,10 @@ defined:
 
    # models.py
    from myapp.cave_setup import cave_cfg
-   from cave.factory.dimension.simple import SimpleDimensionFactory
+   from cave.factory.dimension.simple import SimpleDimensionResourceFactory
 
-   SimpleDimensionFactory(
-       "users", "app", metadata, dimensions, cave=cave_cfg
+   SimpleDimensionResourceFactory(
+       "users", "app", metadata, schema_items, cave=cave_cfg
    )
 
 
