@@ -19,6 +19,11 @@ SimpleDimensionResourceFactory(
 )
 # --- example end ---
 
+SCHEMA_DESCRIPTION = (
+    "A single backing table (``public.users``) with"
+    " a thin ``api.users`` view on top."
+)
+
 VIEWS = [
     {
         "fullname": "api.users",

@@ -28,6 +28,16 @@ EAVDimensionResourceFactory(
 )
 # --- example end ---
 
+SCHEMA_DESCRIPTION = (
+    "An entity table (``private.products_entity``)"
+    " holds one row per logical entity. An attribute"
+    " table (``private.products_attribute``) stores"
+    " each field as a separate row with typed value"
+    " columns. Two pivot views reconstruct the"
+    " columnar layout: ``private.products`` and"
+    " ``api.products``."
+)
+
 VIEWS = [
     {
         "fullname": "private.products",

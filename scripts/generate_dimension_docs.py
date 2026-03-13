@@ -2,14 +2,16 @@
 
 Imports each example module from ``scripts/examples/``,
 creates tables and views on a real PostgreSQL database,
-runs sample queries, and writes RST files with ERD
-diagrams and query output to ``docs/_generated/``.
+captures real ``psql`` output for schema and query results,
+and writes RST files with ERD diagrams to ``docs/_generated/``.
 
 Requires ``DATABASE_URL`` to be set.
 """
 
 import importlib.util
 import os
+import re
+import subprocess
 from pathlib import Path
 from types import ModuleType
 
@@ -49,32 +51,7 @@ def _directive(
     return "\n".join(lines)
 
 
-def _psql_table(
-    headers: list[str],
-    rows: list[list[str]],
-) -> str:
-    """Format *headers* and *rows* as psql-style output.
-
-    Returns a plain-text table like::
-
-       id | name  | email
-      ----+-------+-------------------
-        1 | Alice | alice@example.com
-    """
-    all_rows = [headers, *rows]
-    widths = [max(len(row[i]) for row in all_rows) for i in range(len(headers))]
-
-    def _fmt(row: list[str]) -> str:
-        cells = [f" {cell:<{widths[i]}} " for i, cell in enumerate(row)]
-        return "|".join(cells)
-
-    header_line = _fmt(headers)
-    sep = "+".join("-" * (w + 2) for w in widths)
-    data = "\n".join(_fmt(r) for r in rows)
-    return f"{header_line}\n{sep}\n{data}"
-
-
-# -- Table introspection ---------------------------------------------
+# -- Table introspection (for ERD only) ------------------------------
 
 
 def _type_label(col: Column) -> str:
@@ -232,66 +209,52 @@ def _create_views(conn, metadata: MetaData) -> None:  # noqa: ANN001
         conn.execute(text(f"CREATE OR REPLACE VIEW {fqn} AS {defn}"))
 
 
-def _run_query(
-    conn,  # noqa: ANN001
-    sql: str,
-) -> tuple[list[str], list[list[str]]]:
-    """Execute *sql* and return (headers, rows) of strings."""
-    result = conn.execute(text(sql))
-    headers = list(result.keys())
-    rows = [[_format_cell(cell) for cell in row] for row in result.fetchall()]
-    return headers, rows
+def _psql_url(sqlalchemy_url: str) -> str:
+    """Convert a SQLAlchemy URL to a plain libpq URL.
+
+    Strips the ``+driver`` portion so psql can connect.
+    """
+    return re.sub(r"\+\w+", "", sqlalchemy_url)
 
 
-def _format_cell(value: object) -> str:
-    """Format a single cell value for psql-style output."""
-    if value is None:
-        return "NULL"
-    if isinstance(value, bool):
-        return str(value).lower()
-    return str(value)
+def _psql(url: str, command: str) -> str:
+    """Run a psql command and return its stdout."""
+    result = subprocess.run(  # noqa: S603
+        ["psql", url, "-c", command],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.rstrip()
 
 
 # -- RST section builders -------------------------------------------
 
 
-def _schema_lines(tables: list[dict]) -> list[str]:
-    """RST lines for schema tables."""
+def _schema_lines(url: str, tables: list[dict]) -> list[str]:
+    """RST lines showing ``\\d`` output for each table."""  # noqa: D301
     parts: list[str] = []
     for t in tables:
-        parts.append(f"``{t['fullname']}``")
-        parts.append("")
-        parts.append(
-            _directive(
-                "code-block",
-                _psql_table(
-                    ["Column", "Type", "Constraints"],
-                    list(t["columns"]),
-                ),
-                argument="text",
-            )
-        )
+        output = _psql(url, rf"\d {t['fullname']}")
+        block = rf"=# \d {t['fullname']}" + "\n" + output
+        parts.append(_directive("code-block", block, argument="text"))
         parts.append("")
     return parts
 
 
 def _query_lines(
-    conn,  # noqa: ANN001
+    url: str,
     queries: list[dict],
 ) -> list[str]:
-    """Run each query and build RST code blocks.
-
-    Each *query* dict has ``query`` (SQL string) and
-    an optional ``description``.
-    """
+    """Run each query via psql and build RST code blocks."""
     parts: list[str] = []
     for q in queries:
         sql = q["query"]
         if q.get("description"):
             parts.append(q["description"])
             parts.append("")
-        headers, rows = _run_query(conn, sql)
-        block = f"=# {sql}\n{_psql_table(headers, rows)}\n({len(rows)} rows)"
+        output = _psql(url, sql)
+        block = f"=# {sql}\n{output}"
         parts.append(_directive("code-block", block, argument="text"))
         parts.append("")
     return parts
@@ -304,6 +267,7 @@ def _generate_one(
     slug: str,
     mod: ModuleType,
     conn,  # noqa: ANN001
+    url: str,
 ) -> None:
     """Generate the RST include file for one dimension."""
     tables = _table_schema(mod.metadata)
@@ -326,15 +290,32 @@ def _generate_one(
         if cleaned:
             conn.execute(text(cleaned))
 
+    # Commit so psql can see the data
+    conn.commit()
+
+    psql_url = _psql_url(url)
     parts = [
+        "Schema",
+        "^^^^^^",
+        "",
+        mod.SCHEMA_DESCRIPTION,
+        "",
         _directive("graphviz", dot),
         "",
-        *_schema_lines(tables),
-        *_query_lines(conn, mod.QUERIES),
+        *_schema_lines(psql_url, tables),
+        "Sample queries",
+        "^^^^^^^^^^^^^^",
+        "",
+        *_query_lines(psql_url, mod.QUERIES),
     ]
     path = _OUT / f"dim_{slug}.rst"
     path.write_text("\n".join(parts))
     print(f"wrote {path}")
+
+    # Clean up committed tables
+    for key in reversed(list(mod.metadata.tables)):
+        conn.execute(text(f"DROP TABLE IF EXISTS {key} CASCADE"))
+    conn.commit()
 
 
 _EXAMPLES_LIST = [
@@ -357,9 +338,7 @@ def main() -> None:
     for slug, filename in _EXAMPLES_LIST:
         mod = _load_example(_EXAMPLES / filename)
         with engine.connect() as conn:
-            trans = conn.begin()
-            _generate_one(slug, mod, conn)
-            trans.rollback()
+            _generate_one(slug, mod, conn, url)
 
 
 if __name__ == "__main__":

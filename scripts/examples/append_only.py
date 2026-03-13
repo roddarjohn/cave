@@ -21,6 +21,16 @@ AppendOnlyDimensionResourceFactory(
 )
 # --- example end ---
 
+SCHEMA_DESCRIPTION = (
+    "An append-only attributes table"
+    " (``private.employees_attributes``) stores every"
+    " version of each row. A root table"
+    " (``private.employees_root``) points to the"
+    " current version. Two views join these into a"
+    " flat shape: ``private.employees`` and"
+    " ``api.employees``."
+)
+
 VIEWS = [
     {
         "fullname": "private.employees",
