@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.1.2...pgcraft-v0.2.0) (2026-03-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* change versioning to alpha
+
+### Features
+
+* change versioning to alpha ([2676e4e](https://github.com/roddarjohn/pgcraft/commit/2676e4e841c8f42f6b68e22da19ab26e0c665672))
+
 ## [0.1.2](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.1.1...pgcraft-v0.1.2) (2026-03-13)
 
 
