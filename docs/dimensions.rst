@@ -1,7 +1,7 @@
 Built-in Dimensions
 ===================
 
-Cave ships with three dimension types, each backed by a different
+pgcraft ships with three dimension types, each backed by a different
 storage strategy.  All three share the same plugin-driven pipeline
 and expose a unified PostgREST API view.
 

@@ -11,6 +11,7 @@ pgcraft
    setup
    dimensions
    plugins
+   cookbook
    api
    development
    playground

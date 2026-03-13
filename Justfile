@@ -37,6 +37,8 @@ serve-docs: _docs-setup
 
 [private]
 _docs-setup:
+    #!/usr/bin/env bash
+    export DATABASE_URL="${DATABASE_URL:-postgresql+psycopg:///pgcraft}"
     mkdir -p docs/_generated
     just --list | uv run python scripts/just_to_rst.py > docs/_generated/just_commands.rst
     just --justfile playground/Justfile --list | uv run python scripts/just_to_rst.py > docs/_generated/playground_just_commands.rst

@@ -145,7 +145,7 @@ PostgREST
 ---------
 
 The playground includes a `PostgREST <https://postgrest.org>`_ configuration
-for testing the generated API. Cave automatically creates API views and grants
+for testing the generated API. pgcraft automatically creates API views and grants
 for each factory-created table.
 
 **Prerequisites**
