@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import Column
 
 from pgcraft.check import PGCraftCheck
-from pgcraft.computed import PGCraftComputed
 from pgcraft.statistics import PGCraftStatistics
 
 if TYPE_CHECKING:
@@ -54,9 +53,7 @@ class FactoryContext:
     tablename: str
     schemaname: str
     metadata: MetaData
-    schema_items: list[
-        SchemaItem | PGCraftCheck | PGCraftComputed | PGCraftStatistics
-    ]
+    schema_items: list[SchemaItem | PGCraftCheck | PGCraftStatistics]
     plugins: list[Plugin]
 
     _store: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
@@ -84,7 +81,7 @@ class FactoryContext:
             for i in self.schema_items
             if not isinstance(
                 i,
-                (PGCraftCheck, PGCraftComputed, PGCraftStatistics),
+                (PGCraftCheck, PGCraftStatistics),
             )
         ]
 

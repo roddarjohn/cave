@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from pgcraft.factory.context import FactoryContext
     from pgcraft.statistics import StatisticsViewInfo
 
-from pgcraft.computed import PGCraftComputed, collect_computed
 from pgcraft.plugin import Dynamic, Plugin, produces, requires
 from pgcraft.resource import (
     APIResource,
@@ -27,45 +26,35 @@ from pgcraft.utils.query import compile_query
 def _resolve_columns(
     primary: Table,
     columns: list[str],
-    computed: list[PGCraftComputed],
     alias: str = "p",
 ) -> list[Any]:
     """Build a select list from column names.
 
-    Resolves each name as either a table column or a computed
-    expression. Raises ``ValueError`` for unknown names.
+    Resolves each name against the table's columns.
+    Raises ``ValueError`` for unknown names.
 
     Args:
         primary: The source table.
         columns: Column names to include.
-        computed: Available computed column definitions.
         alias: Table alias prefix for column references.
 
     Returns:
         List of labeled column expressions.
 
     Raises:
-        ValueError: If a column name is not found in the table
-            or computed columns.
+        ValueError: If a column name is not found on the table.
 
     """
     table_cols = {col.key for col in primary.columns}
-    computed_map = {c.name: c for c in computed}
     result: list[Any] = []
 
     for name in columns:
         if name in table_cols:
             result.append(literal_column(f"{alias}.{name}").label(name))
-        elif name in computed_map:
-            comp = computed_map[name]
-            expr = comp.resolve(lambda c: f"{alias}.{c}")
-            result.append(literal_column(f"({expr})").label(name))
         else:
             msg = (
                 f"Column {name!r} not found in table "
-                f"columns ({sorted(table_cols)}) or "
-                f"computed columns "
-                f"({sorted(computed_map)})"
+                f"columns ({sorted(table_cols)})"
             )
             raise ValueError(msg)
 
@@ -113,8 +102,7 @@ class APIPlugin(Plugin):
         view_key: Key in ``ctx`` to store the created view
             under (default ``"api"``).
         columns: Column names to include in the view. When
-            ``None``, all table columns are included. Supports
-            computed column names.
+            ``None``, all table columns are included.
         stats_key: Key in ``ctx`` holding statistics view info.
             When set, LEFT JOINs stats views into the API view.
 
@@ -149,10 +137,7 @@ class APIPlugin(Plugin):
         alias = "p"
 
         if self.columns is not None:
-            computed = collect_computed(ctx.schema_items)
-            select_cols = _resolve_columns(
-                primary, self.columns, computed, alias
-            )
+            select_cols = _resolve_columns(primary, self.columns, alias)
         elif use_alias:
             select_cols = [
                 literal_column(f"{alias}.{col.key}").label(col.key)
@@ -169,7 +154,12 @@ class APIPlugin(Plugin):
 
         if stats:
             definition = self._build_stats_sql(
-                ctx, primary, select_cols, stats, aliases, alias
+                ctx,
+                primary,
+                select_cols,
+                stats,
+                aliases,
+                alias,
             )
         else:
             source = primary

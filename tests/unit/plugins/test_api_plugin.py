@@ -3,7 +3,6 @@
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table
 
-from pgcraft.computed import PGCraftComputed
 from pgcraft.plugins.api import APIPlugin
 from pgcraft.statistics import StatisticsViewInfo
 from tests.unit.plugins.conftest import make_ctx
@@ -12,15 +11,10 @@ from tests.unit.plugins.conftest import make_ctx
 def _ctx_with_primary(
     schema: str = "dim",
     table_key: str = "primary",
-    schema_items=None,
     store=None,
 ):
     """Return a ctx with a simple Table pre-stored at table_key."""
-    ctx = make_ctx(
-        schemaname=schema,
-        schema_items=schema_items,
-        store=store,
-    )
+    ctx = make_ctx(schemaname=schema, store=store)
     table = Table(
         "product",
         MetaData(),
@@ -122,21 +116,7 @@ class TestAPIPluginColumns:
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
         assert "p.id" in view.definition
-        # name should not appear as a selected column
         assert "p.name" not in view.definition
-
-    def test_columns_with_computed(self):
-        comp = PGCraftComputed(
-            "full_name",
-            "{name} || ' extra'",
-            type=String(),
-        )
-        plugin = APIPlugin(columns=["id", "full_name"])
-        ctx = _ctx_with_primary(schema_items=[comp])
-        plugin.run(ctx)
-        view = ctx.metadata.info["views"].views[0]
-        assert "full_name" in view.definition
-        assert "p.name" in view.definition
 
     def test_columns_unknown_raises(self):
         plugin = APIPlugin(columns=["id", "nonexistent"])
