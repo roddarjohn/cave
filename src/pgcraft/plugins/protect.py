@@ -40,7 +40,11 @@ _NAMING_DEFAULTS = {
 
 _PROTECTION_FUNCTION_BODY = """\
 BEGIN
-    IF pg_trigger_depth() = 0 THEN
+    -- pg_trigger_depth() inside a trigger is >= 1.  A direct DML on the
+    -- raw table fires this as the first (and only) trigger, so depth = 1.
+    -- DML that arrives through an INSTEAD OF trigger on the API view
+    -- already has depth >= 1 before this trigger fires, so depth >= 2.
+    IF pg_trigger_depth() < 2 THEN
         RAISE EXCEPTION
             'Direct % on table "%.%" is not allowed. '
             'Mutate data through the API view instead.',
