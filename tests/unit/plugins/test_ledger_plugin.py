@@ -258,11 +258,12 @@ class TestDoubleEntryPlugin:
         DoubleEntryPlugin().run(ctx)
         LedgerTablePlugin().run(ctx)
         table = ctx["primary"]
-        constraints = [c for c in table.constraints if hasattr(c, "sqltext")]
-        assert any(
-            "debit" in str(c.sqltext) and "credit" in str(c.sqltext)
-            for c in constraints
-        )
+        col = table.c["direction"]
+        checks = [c for c in col.constraints if hasattr(c, "sqltext")]
+        assert len(checks) == 1
+        text = str(checks[0].sqltext)
+        assert "debit" in text
+        assert "credit" in text
 
 
 class TestDoubleEntryTriggerPlugin:
