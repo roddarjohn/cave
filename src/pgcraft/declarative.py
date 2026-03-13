@@ -28,7 +28,6 @@ if TYPE_CHECKING:
 
     from sqlalchemy import MetaData
     from sqlalchemy.orm import DeclarativeBase
-    from sqlalchemy.schema import SchemaItem
 
     from pgcraft.plugin import Plugin
 
@@ -207,7 +206,7 @@ def register[T](  # noqa: PLR0913
             raise PGCraftValidationError(msg)
 
         # -- collect columns and run plugins --------------------------
-        schema_items: list[SchemaItem | PGCraftCheck] = [
+        schema_items: list = [
             *_collect_columns(cls),
             *_collect_checks(cls),
         ]

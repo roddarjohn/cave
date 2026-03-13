@@ -1,19 +1,26 @@
 """Unit tests for APIPlugin in isolation."""
 
+import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table
 
 from pgcraft.plugins.api import APIPlugin
+from pgcraft.statistics import JoinedView
 from tests.unit.plugins.conftest import make_ctx
 
 
-def _ctx_with_primary(schema: str = "dim", table_key: str = "primary"):
+def _ctx_with_primary(
+    schema: str = "dim",
+    table_key: str = "primary",
+    store=None,
+):
     """Return a ctx with a simple Table pre-stored at table_key."""
-    ctx = make_ctx(schemaname=schema)
+    ctx = make_ctx(schemaname=schema, store=store)
     table = Table(
         "product",
         MetaData(),
         Column("id", Integer, primary_key=True),
         Column("name", String),
+        Column("internal_notes", String),
         schema=schema,
     )
     ctx[table_key] = table
@@ -93,3 +100,135 @@ class TestAPIPlugin:
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         assert ctx.metadata.info["api_resources"][0].schema == "reporting"
+
+
+class TestAPIPluginColumns:
+    def test_columns_none_selects_all(self):
+        plugin = APIPlugin()
+        ctx = _ctx_with_primary()
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert "id" in view.definition
+        assert "name" in view.definition
+
+    def test_columns_subset(self):
+        plugin = APIPlugin(columns=["id"])
+        ctx = _ctx_with_primary()
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert "p.id" in view.definition
+        assert "p.name" not in view.definition
+
+    def test_columns_unknown_raises(self):
+        plugin = APIPlugin(columns=["id", "nonexistent"])
+        ctx = _ctx_with_primary()
+        with pytest.raises(ValueError, match="nonexistent"):
+            plugin.run(ctx)
+
+
+class TestAPIPluginExcludeColumns:
+    def test_exclude_hides_column(self):
+        plugin = APIPlugin(exclude_columns=["internal_notes"])
+        ctx = _ctx_with_primary()
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert "p.id" in view.definition
+        assert "p.name" in view.definition
+        assert "internal_notes" not in view.definition
+
+    def test_exclude_unknown_raises(self):
+        plugin = APIPlugin(exclude_columns=["nonexistent"])
+        ctx = _ctx_with_primary()
+        with pytest.raises(ValueError, match="nonexistent"):
+            plugin.run(ctx)
+
+    def test_columns_and_exclude_raises(self):
+        plugin = APIPlugin(
+            columns=["id"],
+            exclude_columns=["name"],
+        )
+        ctx = _ctx_with_primary()
+        with pytest.raises(ValueError, match="Cannot specify both"):
+            plugin.run(ctx)
+
+
+class TestAPIPluginJoins:
+    def _ctx_with_joins(self):
+        joins = {
+            "statistics": JoinedView(
+                view_name="dim.product_statistics",
+                join_key="id",
+                column_names=["order_count"],
+            ),
+        }
+        return _ctx_with_primary(
+            store={"joins": joins},
+        )
+
+    def test_join_in_definition(self):
+        plugin = APIPlugin()
+        ctx = self._ctx_with_joins()
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        defn = view.definition.lower()
+        assert "left outer join" in defn
+        assert "product_statistics" in defn
+
+    def test_join_columns_in_select(self):
+        plugin = APIPlugin()
+        ctx = self._ctx_with_joins()
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert "order_count" in view.definition
+
+    def test_join_with_column_selection(self):
+        joins = {
+            "statistics": JoinedView(
+                view_name="dim.product_statistics",
+                join_key="id",
+                column_names=["order_count"],
+            ),
+        }
+        plugin = APIPlugin(columns=["id"])
+        ctx = _ctx_with_primary(
+            store={"joins": joins},
+        )
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert "p.id" in view.definition
+        assert "order_count" in view.definition
+
+    def test_join_with_exclude_columns(self):
+        joins = {
+            "statistics": JoinedView(
+                view_name="dim.product_statistics",
+                join_key="id",
+                column_names=["order_count"],
+            ),
+        }
+        plugin = APIPlugin(exclude_columns=["internal_notes"])
+        ctx = _ctx_with_primary(
+            store={"joins": joins},
+        )
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert "p.id" in view.definition
+        assert "p.name" in view.definition
+        assert "internal_notes" not in view.definition
+        assert "order_count" in view.definition
+
+    def test_empty_joins_no_join(self):
+        plugin = APIPlugin()
+        ctx = _ctx_with_primary(
+            store={"joins": {}},
+        )
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert "join" not in view.definition.lower()
+
+    def test_missing_joins_key_no_join(self):
+        plugin = APIPlugin()
+        ctx = _ctx_with_primary()
+        plugin.run(ctx)
+        view = ctx.metadata.info["views"].views[0]
+        assert "join" not in view.definition.lower()

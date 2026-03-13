@@ -37,7 +37,7 @@ _default_validators: list[_SchemaItemValidator] = [
 
 
 def validate_schema_items(
-    items: list[SchemaItem | PGCraftCheck],
+    items: list,
     *,
     validators: list[_SchemaItemValidator] | None = None,
 ) -> None:
