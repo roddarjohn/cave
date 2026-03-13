@@ -42,6 +42,7 @@ def make_ctx(
     ctx["pk_columns"] = PrimaryKeyColumns(
         [Column(pk_col_name, Integer, primary_key=True)]
     )
+    ctx["created_at_column"] = "created_at"
     for k, v in (store or {}).items():
         ctx[k] = v
     return ctx

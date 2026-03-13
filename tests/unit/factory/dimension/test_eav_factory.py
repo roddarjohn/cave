@@ -18,6 +18,7 @@ from sqlalchemy.sql.expression import Label
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.factory.dimension.eav import EAVDimensionResourceFactory
 from pgcraft.plugins.api import APIPlugin
+from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.eav import (
     EAVTablePlugin,
     EAVTriggerPlugin,
@@ -310,6 +311,7 @@ class TestEAVDimensionResourceFactoryViews:
             [Column("name", String)],
             plugins=[
                 SerialPKPlugin(),
+                CreatedAtPlugin(),
                 EAVTablePlugin(),
                 EAVViewPlugin(),
                 APIPlugin(schema="custom_api"),
