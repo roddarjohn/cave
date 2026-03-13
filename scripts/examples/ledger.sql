@@ -1,17 +1,15 @@
 -- All operations go through the API view.
 -- Only INSERT is allowed; UPDATE and DELETE are rejected.
 
--- A single entry with auto-generated entry_id:
-INSERT INTO api.transactions (value, account, category)
-VALUES (100, 'cash', 'revenue');
+-- Log a status change:
+INSERT INTO api.order_events (value, order_id, status)
+VALUES (1, 'ORD-001', 'placed');
 
--- Correlated entries sharing the same entry_id:
-INSERT INTO api.transactions (entry_id, value, account, category)
+-- Log multiple events at once:
+INSERT INTO api.order_events (value, order_id, status)
 VALUES
-    ('bbbbbbbb-0001-4000-8000-000000000001', 250, 'cash', 'revenue'),
-    ('bbbbbbbb-0001-4000-8000-000000000001', -250, 'accounts_receivable', 'revenue');
+    (1, 'ORD-001', 'confirmed'),
+    (1, 'ORD-002', 'placed');
 
--- Balance per account:
-SELECT account, SUM(value) AS balance
-FROM api.transactions
-GROUP BY account;
+-- Current status per order (most recent event):
+SELECT * FROM ops.order_events_latest;

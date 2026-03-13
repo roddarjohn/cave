@@ -9,7 +9,9 @@ from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
+    LedgerBalanceCheckPlugin,
     LedgerBalanceViewPlugin,
+    LedgerLatestViewPlugin,
     LedgerTablePlugin,
     LedgerTriggerPlugin,
 )
@@ -285,3 +287,107 @@ class TestDoubleEntryTriggerPlugin:
         assert "primary" in reqs
         assert "double_entry_columns" in reqs
         assert "entry_id_column" in reqs
+
+
+class TestLedgerLatestViewPlugin:
+    def _ctx_with_table(self, **kwargs):
+        ctx = _ledger_ctx(**kwargs)
+        LedgerTablePlugin().run(ctx)
+        return ctx
+
+    def test_registers_latest_view(self):
+        ctx = self._ctx_with_table(schema_items=[Column("order_id", String)])
+        LedgerLatestViewPlugin(dimensions=["order_id"]).run(ctx)
+        views = ctx.metadata.info.get("views")
+        assert views is not None
+        assert len(views.views) == 1
+
+    def test_stores_view_name_in_ctx(self):
+        ctx = self._ctx_with_table(schema_items=[Column("order_id", String)])
+        LedgerLatestViewPlugin(dimensions=["order_id"]).run(ctx)
+        assert "latest_view" in ctx
+
+    def test_custom_latest_view_key(self):
+        ctx = self._ctx_with_table(schema_items=[Column("order_id", String)])
+        LedgerLatestViewPlugin(
+            dimensions=["order_id"],
+            latest_view_key="my_latest",
+        ).run(ctx)
+        assert "my_latest" in ctx
+
+    def test_multiple_dimensions(self):
+        ctx = self._ctx_with_table(
+            schema_items=[
+                Column("entity_type", String),
+                Column("entity_id", String),
+            ]
+        )
+        LedgerLatestViewPlugin(dimensions=["entity_type", "entity_id"]).run(ctx)
+        assert "latest_view" in ctx
+
+    def test_empty_dimensions_raises(self):
+        with pytest.raises(PGCraftValidationError, match="non-empty"):
+            LedgerLatestViewPlugin(dimensions=[])
+
+    def test_produces_latest_view_key(self):
+        plugin = LedgerLatestViewPlugin(dimensions=["x"])
+        assert "latest_view" in plugin.resolved_produces()
+
+    def test_requires_table_key_and_created_at(self):
+        plugin = LedgerLatestViewPlugin(dimensions=["x"])
+        reqs = plugin.resolved_requires()
+        assert "primary" in reqs
+        assert "created_at_column" in reqs
+
+
+class TestLedgerBalanceCheckPlugin:
+    def _ctx_with_table(self, **kwargs):
+        ctx = _ledger_ctx(**kwargs)
+        LedgerTablePlugin().run(ctx)
+        return ctx
+
+    def test_registers_function(self):
+        ctx = self._ctx_with_table(schema_items=[Column("warehouse", String)])
+        LedgerBalanceCheckPlugin(dimensions=["warehouse"]).run(ctx)
+        functions = ctx.metadata.info.get("functions")
+        assert functions is not None
+        assert len(functions.functions) == 1
+
+    def test_registers_trigger(self):
+        ctx = self._ctx_with_table(schema_items=[Column("warehouse", String)])
+        LedgerBalanceCheckPlugin(dimensions=["warehouse"]).run(ctx)
+        triggers = ctx.metadata.info.get("triggers")
+        assert triggers is not None
+        assert len(triggers.triggers) == 1
+
+    def test_trigger_is_statement_level(self):
+        ctx = self._ctx_with_table(schema_items=[Column("warehouse", String)])
+        LedgerBalanceCheckPlugin(dimensions=["warehouse"]).run(ctx)
+        trigger = ctx.metadata.info["triggers"].triggers[0]
+        assert trigger.for_each.value == "STATEMENT"
+
+    def test_custom_min_balance(self):
+        ctx = self._ctx_with_table(schema_items=[Column("warehouse", String)])
+        plugin = LedgerBalanceCheckPlugin(
+            dimensions=["warehouse"], min_balance=-100
+        )
+        plugin.run(ctx)
+        assert len(ctx.metadata.info["functions"].functions) == 1
+
+    def test_empty_dimensions_raises(self):
+        with pytest.raises(PGCraftValidationError, match="non-empty"):
+            LedgerBalanceCheckPlugin(dimensions=[])
+
+    def test_multiple_dimensions(self):
+        ctx = self._ctx_with_table(
+            schema_items=[
+                Column("warehouse", String),
+                Column("sku", String),
+            ]
+        )
+        LedgerBalanceCheckPlugin(dimensions=["warehouse", "sku"]).run(ctx)
+        assert len(ctx.metadata.info["triggers"].triggers) == 1
+
+    def test_requires_table_key(self):
+        plugin = LedgerBalanceCheckPlugin(dimensions=["x"])
+        assert "primary" in plugin.resolved_requires()

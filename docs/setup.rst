@@ -155,12 +155,12 @@ is allowed through the API view:
    from pgcraft.factory.ledger import LedgerResourceFactory
 
    LedgerResourceFactory(
-       tablename="transactions",
-       schemaname="finance",
+       tablename="order_events",
+       schemaname="ops",
        metadata=metadata,
        schema_items=[
-           Column("account", String, nullable=False),
-           Column("category", String),
+           Column("order_id", String, nullable=False),
+           Column("status", String, nullable=False),
        ],
    )
 

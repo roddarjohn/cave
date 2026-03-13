@@ -303,9 +303,19 @@ so two independent pipelines can coexist in one factory without colliding.
     Reads ``"primary"`` (via ``table_key``), ``"api"`` (via
     ``view_key``), and ``"entry_id_column"``.
 
+``LedgerLatestViewPlugin``
+    Reads ``"primary"`` (via ``table_key``) and
+    ``"created_at_column"``.  Writes ``"latest_view"``
+    (via ``latest_view_key``).
+
 ``LedgerBalanceViewPlugin``
     Reads ``"primary"`` (via ``table_key``).  Writes
     ``"balance_view"`` (via ``balance_view_key``).
+
+``LedgerBalanceCheckPlugin``
+    Reads ``"primary"`` (via ``table_key``).  Registers an
+    AFTER INSERT trigger enforcing ``SUM(value) >= min_balance``
+    per dimension group.
 
 ``DoubleEntryPlugin``
     Writes ``"double_entry_columns"`` (the direction column name).

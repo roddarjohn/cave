@@ -251,6 +251,196 @@ class LedgerBalanceViewPlugin(Plugin):
         ctx[self.balance_view_key] = view_name
 
 
+_LATEST_NAMING_DEFAULTS = {
+    "ledger_latest_view": "%(table_name)s_latest",
+}
+
+
+@produces(Dynamic("latest_view_key"))
+@requires(Dynamic("table_key"), "created_at_column")
+class LedgerLatestViewPlugin(Plugin):
+    """Create a view showing the most recent row per dimension group.
+
+    Uses PostgreSQL ``DISTINCT ON`` to select the latest row
+    (by ``created_at``) for each unique combination of dimension
+    values.  Useful for status-tracking ledgers where you care
+    about current state, not historical sums.
+
+    Args:
+        dimensions: Column names to partition by.  Must be a
+            non-empty list of column names present on the
+            ledger table.
+        table_key: Key in ``ctx`` for the backing table
+            (default ``"primary"``).
+        latest_view_key: Key in ``ctx`` to store the view name
+            under (default ``"latest_view"``).
+
+    Raises:
+        PGCraftValidationError: If *dimensions* is empty.
+
+    """
+
+    def __init__(
+        self,
+        dimensions: list[str],
+        table_key: str = "primary",
+        latest_view_key: str = "latest_view",
+    ) -> None:
+        """Store configuration."""
+        if not dimensions:
+            msg = "dimensions must be a non-empty list"
+            raise PGCraftValidationError(msg)
+        self.dimensions = list(dimensions)
+        self.table_key = table_key
+        self.latest_view_key = latest_view_key
+
+    def run(self, ctx: FactoryContext) -> None:
+        """Create and register the latest-row view."""
+        table = ctx[self.table_key]
+        created_at_col = ctx["created_at_column"]
+        dim_columns = [table.c[d] for d in self.dimensions]
+
+        query = (
+            select(table)
+            .distinct(*dim_columns)
+            .order_by(
+                *dim_columns,
+                table.c[created_at_col].desc(),
+            )
+        )
+
+        view_name = resolve_name(
+            ctx.metadata,
+            "ledger_latest_view",
+            {
+                "table_name": ctx.tablename,
+                "schema": ctx.schemaname,
+            },
+            _LATEST_NAMING_DEFAULTS,
+        )
+
+        register_view(
+            ctx.metadata,
+            View(
+                view_name,
+                compile_query(query),
+                schema=ctx.schemaname,
+            ),
+        )
+        ctx[self.latest_view_key] = view_name
+
+
+_BALANCE_CHECK_NAMING_DEFAULTS = {
+    "balance_check_function": ("%(schema)s_%(table_name)s_%(op)s"),
+    "balance_check_trigger": ("%(schema)s_%(table_name)s_%(op)s"),
+}
+
+
+@requires(Dynamic("table_key"))
+class LedgerBalanceCheckPlugin(Plugin):
+    """Enforce a minimum balance per dimension group.
+
+    Registers an ``AFTER INSERT FOR EACH STATEMENT`` trigger
+    that checks ``SUM(value) >= min_balance`` for every
+    dimension group affected by the inserted rows.  If any
+    group violates the constraint the entire statement is
+    rejected.
+
+    Uses the same ``REFERENCING NEW TABLE`` transition-table
+    pattern as
+    :class:`~pgcraft.plugins.ledger.DoubleEntryTriggerPlugin`.
+
+    Args:
+        dimensions: Column names that define a balance group.
+            Must be a non-empty list.
+        min_balance: The minimum allowed ``SUM(value)`` per
+            group (default ``0``).
+        table_key: Key in ``ctx`` for the backing table
+            (default ``"primary"``).
+
+    Raises:
+        PGCraftValidationError: If *dimensions* is empty.
+
+    """
+
+    def __init__(
+        self,
+        dimensions: list[str],
+        min_balance: int = 0,
+        table_key: str = "primary",
+    ) -> None:
+        """Store configuration."""
+        if not dimensions:
+            msg = "dimensions must be a non-empty list"
+            raise PGCraftValidationError(msg)
+        self.dimensions = list(dimensions)
+        self.min_balance = min_balance
+        self.table_key = table_key
+
+    def run(self, ctx: FactoryContext) -> None:
+        """Register the balance-check trigger."""
+        table = ctx[self.table_key]
+        table_fullname = f"{ctx.schemaname}.{table.name}"
+
+        dim_cols = ", ".join(self.dimensions)
+        dim_format = ", ".join("%" for _ in self.dimensions)
+        dim_values = ", ".join(f"_bad.{d}" for d in self.dimensions)
+
+        template = load_template(_TEMPLATES / "balance_check.mako")
+        body = template.render(
+            table=table_fullname,
+            dim_cols=dim_cols,
+            dim_format=dim_format,
+            dim_values=dim_values,
+            min_balance=self.min_balance,
+        )
+
+        fn_name = resolve_name(
+            ctx.metadata,
+            "balance_check_function",
+            {
+                "table_name": ctx.tablename,
+                "schema": ctx.schemaname,
+                "op": "balance_check",
+            },
+            _BALANCE_CHECK_NAMING_DEFAULTS,
+        )
+        trigger_name = resolve_name(
+            ctx.metadata,
+            "balance_check_trigger",
+            {
+                "table_name": ctx.tablename,
+                "schema": ctx.schemaname,
+                "op": "balance_check",
+            },
+            _BALANCE_CHECK_NAMING_DEFAULTS,
+        )
+
+        register_function(
+            ctx.metadata,
+            Function(
+                fn_name,
+                body,
+                returns="trigger",
+                language="plpgsql",
+                schema=ctx.schemaname,
+                security=FunctionSecurity.definer,
+            ),
+        )
+
+        register_trigger(
+            ctx.metadata,
+            Trigger.after(
+                "insert",
+                on=table_fullname,
+                execute=f"{ctx.schemaname}.{fn_name}",
+                name=trigger_name,
+            )
+            .for_each_statement()
+            .referencing_new_table_as("new_entries"),
+        )
+
+
 _DOUBLE_ENTRY_NAMING_DEFAULTS = {
     "double_entry_function": ("%(schema)s_%(table_name)s_%(op)s"),
     "double_entry_trigger": ("%(schema)s_%(table_name)s_%(op)s"),

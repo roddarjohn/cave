@@ -2,8 +2,8 @@ Ledger Tables
 =============
 
 Ledger tables are append-only tables designed for recording immutable
-events such as financial transactions, audit logs, or metric
-observations.  Every row has a ``value`` column, an ``entry_id`` UUID
+events such as status transitions, resource consumption, or financial
+transactions.  Every row has a ``value`` column, an ``entry_id`` UUID
 for correlating related entries, a ``created_at`` timestamp, and
 consumer-provided dimension columns.
 
@@ -13,7 +13,7 @@ API view only allows ``SELECT`` and ``INSERT``.
 Choose the variant that matches your data:
 
 - **Basic ledger** -- a single append-only table with a value column.
-  Best for simple event logs, metrics, or single-entry accounting.
+  Best for event logs, status tracking, or metric observations.
 - **Double-entry ledger** -- adds a ``direction`` column
   (``'debit'``/``'credit'``) and a constraint trigger that validates
   debits equal credits per ``entry_id``.  Best for financial journals.
@@ -41,11 +41,51 @@ DELETE on the API view raise a PostgreSQL error.
 .. include:: _generated/dim_ledger.rst
 
 
+Latest View
+~~~~~~~~~~~
+
+Use :class:`~pgcraft.plugins.ledger.LedgerLatestViewPlugin` to create
+a view that shows the most recent row per dimension group.  This is
+useful for status-tracking ledgers where you care about current state
+rather than historical sums:
+
+.. code-block:: python
+
+   from pgcraft.factory.ledger import LedgerResourceFactory
+   from pgcraft.plugins.ledger import LedgerLatestViewPlugin
+
+   LedgerResourceFactory(
+       tablename="order_events",
+       schemaname="ops",
+       metadata=metadata,
+       schema_items=[
+           Column("order_id", String, nullable=False),
+           Column("status", String, nullable=False),
+       ],
+       extra_plugins=[
+           LedgerLatestViewPlugin(dimensions=["order_id"]),
+       ],
+   )
+
+This registers an ``order_events_latest`` view using PostgreSQL's
+``DISTINCT ON``:
+
+.. code-block:: sql
+
+   -- Current status per order:
+   SELECT * FROM ops.order_events_latest;
+
+The view name follows the naming convention and can be customised via
+``metadata.naming_convention["ledger_latest_view"]``.
+
+
 Balance Views
 ~~~~~~~~~~~~~
 
 Use :class:`~pgcraft.plugins.ledger.LedgerBalanceViewPlugin` to create
-a view that shows current balances per dimension group:
+a view that shows current balances (``SUM(value)``) per dimension group.
+Best for ledgers where the running total is meaningful (inventory,
+resource quotas, point systems):
 
 .. code-block:: python
 
@@ -53,27 +93,85 @@ a view that shows current balances per dimension group:
    from pgcraft.plugins.ledger import LedgerBalanceViewPlugin
 
    LedgerResourceFactory(
-       tablename="transactions",
-       schemaname="finance",
+       tablename="stock_movements",
+       schemaname="inventory",
        metadata=metadata,
        schema_items=[
-           Column("account", String, nullable=False),
-           Column("category", String),
+           Column("warehouse", String, nullable=False),
+           Column("sku", String, nullable=False),
        ],
        extra_plugins=[
-           LedgerBalanceViewPlugin(dimensions=["account"]),
+           LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
        ],
    )
 
-This registers a ``transactions_balances`` view:
+This registers a ``stock_movements_balances`` view:
 
 .. code-block:: sql
 
-   SELECT account, balance
-   FROM finance.transactions_balances;
+   SELECT warehouse, sku, balance
+   FROM inventory.stock_movements_balances;
 
 The view name follows the naming convention and can be customised via
 ``metadata.naming_convention["ledger_balance_view"]``.
+
+
+Balance Constraints
+~~~~~~~~~~~~~~~~~~~
+
+Use :class:`~pgcraft.plugins.ledger.LedgerBalanceCheckPlugin` to enforce
+that ``SUM(value)`` for a dimension group never drops below a threshold.
+This is useful for preventing negative inventory, overdrafts, or
+exceeding resource quotas:
+
+.. code-block:: python
+
+   from pgcraft.plugins.ledger import (
+       LedgerBalanceCheckPlugin,
+       LedgerBalanceViewPlugin,
+   )
+
+   LedgerResourceFactory(
+       tablename="stock_movements",
+       schemaname="inventory",
+       metadata=metadata,
+       schema_items=[
+           Column("warehouse", String, nullable=False),
+           Column("sku", String, nullable=False),
+       ],
+       extra_plugins=[
+           LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
+           LedgerBalanceCheckPlugin(
+               dimensions=["warehouse", "sku"],
+               min_balance=0,   # default; cannot go negative
+           ),
+       ],
+   )
+
+The trigger fires ``AFTER INSERT FOR EACH STATEMENT`` and checks only
+the dimension groups affected by the new rows.  If any group's balance
+falls below ``min_balance``, the entire statement is rejected:
+
+.. code-block:: sql
+
+   -- Succeeds (balance stays >= 0):
+   INSERT INTO inventory.stock_movements (value, warehouse, sku)
+   VALUES (100, 'east', 'WIDGET-A');
+
+   -- Fails (balance would go to -50):
+   INSERT INTO inventory.stock_movements (value, warehouse, sku)
+   VALUES (-150, 'east', 'WIDGET-A');
+   -- ERROR: ledger balance violation ...
+
+Set ``min_balance`` to a different value for other use cases:
+
+.. code-block:: python
+
+   # Allow overdraft up to -1000:
+   LedgerBalanceCheckPlugin(
+       dimensions=["account"],
+       min_balance=-1000,
+   )
 
 
 Double-Entry Ledger
@@ -87,6 +185,10 @@ semantics.  Two additional plugins are required:
 - :class:`~pgcraft.plugins.ledger.DoubleEntryTriggerPlugin` -- registers
   an ``AFTER INSERT FOR EACH STATEMENT`` constraint trigger that
   validates debits equal credits for every ``entry_id`` in the batch.
+
+Dimension columns like ``category`` belong on a separate dimension
+table (e.g. ``accounts``), not on the journal itself.  The journal
+references the dimension via a foreign key:
 
 **Example configuration:**
 
@@ -152,7 +254,7 @@ precision, pass ``value_type="numeric"`` to
        schemaname="finance",
        metadata=metadata,
        schema_items=[
-           Column("account", String, nullable=False),
+           Column("account_id", Integer, nullable=False),
        ],
        plugins=[
            SerialPKPlugin(),
@@ -219,6 +321,17 @@ key context keys are:
 ``LedgerTriggerPlugin``
     Reads ``"primary"``, ``"api"``, ``"entry_id_column"``.
 
+``LedgerLatestViewPlugin``
+    Reads ``"primary"`` and ``"created_at_column"``.  Writes
+    ``"latest_view"`` (the view name).
+
+``LedgerBalanceViewPlugin``
+    Reads ``"primary"``.  Writes ``"balance_view"`` (the view name).
+
+``LedgerBalanceCheckPlugin``
+    Reads ``"primary"``.  Registers an AFTER INSERT trigger enforcing
+    ``SUM(value) >= min_balance`` per dimension group.
+
 ``DoubleEntryPlugin``
     Writes ``"double_entry_columns"`` (the direction column name) and
     appends the direction column to ``ctx.injected_columns``.
@@ -226,6 +339,3 @@ key context keys are:
 ``DoubleEntryTriggerPlugin``
     Reads ``"primary"``, ``"double_entry_columns"``,
     ``"entry_id_column"``.
-
-``LedgerBalanceViewPlugin``
-    Reads ``"primary"``.  Writes ``"balance_view"`` (the view name).
