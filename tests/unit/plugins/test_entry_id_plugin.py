@@ -50,3 +50,19 @@ class TestUUIDEntryIDPlugin:
     def test_produces_entry_id_column(self):
         plugin = UUIDEntryIDPlugin()
         assert "entry_id_column" in plugin.resolved_produces()
+
+    def test_injects_column(self):
+        plugin = UUIDEntryIDPlugin()
+        ctx = make_ctx()
+        plugin.run(ctx)
+        injected_names = [c.name for c in ctx.injected_columns]
+        assert "entry_id" in injected_names
+
+    def test_injected_column_is_same_object(self):
+        plugin = UUIDEntryIDPlugin()
+        ctx = make_ctx()
+        plugin.run(ctx)
+        entry_col = next(
+            c for c in ctx.injected_columns if c.name == "entry_id"
+        )
+        assert entry_col is ctx["entry_id_column"]

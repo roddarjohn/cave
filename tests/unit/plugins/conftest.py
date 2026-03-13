@@ -7,6 +7,7 @@ from sqlalchemy_declarative_extensions import View
 
 from pgcraft.columns import PrimaryKeyColumns
 from pgcraft.factory.context import FactoryContext
+from pgcraft.plugins.created_at import CreatedAtPlugin
 
 
 def make_ctx(
@@ -27,7 +28,8 @@ def make_ctx(
         store: Extra keys to pre-populate in the ctx store.
 
     Returns:
-        A FactoryContext with pk_columns in the store.
+        A FactoryContext with pk_columns and created_at in the
+        store.
 
     """
     if schema_items is None:
@@ -42,7 +44,7 @@ def make_ctx(
     ctx["pk_columns"] = PrimaryKeyColumns(
         [Column(pk_col_name, Integer, primary_key=True)]
     )
-    ctx["created_at_column"] = "created_at"
+    CreatedAtPlugin().run(ctx)
     for k, v in (store or {}).items():
         ctx[k] = v
     return ctx

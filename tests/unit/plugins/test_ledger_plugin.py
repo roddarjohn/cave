@@ -215,16 +215,18 @@ class TestLedgerBalanceViewPlugin:
 
 
 class TestDoubleEntryPlugin:
-    def test_adds_direction_to_schema_items(self):
+    def test_injects_direction_column(self):
         ctx = _ledger_ctx()
         DoubleEntryPlugin().run(ctx)
-        col_names = [c.name for c in ctx.columns]
-        assert "direction" in col_names
+        injected_names = [c.name for c in ctx.injected_columns]
+        assert "direction" in injected_names
 
     def test_direction_column_is_not_nullable(self):
         ctx = _ledger_ctx()
         DoubleEntryPlugin().run(ctx)
-        direction = next(c for c in ctx.columns if c.name == "direction")
+        direction = next(
+            c for c in ctx.injected_columns if c.name == "direction"
+        )
         assert not direction.nullable
 
     def test_stores_column_name_in_ctx(self):
@@ -236,8 +238,8 @@ class TestDoubleEntryPlugin:
         ctx = _ledger_ctx()
         DoubleEntryPlugin(column_name="side").run(ctx)
         assert ctx["double_entry_columns"] == "side"
-        col_names = [c.name for c in ctx.columns]
-        assert "side" in col_names
+        injected_names = [c.name for c in ctx.injected_columns]
+        assert "side" in injected_names
 
     def test_singleton_group(self):
         assert DoubleEntryPlugin.singleton_group == "__double_entry__"

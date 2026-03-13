@@ -37,10 +37,12 @@ class UUIDEntryIDPlugin(Plugin):
         self._column_name = column_name
 
     def run(self, ctx: FactoryContext) -> None:
-        """Store the entry ID column in the ctx store."""
-        ctx["entry_id_column"] = Column(
+        """Store the entry ID column and inject it."""
+        col = Column(
             self._column_name,
             UUID(as_uuid=True),
             nullable=False,
             server_default=text("gen_random_uuid()"),
         )
+        ctx["entry_id_column"] = col
+        ctx.injected_columns.append(col)

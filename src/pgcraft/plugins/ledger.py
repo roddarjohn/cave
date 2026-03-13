@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Column,
-    DateTime,
     Integer,
     Numeric,
     String,
@@ -65,10 +64,11 @@ def _dim_column_names(ctx: FactoryContext) -> list[str]:
 class LedgerTablePlugin(Plugin):
     """Create a ledger table with a value column.
 
-    Combines ``ctx["pk_columns"]``, ``ctx["entry_id_column"]``,
-    a ``created_at`` timestamp, a ``value`` column, and
-    ``ctx.table_items`` (dimension columns) into a single
-    append-only table.
+    Combines ``ctx["pk_columns"]``, ``ctx.injected_columns``
+    (provided by upstream plugins like ``UUIDEntryIDPlugin``,
+    ``CreatedAtPlugin``, and ``DoubleEntryPlugin``), a ``value``
+    column, and ``ctx.table_items`` (dimension columns) into a
+    single append-only table.
 
     Args:
         value_type: Type for the value column. Must be
@@ -100,20 +100,13 @@ class LedgerTablePlugin(Plugin):
     def run(self, ctx: FactoryContext) -> None:
         """Create the ledger table and store it in ctx."""
         pk_columns = ctx["pk_columns"]
-        entry_id_col = ctx["entry_id_column"]
-        created_at_col = ctx["created_at_column"]
         sa_type = _VALUE_TYPES[self.value_type]
 
         table = Table(
             ctx.tablename,
             ctx.metadata,
             *pk_columns,
-            entry_id_col,
-            Column(
-                created_at_col,
-                DateTime(timezone=True),
-                server_default="now()",
-            ),
+            *ctx.injected_columns,
             Column("value", sa_type(), nullable=False),
             *ctx.table_items,
             schema=ctx.schemaname,
@@ -293,9 +286,8 @@ class DoubleEntryPlugin(Plugin):
         self._column_name = column_name
 
     def run(self, ctx: FactoryContext) -> None:
-        """Add the direction column to schema_items."""
-        ctx.schema_items.insert(
-            0,
+        """Inject the direction column and store its name."""
+        ctx.injected_columns.append(
             Column(
                 self._column_name,
                 String(6),

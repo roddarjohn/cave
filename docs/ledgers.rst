@@ -200,16 +200,18 @@ key context keys are:
     Writes ``"pk_columns"``.
 
 ``UUIDEntryIDPlugin``
-    Writes ``"entry_id_column"`` -- a ``Column`` object spliced into
-    the table by ``LedgerTablePlugin``.
+    Writes ``"entry_id_column"`` (a ``Column`` object) and appends the
+    column to ``ctx.injected_columns``.
 
 ``CreatedAtPlugin``
-    Writes ``"created_at_column"`` -- the column name string.
+    Writes ``"created_at_column"`` (the column name string) and appends
+    a ``DateTime`` column to ``ctx.injected_columns``.
 
 ``LedgerTablePlugin``
-    Reads ``"pk_columns"``, ``"entry_id_column"``,
-    ``"created_at_column"``.  Writes ``"primary"`` (the table) and
-    ``"__root__"``.
+    Reads ``"pk_columns"`` and spreads ``ctx.injected_columns`` into
+    the table.  Requires ``"entry_id_column"`` and
+    ``"created_at_column"`` for plugin ordering.  Writes ``"primary"``
+    (the table) and ``"__root__"``.
 
 ``APIPlugin``
     Reads ``"primary"``.  Writes ``"api"`` (the view).
@@ -218,8 +220,8 @@ key context keys are:
     Reads ``"primary"``, ``"api"``, ``"entry_id_column"``.
 
 ``DoubleEntryPlugin``
-    Writes ``"double_entry_columns"`` (the direction column name).
-    Mutates ``ctx.schema_items`` to include the direction column.
+    Writes ``"double_entry_columns"`` (the direction column name) and
+    appends the direction column to ``ctx.injected_columns``.
 
 ``DoubleEntryTriggerPlugin``
     Reads ``"primary"``, ``"double_entry_columns"``,

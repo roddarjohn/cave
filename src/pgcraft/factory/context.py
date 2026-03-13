@@ -47,6 +47,14 @@ class FactoryContext:
 
     ``"key" in ctx``
         Test whether a key has been set without raising.
+
+    **Injected columns** (append-only list):
+
+    Plugins that provide columns for table construction (e.g.
+    ``CreatedAtPlugin``, ``UUIDEntryIDPlugin``, ``DoubleEntryPlugin``)
+    append :class:`~sqlalchemy.Column` objects to
+    ``ctx.injected_columns``.  Table plugins spread this list into
+    the table definition alongside PK and dimension columns.
     """
 
     tablename: str
@@ -56,6 +64,9 @@ class FactoryContext:
     plugins: list[Plugin]
 
     _store: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+    injected_columns: list[Column] = field(
+        default_factory=list, init=False, repr=False
+    )
 
     @property
     def columns(self) -> list[Column]:

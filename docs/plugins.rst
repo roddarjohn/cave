@@ -106,6 +106,50 @@ no relationship to each other preserve their original list order.
 ``MyTransformPlugin`` will always run after the plugin that produces
 ``"primary"``, regardless of the order they appear in the plugin list.
 
+Injected columns
+~~~~~~~~~~~~~~~~~
+
+Some plugins need to contribute columns to a table without knowing
+which table plugin will consume them.  For this, plugins append
+:class:`~sqlalchemy.Column` objects to ``ctx.injected_columns`` — a
+shared list on :class:`~pgcraft.factory.context.FactoryContext`.  Table
+plugins that support this pattern (currently
+:class:`~pgcraft.plugins.ledger.LedgerTablePlugin`) spread the list
+into the table definition:
+
+.. code-block:: python
+
+   # Column-providing plugin
+   class MyColumnPlugin(Plugin):
+       def run(self, ctx: FactoryContext) -> None:
+           ctx.injected_columns.append(
+               Column("tenant_id", Integer, nullable=False)
+           )
+
+   # Table plugin spreads injected columns
+   table = Table(
+       ctx.tablename, ctx.metadata,
+       *pk_columns,
+       *ctx.injected_columns,   # entry_id, created_at, etc.
+       Column("value", Integer(), nullable=False),
+       *ctx.table_items,
+       schema=ctx.schemaname,
+   )
+
+Built-in plugins that inject columns:
+
+- :class:`~pgcraft.plugins.created_at.CreatedAtPlugin` — injects a
+  ``created_at`` timestamp column.
+- :class:`~pgcraft.plugins.entry_id.UUIDEntryIDPlugin` — injects an
+  ``entry_id`` UUID column.
+- :class:`~pgcraft.plugins.ledger.DoubleEntryPlugin` — injects a
+  ``direction`` column for debit/credit semantics.
+
+These plugins also write their standard ctx store keys (e.g.
+``"created_at_column"``, ``"entry_id_column"``, ``"double_entry_columns"``)
+so that downstream trigger plugins can look up column metadata.
+
+
 Before any :meth:`~pgcraft.plugin.Plugin.run` call the factory collects two
 special inputs:
 
@@ -243,12 +287,17 @@ so two independent pipelines can coexist in one factory without colliding.
     (optional; skipped if absent from ``ctx``).
 
 ``UUIDEntryIDPlugin``
-    Writes ``"entry_id_column"`` (a ``Column`` object).
+    Writes ``"entry_id_column"`` (a ``Column`` object).  Also appends
+    the column to ``ctx.injected_columns``.
+
+``CreatedAtPlugin``
+    Writes ``"created_at_column"`` (the column name string).  Also
+    appends a ``DateTime`` column to ``ctx.injected_columns``.
 
 ``LedgerTablePlugin``
-    Reads ``"pk_columns"``, ``"entry_id_column"``,
-    ``"created_at_column"``.  Writes ``"primary"`` (the table) and
-    ``"__root__"``.
+    Reads ``"pk_columns"`` and ``ctx.injected_columns``.  Requires
+    ``"entry_id_column"`` and ``"created_at_column"`` for ordering.
+    Writes ``"primary"`` (the table) and ``"__root__"``.
 
 ``LedgerTriggerPlugin``
     Reads ``"primary"`` (via ``table_key``), ``"api"`` (via
@@ -260,6 +309,7 @@ so two independent pipelines can coexist in one factory without colliding.
 
 ``DoubleEntryPlugin``
     Writes ``"double_entry_columns"`` (the direction column name).
+    Appends a ``direction`` column to ``ctx.injected_columns``.
 
 ``DoubleEntryTriggerPlugin``
     Reads ``"primary"`` (via ``table_key``),

@@ -1,6 +1,6 @@
 """Unit tests for CreatedAtPlugin."""
 
-from sqlalchemy import Column, Integer, MetaData, String
+from sqlalchemy import Column, DateTime, Integer, MetaData, String
 
 from pgcraft.columns import PrimaryKeyColumns
 from pgcraft.factory.context import FactoryContext
@@ -38,3 +38,18 @@ class TestCreatedAtPlugin:
     def test_produces_created_at_column(self):
         plugin = CreatedAtPlugin()
         assert "created_at_column" in plugin.resolved_produces()
+
+    def test_injects_column(self):
+        plugin = CreatedAtPlugin()
+        ctx = _make_bare_ctx()
+        plugin.run(ctx)
+        assert len(ctx.injected_columns) == 1
+        col = ctx.injected_columns[0]
+        assert col.name == "created_at"
+        assert isinstance(col.type, DateTime)
+
+    def test_injects_custom_named_column(self):
+        plugin = CreatedAtPlugin(column_name="inserted_at")
+        ctx = _make_bare_ctx()
+        plugin.run(ctx)
+        assert ctx.injected_columns[0].name == "inserted_at"
