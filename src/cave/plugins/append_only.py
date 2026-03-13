@@ -94,7 +94,7 @@ class AppendOnlyTablePlugin(Plugin):
                 DateTime(timezone=True),
                 server_default="now()",
             ),
-            *ctx.columns,
+            *ctx.table_items,
             schema=ctx.schemaname,
         )
         ctx[self.attributes_key] = attributes_table

@@ -1,8 +1,16 @@
 """Unit tests for SimpleTablePlugin and SimpleTriggerPlugin."""
 
 import pytest
-from sqlalchemy import Column, String, Table
+from sqlalchemy import (
+    Column,
+    Computed,
+    Integer,
+    String,
+    Table,
+    UniqueConstraint,
+)
 
+from cave.check import CaveCheck
 from cave.plugins.simple import (
     SimpleTablePlugin,
     SimpleTriggerPlugin,
@@ -64,6 +72,56 @@ class TestSimpleTablePlugin:
     def test_requires_pk_columns(self):
         plugin = SimpleTablePlugin()
         assert "pk_columns" in plugin.resolved_requires()
+
+    def test_table_includes_unique_constraint(self):
+        plugin = SimpleTablePlugin()
+        ctx = make_ctx(
+            schema_items=[
+                Column("code", String),
+                UniqueConstraint("code"),
+            ]
+        )
+        plugin.run(ctx)
+        table = ctx["primary"]
+        uq_constraints = [
+            c for c in table.constraints if isinstance(c, UniqueConstraint)
+        ]
+        assert len(uq_constraints) == 1
+
+    def test_table_includes_computed_column(self):
+        plugin = SimpleTablePlugin()
+        ctx = make_ctx(
+            schema_items=[
+                Column("price", Integer),
+                Column("qty", Integer),
+                Column(
+                    "total",
+                    Integer,
+                    Computed("price * qty"),
+                ),
+            ]
+        )
+        plugin.run(ctx)
+        table = ctx["primary"]
+        col_names = {c.name for c in table.columns}
+        assert "total" in col_names
+        assert table.c["total"].computed is not None
+
+    def test_cave_check_excluded_from_table(self):
+        plugin = SimpleTablePlugin()
+        ctx = make_ctx(
+            schema_items=[
+                Column("price", Integer),
+                CaveCheck("{price} > 0", name="pos"),
+            ]
+        )
+        plugin.run(ctx)
+        table = ctx["primary"]
+        col_names = {c.name for c in table.columns}
+        assert "price" in col_names
+        # CaveCheck should not appear as a column or constraint
+        ck_names = [c.name for c in table.constraints if hasattr(c, "sqltext")]
+        assert "pos" not in ck_names
 
 
 class TestSimpleTriggerPlugin:

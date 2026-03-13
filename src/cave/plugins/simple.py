@@ -53,7 +53,7 @@ class SimpleTablePlugin(Plugin):
             ctx.tablename,
             ctx.metadata,
             *pk_columns,
-            *ctx.columns,
+            *ctx.table_items,
             schema=ctx.schemaname,
         )
         ctx[self.table_key] = table
