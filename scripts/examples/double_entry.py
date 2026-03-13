@@ -2,13 +2,13 @@
 
 from sqlalchemy import Column, ForeignKey, MetaData, String
 
+from pgcraft import pg_build_naming_conventions
 from pgcraft.factory.dimension import SimpleDimensionResourceFactory
 from pgcraft.factory.ledger import LedgerResourceFactory
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
 )
-from pgcraft import pg_build_naming_conventions
 
 metadata = MetaData(naming_convention=pg_build_naming_conventions())
 

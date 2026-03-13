@@ -2,8 +2,8 @@
 
 from sqlalchemy import Column, MetaData, String
 
-from pgcraft.factory.dimension import SimpleDimensionResourceFactory
 from pgcraft import pg_build_naming_conventions
+from pgcraft.factory.dimension import SimpleDimensionResourceFactory
 
 metadata = MetaData(naming_convention=pg_build_naming_conventions())
 

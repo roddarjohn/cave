@@ -9,8 +9,8 @@ from sqlalchemy import (
     String,
 )
 
-from pgcraft.factory.dimension import EAVDimensionResourceFactory
 from pgcraft import pg_build_naming_conventions
+from pgcraft.factory.dimension import EAVDimensionResourceFactory
 
 metadata = MetaData(naming_convention=pg_build_naming_conventions())
 
