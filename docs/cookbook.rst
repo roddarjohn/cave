@@ -554,12 +554,12 @@ statistics:
            Column("name", String, nullable=False),
            Column("email", String),
            PGCraftStatistics(
-               name="order_statistics",
+               name="orders",
                query=order_stats,
                join_key="customer_id",
            ),
            PGCraftStatistics(
-               name="invoice_statistics",
+               name="invoices",
                query=invoice_stats,
                join_key="customer_id",
            ),
@@ -577,8 +577,8 @@ This creates:
 
 * ``dim.customer`` — the backing table (``id``, ``name``,
   ``email``).
-* ``dim.customer_order_statistics`` — a view aggregating orders.
-* ``dim.customer_invoice_statistics`` — a view aggregating
+* ``dim.customer_orders_statistics`` — a view aggregating orders.
+* ``dim.customer_invoices_statistics`` — a view aggregating
   invoices.
 * ``api.customer`` — the API view with LEFT JOINs to both
   statistics views.
@@ -591,9 +591,9 @@ The generated API view looks like:
           s.order_count, s.order_total,
           s1.invoice_count, s1.invoiced_total, s1.paid_total
    FROM dim.customer AS p
-   LEFT OUTER JOIN dim.customer_order_statistics AS s
+   LEFT OUTER JOIN dim.customer_orders_statistics AS s
      ON p.id = s.customer_id
-   LEFT OUTER JOIN dim.customer_invoice_statistics AS s1
+   LEFT OUTER JOIN dim.customer_invoices_statistics AS s1
      ON p.id = s1.customer_id
 
 The join key column (``customer_id``) is automatically excluded
@@ -607,8 +607,8 @@ How it works
    columns to the backing table.
 2. :class:`~pgcraft.plugins.statistics.StatisticsViewPlugin` compiles
    each ``PGCraftStatistics`` query to SQL and creates a view (or
-   materialized view) named ``{tablename}_{stats.name}`` in the
-   dimension schema.
+   materialized view) named ``{tablename}_{name}_statistics`` in
+   the dimension schema.
 3. :class:`~pgcraft.plugins.api.APIPlugin`, when given
    ``stats_key="statistics_views"``, reads the view info and
    generates LEFT JOINs into the API view.
@@ -626,7 +626,7 @@ materialized view that must be refreshed manually:
 .. code-block:: python
 
    PGCraftStatistics(
-       name="summary",
+       name="lifetime",
        query=select(
            orders.c.customer_id,
            func.sum(orders.c.total).label("lifetime_value"),
@@ -639,7 +639,7 @@ Refresh it on a schedule:
 
 .. code-block:: sql
 
-   REFRESH MATERIALIZED VIEW dim.customer_summary;
+   REFRESH MATERIALIZED VIEW dim.customer_lifetime_statistics;
 
 Join key
 ~~~~~~~~
@@ -657,7 +657,7 @@ which works when the statistics query uses the same name:
 
    # Works because the query selects "id", matching the PK
    PGCraftStatistics(
-       name="self_stats",
+       name="lines",
        query=select(
            orders.c.id,
            func.count().label("line_count"),
