@@ -8,7 +8,6 @@ from sqlalchemy import (
     MetaData,
     Numeric,
     String,
-
     func,
     select,
 )
@@ -80,7 +79,7 @@ AppendOnlyDimensionResourceFactory(
 
 # -- Invoices (append-only dimension) ----------------------------------
 
-_invoices = AppendOnlyDimensionResourceFactory(
+Invoices = AppendOnlyDimensionResourceFactory(
     tablename="invoices",
     schemaname="private",
     metadata=metadata,
@@ -92,7 +91,7 @@ _invoices = AppendOnlyDimensionResourceFactory(
 
 # -- Invoice lines (EAV dimension, FK to invoices) --------------------
 
-_invoice_lines = EAVDimensionResourceFactory(
+InvoiceLines = EAVDimensionResourceFactory(
     tablename="invoice_lines",
     schemaname="private",
     metadata=metadata,
@@ -135,7 +134,7 @@ EAVDimensionResourceFactory(
 
 # -- Orders (simple dimension) -----------------------------------------
 
-_orders = SimpleDimensionResourceFactory(
+Orders = SimpleDimensionResourceFactory(
     tablename="orders",
     schemaname="public",
     metadata=metadata,
@@ -147,20 +146,17 @@ _orders = SimpleDimensionResourceFactory(
 
 # -- Customers with statistics ------------------------------------------
 
-_orders_t = _orders.table
-_invoices_t = _invoices.table
-
 _order_stats = select(
-    _orders_t.c.customer_id,
+    Orders.table.c.customer_id,
     func.count().label("order_count"),
-    func.sum(_orders_t.c.total).label("order_total"),
-).group_by(_orders_t.c.customer_id)
+    func.sum(Orders.table.c.total).label("order_total"),
+).group_by(Orders.table.c.customer_id)
 
 _invoice_stats = select(
-    _invoices_t.c.customer_id,
+    Invoices.table.c.customer_id,
     func.count().label("invoice_count"),
-    func.sum(_invoices_t.c.amount).label("invoiced_total"),
-).group_by(_invoices_t.c.customer_id)
+    func.sum(Invoices.table.c.amount).label("invoiced_total"),
+).group_by(Invoices.table.c.customer_id)
 
 SimpleDimensionResourceFactory(
     tablename="customers",
@@ -209,12 +205,7 @@ LedgerResourceFactory(
     events=[_inv_adjust],
 )
 
-# -- Revenue ledger with transactional reconciliation ---------------
-# The reconcile event accepts invoice IDs, joins against the
-# invoice_lines view to produce the desired state, and diffs
-# against existing balances per (invoice_id, account).
-
-_il = _invoice_lines.table
+# -- Revenue ledger (transactional reconciliation) ---------------------
 
 _rev_recognize = LedgerEvent(
     name="recognize",
@@ -223,11 +214,11 @@ _rev_recognize = LedgerEvent(
         .label("invoice_id"),
     ),
     desired=lambda pginput: select(
-        _il.c.invoice_id,
-        _il.c.account,
-        _il.c.amount.label("value"),
+        InvoiceLines.table.c.invoice_id,
+        InvoiceLines.table.c.account,
+        InvoiceLines.table.c.amount.label("value"),
     ).where(
-        _il.c.invoice_id.in_(
+        InvoiceLines.table.c.invoice_id.in_(
             select(pginput.c.invoice_id)
         )
     ),
