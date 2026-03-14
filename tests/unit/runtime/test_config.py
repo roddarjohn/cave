@@ -5,6 +5,9 @@ from pydantic import ValidationError
 
 from pgcraft.runtime.config import ColumnConfig, DimensionConfig
 
+_PG_ID = "valid PostgreSQL identifier"
+
+
 # ---------------------------------------------------------------------------
 # ColumnConfig — name validation
 # ---------------------------------------------------------------------------
@@ -28,23 +31,23 @@ class TestColumnConfigName:
         assert col.name == "label"
 
     def test_uppercase_is_rejected(self):
-        with pytest.raises(ValidationError, match="valid PostgreSQL identifier"):
+        with pytest.raises(ValidationError, match=_PG_ID):
             ColumnConfig(name="MyColumn", type="text")
 
     def test_spaces_are_rejected(self):
-        with pytest.raises(ValidationError, match="valid PostgreSQL identifier"):
+        with pytest.raises(ValidationError, match=_PG_ID):
             ColumnConfig(name="my column", type="text")
 
     def test_digit_prefix_is_rejected(self):
-        with pytest.raises(ValidationError, match="valid PostgreSQL identifier"):
+        with pytest.raises(ValidationError, match=_PG_ID):
             ColumnConfig(name="1col", type="text")
 
     def test_hyphen_is_rejected(self):
-        with pytest.raises(ValidationError, match="valid PostgreSQL identifier"):
+        with pytest.raises(ValidationError, match=_PG_ID):
             ColumnConfig(name="my-col", type="text")
 
     def test_name_too_long_is_rejected(self):
-        with pytest.raises(ValidationError, match="valid PostgreSQL identifier"):
+        with pytest.raises(ValidationError, match=_PG_ID):
             ColumnConfig(name="a" * 64, type="text")
 
     def test_max_length_is_accepted(self):
@@ -108,7 +111,9 @@ class TestColumnConfigNullableAndDefault:
         assert col.default == "now()"
 
     def test_current_timestamp_accepted(self):
-        col = ColumnConfig(name="col", type="timestamptz", default="current_timestamp")
+        col = ColumnConfig(
+            name="col", type="timestamptz", default="current_timestamp"
+        )
         assert col.default == "current_timestamp"
 
     def test_gen_random_uuid_accepted(self):
@@ -116,8 +121,14 @@ class TestColumnConfigNullableAndDefault:
         assert col.default == "gen_random_uuid()"
 
     def test_boolean_literals_accepted(self):
-        assert ColumnConfig(name="col", type="boolean", default="true").default == "true"
-        assert ColumnConfig(name="col", type="boolean", default="false").default == "false"
+        assert (
+            ColumnConfig(name="col", type="boolean", default="true").default
+            == "true"
+        )
+        assert (
+            ColumnConfig(name="col", type="boolean", default="false").default
+            == "false"
+        )
 
     def test_null_literal_accepted(self):
         col = ColumnConfig(name="col", type="text", default="null")
@@ -163,15 +174,15 @@ class TestDimensionConfigTableName:
         assert cfg.table_name == "orders"
 
     def test_uppercase_rejected(self):
-        with pytest.raises(ValidationError, match="valid PostgreSQL identifier"):
+        with pytest.raises(ValidationError, match=_PG_ID):
             DimensionConfig(table_name="MyTable", columns=[])
 
     def test_hyphen_rejected(self):
-        with pytest.raises(ValidationError, match="valid PostgreSQL identifier"):
+        with pytest.raises(ValidationError, match=_PG_ID):
             DimensionConfig(table_name="my-table", columns=[])
 
     def test_name_too_long_rejected(self):
-        with pytest.raises(ValidationError, match="valid PostgreSQL identifier"):
+        with pytest.raises(ValidationError, match=_PG_ID):
             DimensionConfig(table_name="a" * 64, columns=[])
 
 

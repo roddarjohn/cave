@@ -109,10 +109,7 @@ def _to_executables(  # noqa: PLR0911
 
     if isinstance(op, CreateSchemaOp):
         stmts = op.to_sql()
-        return [
-            text(s) if isinstance(s, str) else s
-            for s in stmts
-        ]
+        return [text(s) if isinstance(s, str) else s for s in stmts]
 
     if isinstance(op, CreateRoleOp):
         return [text(s) for s in op.to_sql()]

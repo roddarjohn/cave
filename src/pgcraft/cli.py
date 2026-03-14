@@ -103,7 +103,6 @@ def generate_schema(
         typer.Option(
             "--dry-run",
             help="Print the ops without touching the database.",
-            is_flag=True,
         ),
     ] = False,
 ) -> None:
