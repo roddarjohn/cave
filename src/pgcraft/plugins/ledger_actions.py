@@ -238,12 +238,22 @@ class LedgerActionsPlugin(Plugin):
                 else:
                     existing_cols_padded.append(f"NULL AS {col_name}")
 
+            # Passthrough cols: in desired but not diff_keys
+            # or value.  These get MAX() in aggregation.
+            passthrough_cols = [
+                c
+                for c in desired_col_names
+                if c not in event.diff_keys and c != "value"
+            ]
+
             template_ctx.update(
                 desired_sql=desired_sql,
                 existing_sql=existing_sql,
                 all_cols=all_cols,
                 desired_cols=", ".join(desired_col_names),
                 existing_cols=", ".join(existing_cols_padded),
+                diff_keys=list(event.diff_keys),
+                passthrough_cols=passthrough_cols,
             )
         else:
             # Simple mode: columns from input select.
