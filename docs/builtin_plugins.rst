@@ -286,11 +286,11 @@ Example — order and invoice statistics
    )
    from pgcraft.statistics import PGCraftStatisticsView
    from pgcraft import (
-       pg_build_naming_conventions,
+       pgcraft_build_naming_conventions,
    )
 
    metadata = MetaData(
-       naming_convention=pg_build_naming_conventions(),
+       naming_convention=pgcraft_build_naming_conventions(),
    )
 
    # Reference tables (already exist in the database)

@@ -16,15 +16,15 @@ pgcraft extends the same mechanism rather than inventing a parallel system.
 Setting up naming conventions
 ------------------------------
 
-Pass :func:`~pgcraft.pg_build_naming_conventions` to your
+Pass :func:`~pgcraft.pgcraft_build_naming_conventions` to your
 :class:`~sqlalchemy.schema.MetaData` when you create it:
 
 .. code-block:: python
 
    from sqlalchemy import MetaData
-   from pgcraft import pg_build_naming_conventions
+   from pgcraft import pgcraft_build_naming_conventions
 
-   metadata = MetaData(naming_convention=pg_build_naming_conventions())
+   metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
 This populates the standard SQLAlchemy constraint keys (``pk``, ``fk``,
 ``uq``, ``ix``, ``ck``) with length-safe token callables, and also seeds the
@@ -39,19 +39,19 @@ truncated and an 8-character MD5 digest is appended to avoid collisions:
 
 .. code-block:: python
 
-   metadata = MetaData(naming_convention=pg_build_naming_conventions(max_length=63))
+   metadata = MetaData(naming_convention=pgcraft_build_naming_conventions(max_length=63))
 
 
 Overriding a specific convention
 ---------------------------------
 
 Every naming convention key is just a string in the ``naming_convention`` dict.
-Set it *after* calling :func:`~pgcraft.pg_build_naming_conventions` to override
+Set it *after* calling :func:`~pgcraft.pgcraft_build_naming_conventions` to override
 only that key while keeping all others:
 
 .. code-block:: python
 
-   metadata = MetaData(naming_convention=pg_build_naming_conventions())
+   metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
    # Give the "prices" append-only dimension custom table names.
    metadata.naming_convention["append_only_root"] = "%(table_name)s_ids"
@@ -75,7 +75,7 @@ Convention reference
 Constraint names
 ~~~~~~~~~~~~~~~~
 
-These keys are provided by :func:`~pgcraft.pg_build_naming_conventions` and
+These keys are provided by :func:`~pgcraft.pgcraft_build_naming_conventions` and
 govern how SQLAlchemy names database constraints and indexes.  They follow the
 same ``%(token)s`` interpolation format described in the SQLAlchemy
 `constraint naming conventions`_ guide.

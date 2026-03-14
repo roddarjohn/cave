@@ -39,10 +39,10 @@ pass an explicit ``plugins`` list that omits them.
    )
    from pgcraft.plugins.pk import SerialPKPlugin
    from pgcraft.plugins.simple import SimpleTablePlugin
-   from pgcraft import pg_build_naming_conventions
+   from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
-       naming_convention=pg_build_naming_conventions(),
+       naming_convention=pgcraft_build_naming_conventions(),
    )
 
    SimpleDimensionResourceFactory(
@@ -148,10 +148,10 @@ application import:
    from pgcraft.declarative import register
    from pgcraft.plugins.pk import SerialPKPlugin
    from pgcraft.plugins.simple import SimpleTablePlugin
-   from pgcraft import pg_build_naming_conventions
+   from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
-       naming_convention=pg_build_naming_conventions(),
+       naming_convention=pgcraft_build_naming_conventions(),
    )
 
 
@@ -294,10 +294,10 @@ Use the factory defaults — no explicit plugin list needed:
    from pgcraft.factory.dimension.simple import (
        SimpleDimensionResourceFactory,
    )
-   from pgcraft import pg_build_naming_conventions
+   from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
-       naming_convention=pg_build_naming_conventions(),
+       naming_convention=pgcraft_build_naming_conventions(),
    )
 
    SimpleDimensionResourceFactory(
@@ -415,10 +415,10 @@ that should not be visible to API consumers.
        SimpleTablePlugin,
        SimpleTriggerPlugin,
    )
-   from pgcraft import pg_build_naming_conventions
+   from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
-       naming_convention=pg_build_naming_conventions(),
+       naming_convention=pgcraft_build_naming_conventions(),
    )
 
    SimpleDimensionResourceFactory(
@@ -500,11 +500,11 @@ statistics:
    )
    from pgcraft.statistics import PGCraftStatisticsView
    from pgcraft import (
-       pg_build_naming_conventions,
+       pgcraft_build_naming_conventions,
    )
 
    metadata = MetaData(
-       naming_convention=pg_build_naming_conventions(),
+       naming_convention=pgcraft_build_naming_conventions(),
    )
 
    # -- Reference tables (already exist in the database) ------
@@ -724,11 +724,11 @@ are separate views that get LEFT JOINed into the API.
    )
    from pgcraft.statistics import PGCraftStatisticsView
    from pgcraft import (
-       pg_build_naming_conventions,
+       pgcraft_build_naming_conventions,
    )
 
    metadata = MetaData(
-       naming_convention=pg_build_naming_conventions(),
+       naming_convention=pgcraft_build_naming_conventions(),
    )
 
    # Reference table

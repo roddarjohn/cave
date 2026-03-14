@@ -1,3 +1,3 @@
-from pgcraft.utils.naming_convention import pg_build_naming_conventions
+from pgcraft.utils.naming_convention import pgcraft_build_naming_conventions
 
-__all__ = ["pg_build_naming_conventions"]
+__all__ = ["pgcraft_build_naming_conventions"]

@@ -36,7 +36,7 @@ def _ref(constraint: ColumnCollectionConstraint, _table: Table) -> str:
     return "_".join(f.column.table.name for f in constraint.elements)
 
 
-def pg_build_naming_conventions(
+def pgcraft_build_naming_conventions(
     max_length: int = 63,
 ) -> dict[str, str | Callable[[ColumnCollectionConstraint, Table], str]]:
     """Build a SQLAlchemy naming convention dict with length-safe names."""
