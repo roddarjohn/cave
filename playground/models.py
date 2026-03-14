@@ -1,5 +1,4 @@
 from sqlalchemy import (
-    Boolean,
     Column,
     Computed,
     Float,
@@ -15,43 +14,36 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 
+from pgcraft import (
+    LedgerEvent,
+    ledger_balances,
+    pgcraft_build_naming_conventions,
+)
 from pgcraft.check import PGCraftCheck
 from pgcraft.declarative import register
-from pgcraft.factory.dimension import (
-    AppendOnlyDimensionResourceFactory,
-    EAVDimensionResourceFactory,
-    SimpleDimensionResourceFactory,
-)
-from pgcraft.factory.ledger import LedgerResourceFactory
-from pgcraft.ledger.events import LedgerEvent, ledger_balances
-from pgcraft.plugins.api import APIPlugin
-from pgcraft.plugins.check import (
-    TableCheckPlugin,
-    TriggerCheckPlugin,
-)
+from pgcraft.factory.dimension.append_only import PGCraftAppendOnly
+from pgcraft.factory.dimension.eav import PGCraftEAV
+from pgcraft.factory.dimension.simple import PGCraftSimple
+from pgcraft.factory.ledger import PGCraftLedger
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
-    LedgerBalanceViewPlugin,
 )
-from pgcraft.plugins.pk import SerialPKPlugin
-from pgcraft.plugins.simple import (
-    SimpleTablePlugin,
-    SimpleTriggerPlugin,
-)
-from pgcraft.statistics import PGCraftStatisticsView
-from pgcraft import pgcraft_build_naming_conventions
+from pgcraft.views.actions import LedgerActions
+from pgcraft.views.api import APIView
+from pgcraft.views.balance import BalanceView
+from pgcraft.views.view import PGCraftView
 
 metadata = MetaData(
     naming_convention=pgcraft_build_naming_conventions(),
 )
 
-# -- Factory-based models -----------------------------------------------
+# -- Table factories: create the data model -------------------------
 
-SimpleDimensionResourceFactory(
-    tablename="users",
-    schemaname="public",
-    metadata=metadata,
+users = PGCraftSimple(
+    "users",
+    "public",
+    metadata,
     schema_items=[
         Column("name", String),
         Column("price", Integer),
@@ -60,45 +52,34 @@ SimpleDimensionResourceFactory(
         PGCraftCheck("{price} > 0", name="positive_price"),
         PGCraftCheck("{qty} >= 0", name="nonneg_qty"),
     ],
-    plugins=[
-        SerialPKPlugin(),
-        SimpleTablePlugin(),
-        TableCheckPlugin(),
-        APIPlugin(
-            grants=["select", "insert", "update", "delete"]
-        ),
-        SimpleTriggerPlugin(),
-    ],
 )
 
-AppendOnlyDimensionResourceFactory(
-    tablename="students",
-    schemaname="private",
-    metadata=metadata,
+students = PGCraftAppendOnly(
+    "students",
+    "private",
+    metadata,
     schema_items=[
         Column("name", String),
-        Column("user_id", ForeignKey("public.users.id")),
+        Column(
+            "user_id", ForeignKey("public.users.id")
+        ),
     ],
 )
 
-# -- Invoices (append-only dimension) ----------------------------------
-
-Invoices = AppendOnlyDimensionResourceFactory(
-    tablename="invoices",
-    schemaname="private",
-    metadata=metadata,
+Invoices = PGCraftAppendOnly(
+    "invoices",
+    "private",
+    metadata,
     schema_items=[
         Column("customer_id", Integer, nullable=False),
         Column("amount", Numeric(10, 2), nullable=False),
     ],
 )
 
-# -- Invoice lines (EAV dimension, FK to invoices) --------------------
-
-InvoiceLines = EAVDimensionResourceFactory(
-    tablename="invoice_lines",
-    schemaname="private",
-    metadata=metadata,
+InvoiceLines = PGCraftEAV(
+    "invoice_lines",
+    "private",
+    metadata,
     schema_items=[
         Column(
             "invoice_id",
@@ -109,80 +90,82 @@ InvoiceLines = EAVDimensionResourceFactory(
         Column("department", String, nullable=False),
         Column("amount", Integer, nullable=False),
     ],
-    extra_plugins=[
-        TriggerCheckPlugin(),
-        TriggerCheckPlugin(view_key="api"),
-    ],
 )
 
-# -- Products (EAV dimension) ------------------------------------------
-
-EAVDimensionResourceFactory(
-    tablename="products",
-    schemaname="private",
-    metadata=metadata,
+PGCraftEAV(
+    "products",
+    "private",
+    metadata,
     schema_items=[
         Column("color", String),
         Column("weight", Float),
-        Column("is_active", Boolean),
         Column("price", Integer),
         PGCraftCheck(
             "{price} > 0", name="positive_product_price"
         ),
     ],
-    extra_plugins=[
-        TriggerCheckPlugin(),
-        TriggerCheckPlugin(view_key="api"),
-    ],
 )
 
-# -- Orders (simple dimension) -----------------------------------------
-
-Orders = SimpleDimensionResourceFactory(
-    tablename="orders",
-    schemaname="public",
-    metadata=metadata,
+Orders = PGCraftSimple(
+    "orders",
+    "public",
+    metadata,
     schema_items=[
         Column("customer_id", Integer, nullable=False),
         Column("total", Numeric(10, 2), nullable=False),
     ],
 )
 
-# -- Customers with statistics ------------------------------------------
-
-_order_stats = select(
-    Orders.table.c.customer_id,
-    func.count().label("order_count"),
-    func.sum(Orders.table.c.total).label("order_total"),
-).group_by(Orders.table.c.customer_id)
-
-_invoice_stats = select(
-    Invoices.table.c.customer_id,
-    func.count().label("invoice_count"),
-    func.sum(Invoices.table.c.amount).label("invoiced_total"),
-).group_by(Invoices.table.c.customer_id)
-
-SimpleDimensionResourceFactory(
-    tablename="customers",
-    schemaname="public",
-    metadata=metadata,
+customers = PGCraftSimple(
+    "customers",
+    "public",
+    metadata,
     schema_items=[
         Column("name", String, nullable=False),
         Column("email", String),
-        PGCraftStatisticsView(
-            name="orders",
-            query=_order_stats,
-            join_key="customer_id",
-        ),
-        PGCraftStatisticsView(
-            name="invoices",
-            query=_invoice_stats,
-            join_key="customer_id",
-        ),
     ],
 )
 
-# -- Inventory ledger (simple event) -----------------------------------
+# -- View factories: create derived output --------------------------
+
+APIView(
+    source=users,
+    grants=["select", "insert", "update", "delete"],
+)
+APIView(source=students)
+APIView(source=Invoices)
+APIView(source=InvoiceLines)
+APIView(source=Orders)
+
+# -- Statistics via PGCraftView + APIView query lambda --
+
+_order_stats = PGCraftView(
+    "customers_orders_stats",
+    "public",
+    metadata,
+    query=select(
+        Orders.table.c.customer_id,
+        func.count().label("order_count"),
+        func.sum(Orders.table.c.total).label("order_total"),
+    ).group_by(Orders.table.c.customer_id),
+)
+
+_invoice_stats = PGCraftView(
+    "customers_invoices_stats",
+    "public",
+    metadata,
+    query=select(
+        Invoices.table.c.customer_id,
+        func.count().label("invoice_count"),
+        func.sum(Invoices.table.c.amount).label(
+            "invoiced_total"
+        ),
+    ).group_by(Invoices.table.c.customer_id),
+)
+
+APIView(source=customers)
+
+# -- Inventory ledger (simple event) --------------------------------
 
 _inv_adjust = LedgerEvent(
     name="adjust",
@@ -194,40 +177,44 @@ _inv_adjust = LedgerEvent(
     ),
 )
 
-LedgerResourceFactory(
-    tablename="inventory",
-    schemaname="private",
-    metadata=metadata,
+inventory = PGCraftLedger(
+    "inventory",
+    "private",
+    metadata,
     schema_items=[
         Column("warehouse", String, nullable=False),
         Column("sku", String, nullable=False),
         Column("reason", String, nullable=True),
     ],
-    extra_plugins=[
-        LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
-    ],
-    events=[_inv_adjust],
 )
 
-# -- General ledger (double-entry reconciliation) ---------------------
-# Each invoice line produces two balanced ledger entries:
-#   - debit  to "accounts_receivable"
-#   - credit to "revenue"
+APIView(
+    source=inventory,
+    grants=["select", "insert"],
+)
+BalanceView(
+    source=inventory, dimensions=["warehouse", "sku"]
+)
+LedgerActions(source=inventory, events=[_inv_adjust])
+
+# -- General ledger (double-entry reconciliation) -------------------
 
 _il = InvoiceLines.table
 
 _post_invoices = LedgerEvent(
     name="post",
     input=lambda p: select(
-        func.unnest(p("invoice_ids", ARRAY(Integer)))
-        .label("invoice_id"),
+        func.unnest(
+            p("invoice_ids", ARRAY(Integer))
+        ).label("invoice_id"),
     ),
     desired=lambda pginput: union_all(
         select(
             _il.c.invoice_id,
             _il.c.department,
-            literal_column("'accounts_receivable'")
-            .label("account"),
+            literal_column("'accounts_receivable'").label(
+                "account"
+            ),
             literal_column("'debit'").label("direction"),
             _il.c.amount.label("value"),
         ).where(
@@ -248,17 +235,23 @@ _post_invoices = LedgerEvent(
         ),
     ),
     existing=ledger_balances(
-        "invoice_id", "department", "account", "direction"
+        "invoice_id",
+        "department",
+        "account",
+        "direction",
     ),
     diff_keys=[
-        "invoice_id", "department", "account", "direction"
+        "invoice_id",
+        "department",
+        "account",
+        "direction",
     ],
 )
 
-LedgerResourceFactory(
-    tablename="ledger",
-    schemaname="private",
-    metadata=metadata,
+ledger = PGCraftLedger(
+    "ledger",
+    "private",
+    metadata,
     schema_items=[
         Column("invoice_id", Integer, nullable=False),
         Column("department", String, nullable=False),
@@ -267,29 +260,29 @@ LedgerResourceFactory(
     extra_plugins=[
         DoubleEntryPlugin(),
         DoubleEntryTriggerPlugin(),
-        LedgerBalanceViewPlugin(
-            dimensions=[
-                "invoice_id",
-                "department",
-                "account",
-            ]
-        ),
     ],
-    events=[_post_invoices],
 )
 
-# -- Declarative models -------------------------------------------------
+APIView(
+    source=ledger,
+    grants=["select", "insert"],
+)
+BalanceView(
+    source=ledger,
+    dimensions=[
+        "invoice_id",
+        "department",
+        "account",
+    ],
+)
+LedgerActions(source=ledger, events=[_post_invoices])
+
+# -- Declarative models --------------------------------------------
 
 
 @register(
     metadata=metadata,
-    plugins=[
-        SerialPKPlugin(),
-        SimpleTablePlugin(),
-        TableCheckPlugin(),
-        APIPlugin(grants=["select", "insert", "update"]),
-        SimpleTriggerPlugin(),
-    ],
+    api={"grants": ["select", "insert", "update"]},
 )
 class Locations:
     __tablename__ = "locations"
@@ -304,5 +297,6 @@ class Locations:
         nullable=True,
     )
     name_not_empty = PGCraftCheck(
-        "length({name}) > 0", name="locations_name_not_empty"
+        "length({name}) > 0",
+        name="locations_name_not_empty",
     )

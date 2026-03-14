@@ -1,74 +1,62 @@
-"""Ledger resource factory convenience class."""
+"""Ledger resource factory."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
 from pgcraft.factory.base import ResourceFactory
-from pgcraft.plugins.api import APIPlugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
 from pgcraft.plugins.ledger import (
     LedgerTablePlugin,
     LedgerTriggerPlugin,
 )
-from pgcraft.plugins.ledger_actions import LedgerActionsPlugin
-from pgcraft.plugins.pk import SerialPKPlugin
-from pgcraft.plugins.protect import RawTableProtectionPlugin
 
 if TYPE_CHECKING:
     from sqlalchemy import MetaData
     from sqlalchemy.schema import SchemaItem
 
     from pgcraft.check import PGCraftCheck
-    from pgcraft.ledger.events import LedgerEvent
     from pgcraft.plugin import Plugin
     from pgcraft.statistics import PGCraftStatisticsView
 
 
-class LedgerResourceFactory(ResourceFactory):
+class PGCraftLedger(ResourceFactory):
     """Create a ledger: append-only table with a value column.
 
-    Default plugins:
+    Internal plugins (always present):
 
-    1. :class:`~pgcraft.plugins.pk.SerialPKPlugin` -- auto-increment PK.
-    2. :class:`~pgcraft.plugins.entry_id.UUIDEntryIDPlugin` --
+    1. :class:`~pgcraft.plugins.entry_id.UUIDEntryIDPlugin` --
        UUID entry ID for correlating related entries.
-    3. :class:`~pgcraft.plugins.created_at.CreatedAtPlugin` --
+    2. :class:`~pgcraft.plugins.created_at.CreatedAtPlugin` --
        ``created_at`` column name.
-    4. :class:`~pgcraft.plugins.ledger.LedgerTablePlugin` --
+    3. :class:`~pgcraft.plugins.ledger.LedgerTablePlugin` --
        backing table with value column.
-    5. :class:`~pgcraft.plugins.api.APIPlugin` -- API view +
-       resource (select + insert grants).
-    6. :class:`~pgcraft.plugins.ledger.LedgerTriggerPlugin` --
-       INSERT INSTEAD OF trigger.
-    7. :class:`~pgcraft.plugins.protect.RawTableProtectionPlugin` --
-       BEFORE triggers blocking direct DML on the backing table.
 
-    Pass ``plugins=[...]`` to replace these entirely, or
-    ``extra_plugins=[...]`` to append to them.
+    A :class:`~pgcraft.plugins.pk.SerialPKPlugin` is auto-added
+    when no user plugin produces ``pk_columns``.
 
-    When ``events`` is provided, a
-    :class:`~pgcraft.plugins.ledger_actions.LedgerActionsPlugin`
-    is automatically appended to ``extra_plugins`` so it runs
-    after the table and API view have been created.
+    Use :class:`~pgcraft.views.api.APIView` to expose this table
+    through a PostgREST API view with INSERT triggers.
+    Use :class:`~pgcraft.views.balance.BalanceView`,
+    :class:`~pgcraft.views.latest.LatestView`, and
+    :class:`~pgcraft.views.actions.LedgerActions` for derived
+    views and event functions.
 
     Args:
-        events: Optional list of
-            :class:`~pgcraft.ledger.events.LedgerEvent` instances
-            to generate SQL functions for.
+        events: Deprecated.  Use
+            :class:`~pgcraft.views.actions.LedgerActions` instead.
 
     """
 
-    DEFAULT_PLUGINS: ClassVar[list[Plugin]] = [
-        SerialPKPlugin(),
+    _INTERNAL_PLUGINS: ClassVar[list[Plugin]] = [
         UUIDEntryIDPlugin(),
         CreatedAtPlugin(),
         LedgerTablePlugin(),
-        APIPlugin(grants=["select", "insert"]),
-        LedgerTriggerPlugin(),
-        RawTableProtectionPlugin("primary"),
     ]
+
+    TRIGGER_PLUGIN_CLS = LedgerTriggerPlugin
+    PROTECTED_TABLE_KEYS: ClassVar[list[str]] = []
 
     def __init__(  # noqa: PLR0913
         self,
@@ -77,7 +65,7 @@ class LedgerResourceFactory(ResourceFactory):
         metadata: MetaData,
         schema_items: list[SchemaItem | PGCraftCheck | PGCraftStatisticsView],
         *,
-        events: list[LedgerEvent] | None = None,
+        events: list | None = None,
         config: object | None = None,
         plugins: list[Plugin] | None = None,
         extra_plugins: list[Plugin] | None = None,
@@ -89,13 +77,18 @@ class LedgerResourceFactory(ResourceFactory):
             schemaname: PostgreSQL schema for generated objects.
             metadata: SQLAlchemy ``MetaData`` to register on.
             schema_items: Dimension column definitions.
-            events: Optional ledger events to generate functions for.
-            config: Optional global :class:`~pgcraft.config.PGCraftConfig`.
-            plugins: If given, replaces ``DEFAULT_PLUGINS`` entirely.
-            extra_plugins: Appended to the resolved plugin list.
+            events: Deprecated.  Use
+                :class:`~pgcraft.views.actions.LedgerActions`.
+            config: Optional global config.
+            plugins: If given, replaces ``DEFAULT_PLUGINS``.
+            extra_plugins: Appended to resolved plugin list.
 
         """
         if events:
+            from pgcraft.plugins.ledger_actions import (  # noqa: PLC0415
+                LedgerActionsPlugin,
+            )
+
             extra_plugins = [
                 *(extra_plugins or []),
                 LedgerActionsPlugin(events),

@@ -1,4 +1,4 @@
-"""Unit tests for EAVDimensionResourceFactory and EAV helper functions."""
+"""Unit tests for PGCraftEAV and EAV helper functions."""
 
 import pytest
 from sqlalchemy import (
@@ -16,23 +16,18 @@ from sqlalchemy import (
 from sqlalchemy.sql.expression import Label
 
 from pgcraft.errors import PGCraftValidationError
-from pgcraft.factory.dimension.eav import EAVDimensionResourceFactory
-from pgcraft.plugins.api import APIPlugin
-from pgcraft.plugins.created_at import CreatedAtPlugin
+from pgcraft.factory.dimension.eav import PGCraftEAV
 from pgcraft.plugins.eav import (
-    EAVTablePlugin,
-    EAVTriggerPlugin,
-    EAVViewPlugin,
     _EAVMapping,
     _needed_value_columns,
     _pivot_aggregate,
     _resolve_value_column,
 )
-from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.views.api import APIView
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------
 # _resolve_value_column
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------
 
 
 class TestResolveValueColumn:
@@ -78,9 +73,9 @@ class TestResolveValueColumn:
         assert name == name.lower()
 
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------
 # _needed_value_columns
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------
 
 
 class TestNeededValueColumns:
@@ -116,7 +111,7 @@ class TestNeededValueColumns:
         assert isinstance(_needed_value_columns(mappings), dict)
 
     def test_first_type_wins_for_duplicate(self):
-        """First occurrence of a column name determines the stored type."""
+        """First occurrence determines the stored type."""
         string_type = String()
         text_type = Text()
         mappings = [
@@ -127,9 +122,9 @@ class TestNeededValueColumns:
         assert result["text_value"] is string_type
 
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------
 # _pivot_aggregate
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------
 
 
 class TestPivotAggregate:
@@ -172,7 +167,7 @@ class TestPivotAggregate:
         assert result.key == "active"
 
     def test_boolean_involves_cast(self):
-        """Boolean aggregation uses a CAST in the SQL expression."""
+        """Boolean aggregation uses a CAST."""
 
         subq = self._make_subquery("boolean_value", Boolean())
         mapping = _EAVMapping("active", "boolean_value", Boolean())
@@ -182,37 +177,49 @@ class TestPivotAggregate:
         assert "CAST" in sql_str.upper()
 
 
-# ---------------------------------------------------------------------------
-# EAVDimensionResourceFactory — metadata-level checks
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------
+# PGCraftEAV -- metadata-level checks
+# -----------------------------------------------------------
 
 
-class TestEAVDimensionResourceFactoryTables:
+class TestPGCraftEAVTables:
     def test_entity_table_created(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
         assert "dim.product_entity" in metadata.tables
 
     def test_attribute_table_created(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
         assert "dim.product_attribute" in metadata.tables
 
     def test_exactly_two_tables(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
         assert len(metadata.tables) == 2
 
     def test_entity_table_has_pk(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
         entity = metadata.tables["dim.product_entity"]
         pk_cols = [c for c in entity.columns if c.primary_key]
@@ -220,8 +227,11 @@ class TestEAVDimensionResourceFactoryTables:
 
     def test_attribute_table_has_entity_fk(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
         attr = metadata.tables["dim.product_attribute"]
         fk_targets = {fk.column.table.name for fk in attr.foreign_keys}
@@ -229,8 +239,11 @@ class TestEAVDimensionResourceFactoryTables:
 
     def test_attribute_table_has_value_column(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
         attr = metadata.tables["dim.product_attribute"]
         col_names = {c.name for c in attr.columns}
@@ -238,20 +251,28 @@ class TestEAVDimensionResourceFactoryTables:
 
     def test_attribute_table_has_attribute_name_column(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
         attr = metadata.tables["dim.product_attribute"]
         col_names = {c.name for c in attr.columns}
         assert "attribute_name" in col_names
 
-    def test_multiple_column_types_create_separate_value_columns(self):
+    def test_multiple_column_types_create_value_columns(
+        self,
+    ):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
+        PGCraftEAV(
             "product",
             "dim",
             metadata,
-            [Column("name", String), Column("count", Integer)],
+            [
+                Column("name", String),
+                Column("count", Integer),
+            ],
         )
         attr = metadata.tables["dim.product_attribute"]
         col_names = {c.name for c in attr.columns}
@@ -260,26 +281,35 @@ class TestEAVDimensionResourceFactoryTables:
 
     def test_schema_applied(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "myschema", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "myschema",
+            metadata,
+            [Column("name", String)],
         )
         assert "myschema.product_entity" in metadata.tables
         assert "myschema.product_attribute" in metadata.tables
 
 
-class TestEAVDimensionResourceFactoryViews:
+class TestPGCraftEAVViews:
     def test_pivot_view_registered(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
         views = metadata.info.get("views")
         assert views is not None
 
     def test_pivot_view_in_dim_schema(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
         views = metadata.info["views"].views
         dim_views = [v for v in views if v.schema == "dim"]
@@ -287,44 +317,60 @@ class TestEAVDimensionResourceFactoryViews:
 
     def test_api_view_in_api_schema(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        f = PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
+        APIView(source=f)
         views = metadata.info["views"].views
         api_views = [v for v in views if v.schema == "api"]
         assert len(api_views) == 1
         assert api_views[0].name == "product"
 
-    def test_exactly_two_views(self):
+    def test_factory_creates_one_view(self):
+        """Factory alone creates exactly one pivot view."""
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
-        )
-        assert len(metadata.info["views"].views) == 2
-
-    def test_api_view_schema_respects_configuration(self):
-        metadata = MetaData()
-        EAVDimensionResourceFactory(
+        PGCraftEAV(
             "product",
             "dim",
             metadata,
             [Column("name", String)],
-            plugins=[
-                SerialPKPlugin(),
-                CreatedAtPlugin(),
-                EAVTablePlugin(),
-                EAVViewPlugin(),
-                APIPlugin(schema="custom_api"),
-                EAVTriggerPlugin(),
-            ],
         )
+        assert len(metadata.info["views"].views) == 1
+
+    def test_exactly_two_views_with_apiview(self):
+        """Factory + APIView creates two views total."""
+        metadata = MetaData()
+        f = PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
+        )
+        APIView(source=f)
+        assert len(metadata.info["views"].views) == 2
+
+    def test_api_view_schema_respects_configuration(self):
+        metadata = MetaData()
+        f = PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
+        )
+        APIView(source=f, schema="custom_api")
         views = metadata.info["views"].views
         assert any(v.schema == "custom_api" for v in views)
 
-    def test_pivot_view_definition_contains_entity_table(self):
+    def test_pivot_view_definition_contains_entity(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
         views = metadata.info["views"].views
         pivot_view = next(
@@ -333,35 +379,42 @@ class TestEAVDimensionResourceFactoryViews:
         assert "product_entity" in pivot_view.definition
 
 
-class TestEAVDimensionResourceFactoryTriggers:
+class TestPGCraftEAVTriggers:
     def test_functions_registered(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        f = PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
+        APIView(source=f)
         functions = metadata.info.get("functions")
         assert functions is not None
-        # 6 INSTEAD OF functions (2 views × 3 ops)
-        # + 2 protection functions (one per raw table: entity + attribute)
+        # 6 INSTEAD OF functions (2 views x 3 ops)
+        # + 2 protection functions (entity + attribute)
         assert len(functions.functions) == 8
 
     def test_triggers_registered(self):
         metadata = MetaData()
-        EAVDimensionResourceFactory(
-            "product", "dim", metadata, [Column("name", String)]
+        f = PGCraftEAV(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
         )
+        APIView(source=f)
         triggers = metadata.info.get("triggers")
         assert triggers is not None
-        # 6 INSTEAD OF triggers + 6 BEFORE protection triggers
-        # (2 tables × 3 ops)
+        # 6 INSTEAD OF + 6 BEFORE protection (2 tables x 3)
         assert len(triggers.triggers) == 12
 
 
-class TestEAVDimensionResourceFactoryValidation:
+class TestPGCraftEAVValidation:
     def test_pk_column_raises(self):
         metadata = MetaData()
         with pytest.raises(PGCraftValidationError):
-            EAVDimensionResourceFactory(
+            PGCraftEAV(
                 "product",
                 "dim",
                 metadata,

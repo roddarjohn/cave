@@ -10,12 +10,13 @@ from sqlalchemy import (
 )
 
 from pgcraft import pgcraft_build_naming_conventions
-from pgcraft.factory.dimension import EAVDimensionResourceFactory
+from pgcraft.factory import PGCraftEAV
+from pgcraft.views import APIView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
 # --- example start ---
-EAVDimensionResourceFactory(
+products = PGCraftEAV(
     tablename="products",
     schemaname="private",
     metadata=metadata,
@@ -26,6 +27,8 @@ EAVDimensionResourceFactory(
         Column("price", Integer),
     ],
 )
+
+APIView(source=products)
 # --- example end ---
 
 SCHEMA_DESCRIPTION = (

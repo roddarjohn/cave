@@ -1,43 +1,48 @@
-"""EAV dimension resource factory convenience class."""
+"""EAV dimension resource factory."""
 
 from typing import ClassVar
 
 from pgcraft.factory.base import ResourceFactory
 from pgcraft.plugin import Plugin
-from pgcraft.plugins.api import APIPlugin
+from pgcraft.plugins.check import TriggerCheckPlugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
-from pgcraft.plugins.eav import EAVTablePlugin, EAVTriggerPlugin, EAVViewPlugin
-from pgcraft.plugins.pk import SerialPKPlugin
-from pgcraft.plugins.protect import RawTableProtectionPlugin
-from pgcraft.plugins.statistics import StatisticsViewPlugin
+from pgcraft.plugins.eav import (
+    EAVTablePlugin,
+    EAVTriggerPlugin,
+    EAVViewPlugin,
+)
 
 
-class EAVDimensionResourceFactory(ResourceFactory):
+class PGCraftEAV(ResourceFactory):
     """Create an EAV (Entity-Attribute-Value) dimension.
 
-    Default plugins:
+    Internal plugins (always present):
 
-    1. :class:`~pgcraft.plugins.pk.SerialPKPlugin` -- auto-increment PK.
-    2. :class:`~pgcraft.plugins.created_at.CreatedAtPlugin` --
-       ``created_at`` timestamp on entity table.
-    3. :class:`~pgcraft.plugins.eav.EAVTablePlugin` -- entity +
+    1. :class:`~pgcraft.plugins.created_at.CreatedAtPlugin` --
+       ``created_at`` column name.
+    2. :class:`~pgcraft.plugins.eav.EAVTablePlugin` -- entity +
        attribute tables.
-    4. :class:`~pgcraft.plugins.eav.EAVViewPlugin` -- pivot view.
-    5. :class:`~pgcraft.plugins.statistics.StatisticsViewPlugin` --
-       statistics views (no-op when no statistics items).
-    6. :class:`~pgcraft.plugins.api.APIPlugin` -- API view + resource.
-    7. :class:`~pgcraft.plugins.eav.EAVTriggerPlugin` -- INSTEAD OF triggers.
-    8. :class:`~pgcraft.plugins.protect.RawTableProtectionPlugin` --
-       BEFORE triggers blocking direct DML on entity and attribute tables.
+    3. :class:`~pgcraft.plugins.eav.EAVViewPlugin` -- pivot view
+       proxy.
+    4. :class:`~pgcraft.plugins.check.TriggerCheckPlugin` --
+       trigger-based checks on the pivot view.
+
+    A :class:`~pgcraft.plugins.pk.SerialPKPlugin` is auto-added
+    when no user plugin produces ``pk_columns``.
+
+    Use :class:`~pgcraft.views.api.APIView` to expose this table
+    through a PostgREST API view with CRUD triggers.
     """
 
-    DEFAULT_PLUGINS: ClassVar[list[Plugin]] = [
-        SerialPKPlugin(),
+    _INTERNAL_PLUGINS: ClassVar[list[Plugin]] = [
         CreatedAtPlugin(),
         EAVTablePlugin(),
         EAVViewPlugin(),
-        StatisticsViewPlugin(),
-        APIPlugin(),
-        EAVTriggerPlugin(),
-        RawTableProtectionPlugin("entity", "attribute"),
+        TriggerCheckPlugin(),
+    ]
+
+    TRIGGER_PLUGIN_CLS = EAVTriggerPlugin
+    PROTECTED_TABLE_KEYS: ClassVar[list[str]] = [
+        "entity",
+        "attribute",
     ]

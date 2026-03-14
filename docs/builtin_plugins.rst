@@ -83,15 +83,11 @@ schema items.
 
    from sqlalchemy import Column, MetaData, String
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import SimpleTablePlugin
+   from pgcraft.factory import PGCraftSimple
 
    metadata = MetaData()
 
-   SimpleDimensionResourceFactory(
+   PGCraftSimple(
        tablename="users",
        schemaname="public",
        metadata=metadata,
@@ -99,43 +95,32 @@ schema items.
            Column("name", String, nullable=False),
            Column("email", String),
        ],
-       plugins=[
-           SerialPKPlugin(),
-           SimpleTablePlugin(),
-       ],
    )
 
 This creates ``public.users`` with columns ``id``, ``name``,
 ``email``.
 
 
-APIPlugin
----------
+APIView
+-------
 
-.. module:: pgcraft.plugins.api
+.. module:: pgcraft.views.api
 
-Creates a PostgREST-facing view and registers the API resource
-for role/grant generation.
-
-**Produces:** ``"api"`` (via ``view_key``)
-
-**Requires:** ``"primary"`` (via ``table_key``)
+API views are created separately from the factory using
+:class:`~pgcraft.views.api.APIView`.  This creates a
+PostgREST-facing view and registers the API resource for
+role/grant generation.
 
 **Parameters:**
+
+``source``
+    The factory instance to create the API view for.
 
 ``schema``
     Schema for the API view (default ``"api"``).
 
 ``grants``
     PostgREST privileges (default ``["select"]``).
-
-``table_key``
-    Context key to read the source table from (default
-    ``"primary"``).
-
-``view_key``
-    Context key to store the created view under (default
-    ``"api"``).
 
 ``columns``
     List of column names to include in the view.  When ``None``
@@ -146,24 +131,32 @@ for role/grant generation.
     List of column names to hide from the view.  Mutually
     exclusive with ``columns``.
 
-``joins_key``
-    Context key holding a dict of
-    :class:`~pgcraft.statistics.JoinedView` entries (default
-    ``"joins"``).  LEFT JOINs each view into the API view when
-    the key exists and is non-empty.
-
 Default behaviour — ``SELECT *``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   from pgcraft.plugins.api import APIPlugin
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.views import APIView
+
+   users = PGCraftSimple(
+       tablename="users",
+       schemaname="public",
+       metadata=metadata,
+       schema_items=[
+           Column("name", String, nullable=False),
+           Column("email", String),
+       ],
+   )
 
    # Exposes all columns, SELECT only
-   APIPlugin()
+   APIView(source=users)
 
    # Full CRUD grants
-   APIPlugin(grants=["select", "insert", "update", "delete"])
+   APIView(
+       source=users,
+       grants=["select", "insert", "update", "delete"],
+   )
 
 Column selection
 ~~~~~~~~~~~~~~~~
@@ -173,14 +166,7 @@ internal columns that should not be visible through the API:
 
 .. code-block:: python
 
-   from sqlalchemy import Column, String, Text
-
-   schema_items = [
-       Column("name", String, nullable=False),
-       Column("internal_notes", Text),  # hidden from API
-   ]
-
-   APIPlugin(columns=["id", "name"])
+   APIView(source=users, columns=["id", "name"])
 
 The generated view:
 
@@ -197,7 +183,10 @@ included automatically:
 
 .. code-block:: python
 
-   APIPlugin(exclude_columns=["internal_notes"])
+   APIView(
+       source=users,
+       exclude_columns=["internal_notes"],
+   )
 
 This is often more convenient than ``columns`` when you only want
 to hide one or two columns from a large table.
@@ -208,21 +197,15 @@ Joins
 When ``PGCraftStatisticsView`` items are present in
 ``schema_items``, the default ``StatisticsViewPlugin`` creates
 the views and stores :class:`~pgcraft.statistics.JoinedView`
-entries in ``ctx["joins"]``.  ``APIPlugin`` automatically LEFT
+entries in ``ctx["joins"]``.  ``APIView`` automatically LEFT
 JOINs them into the API view — no extra configuration needed.
 
-From the API plugin's perspective, joins are generic — any plugin
+From the API view's perspective, joins are generic — any plugin
 that writes a dict of ``JoinedView`` entries to ``ctx["joins"]``
 will be picked up automatically.
 
 See :ref:`StatisticsViewPlugin <statistics-view-plugin>` for
 the statistics-specific workflow.
-
-Combined with column exclusion:
-
-.. code-block:: python
-
-   APIPlugin(exclude_columns=["internal_notes"])
 
 
 .. _statistics-view-plugin:
@@ -281,10 +264,9 @@ Example — order and invoice statistics
        select,
    )
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
+   from pgcraft.factory import PGCraftSimple
    from pgcraft.statistics import PGCraftStatisticsView
+   from pgcraft.views import APIView
    from pgcraft import (
        pgcraft_build_naming_conventions,
    )
@@ -323,8 +305,8 @@ Example — order and invoice statistics
        func.sum(invoices.c.amount).label("invoiced_total"),
    ).group_by(invoices.c.customer_id)
 
-   # Dimension with statistics — just use defaults
-   SimpleDimensionResourceFactory(
+   # Dimension with statistics
+   customers = PGCraftSimple(
        tablename="customers",
        schemaname="public",
        metadata=metadata,
@@ -343,6 +325,8 @@ Example — order and invoice statistics
            ),
        ],
    )
+
+   APIView(source=customers)
 
 This creates:
 
@@ -438,28 +422,12 @@ SimpleTriggerPlugin
 -------------------
 
 Registers INSTEAD OF ``INSERT`` / ``UPDATE`` / ``DELETE`` triggers
-on the API view, forwarding writes to the backing table.
+on the API view, forwarding writes to the backing table.  This is
+an internal plugin used by ``APIView`` -- not typically configured
+directly by users.
 
 **Requires:** ``"primary"`` (via ``table_key``),
 ``"api"`` (via ``view_key``)
-
-**Parameters:**
-
-``table_key``
-    Context key for the backing table (default ``"primary"``).
-
-``view_key``
-    Context key for the API view (default ``"api"``).
-
-**Example:**
-
-.. code-block:: python
-
-   from pgcraft.plugins.simple import SimpleTriggerPlugin
-
-   SimpleTriggerPlugin()
-
-This is typically the last plugin in a simple dimension pipeline.
 
 
 TableCheckPlugin
@@ -477,20 +445,22 @@ Resolves :class:`~pgcraft.check.PGCraftCheck` items into real
 .. code-block:: python
 
    from pgcraft.check import PGCraftCheck
-   from pgcraft.plugins.check import TableCheckPlugin
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.views import APIView
 
-   schema_items = [
-       Column("price", Integer),
-       PGCraftCheck("{price} > 0", name="positive_price"),
-   ]
+   products = PGCraftSimple(
+       tablename="products",
+       schemaname="public",
+       metadata=metadata,
+       schema_items=[
+           Column("price", Integer),
+           PGCraftCheck(
+               "{price} > 0", name="positive_price"
+           ),
+       ],
+   )
 
-   plugins = [
-       SerialPKPlugin(),
-       SimpleTablePlugin(),
-       TableCheckPlugin(),
-       APIPlugin(),
-       SimpleTriggerPlugin(),
-   ]
+   APIView(source=products)
 
 
 TriggerCheckPlugin
@@ -560,11 +530,10 @@ update (preserving history) and handle deletes.
 
    from sqlalchemy import Column, ForeignKey, String
 
-   from pgcraft.factory.dimension.append_only import (
-       AppendOnlyDimensionResourceFactory,
-   )
+   from pgcraft.factory import PGCraftAppendOnly
+   from pgcraft.views import APIView
 
-   AppendOnlyDimensionResourceFactory(
+   students = PGCraftAppendOnly(
        tablename="students",
        schemaname="private",
        metadata=metadata,
@@ -573,6 +542,8 @@ update (preserving history) and handle deletes.
            Column("user_id", ForeignKey("public.users.id")),
        ],
    )
+
+   APIView(source=students)
 
 This creates ``private.students`` (root), ``private.students_log``
 (attributes), a join view at ``private.students_current``, and an
@@ -623,12 +594,11 @@ updates into individual EAV attribute rows.
    from sqlalchemy import Boolean, Column, Float, Integer, String
 
    from pgcraft.check import PGCraftCheck
-   from pgcraft.factory.dimension.eav import (
-       EAVDimensionResourceFactory,
-   )
+   from pgcraft.factory import PGCraftEAV
    from pgcraft.plugins.check import TriggerCheckPlugin
+   from pgcraft.views import APIView
 
-   EAVDimensionResourceFactory(
+   products = PGCraftEAV(
        tablename="products",
        schemaname="private",
        metadata=metadata,
@@ -646,6 +616,8 @@ updates into individual EAV attribute rows.
            TriggerCheckPlugin(view_key="api"),
        ],
    )
+
+   APIView(source=products)
 
 This creates ``private.products_entity``,
 ``private.products_attribute``, a pivot view, and an API view.
@@ -665,8 +637,8 @@ declarations.  A typical simple dimension pipeline runs:
    SimpleTablePlugin     → primary, __root__
    TableCheckPlugin      (reads __root__)
    StatisticsViewPlugin  → joins  (no-op if empty)
-   APIPlugin             → api
-   SimpleTriggerPlugin   (reads primary, api)
+
+API views and triggers are created separately via ``APIView``.
 
 All context key names are overridable via constructor arguments,
 so two independent pipelines can coexist in one factory.

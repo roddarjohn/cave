@@ -40,11 +40,12 @@ pip install pgcraft            # or: uv add pgcraft
 
 ```python
 from sqlalchemy import Column, MetaData, String
-from pgcraft.factory.dimension import SimpleDimensionResourceFactory
+from pgcraft.factory import PGCraftSimple
+from pgcraft.views import APIView
 
 metadata = MetaData()
 
-SimpleDimensionResourceFactory(
+users = PGCraftSimple(
     tablename="users",
     schemaname="public",
     metadata=metadata,
@@ -53,6 +54,8 @@ SimpleDimensionResourceFactory(
         Column("email", String),
     ],
 )
+
+APIView(source=users)
 ```
 
 This creates:

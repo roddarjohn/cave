@@ -1,4 +1,4 @@
-"""Integration tests for LedgerResourceFactory.
+"""Integration tests for PGCraftLedger.
 
 Creates real database objects and verifies insert-only operations
 through the API view and its INSTEAD OF trigger.

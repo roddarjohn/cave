@@ -12,11 +12,9 @@ Use pgcraft purely as a migration generator — define your schema with
 pgcraft factories, produce Alembic migrations, and export them as raw
 SQL. No pgcraft code runs at application time.
 
-The default factory plugins include
-:class:`~pgcraft.plugins.api.APIPlugin` (PostgREST views) and
-:class:`~pgcraft.plugins.simple.SimpleTriggerPlugin` (INSTEAD OF
-triggers on those views). Since this recipe does not use PostgREST,
-pass an explicit ``plugins`` list that omits them.
+API views are created separately via
+:class:`~pgcraft.views.api.APIView`.  Since this recipe does not
+use PostgREST, simply omit the ``APIView`` call.
 
 **Project layout**::
 
@@ -34,18 +32,14 @@ pass an explicit ``plugins`` list that omits them.
    # models.py
    from sqlalchemy import Column, MetaData, Numeric, String
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import SimpleTablePlugin
+   from pgcraft.factory import PGCraftSimple
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
    )
 
-   SimpleDimensionResourceFactory(
+   PGCraftSimple(
        tablename="products",
        schemaname="inventory",
        metadata=metadata,
@@ -53,10 +47,6 @@ pass an explicit ``plugins`` list that omits them.
            Column("name", String, nullable=False),
            Column("sku", String(32), nullable=False),
            Column("price", Numeric(10, 2), nullable=False),
-       ],
-       plugins=[
-           SerialPKPlugin(),
-           SimpleTablePlugin(),
        ],
    )
 
@@ -130,9 +120,8 @@ import time — access it via
 ``metadata.tables["<schema>.<tablename>"]`` to get a standard
 :class:`sqlalchemy.schema.Table` object.
 
-Since this recipe does not use PostgREST, the plugin list omits
-:class:`~pgcraft.plugins.api.APIPlugin` and
-:class:`~pgcraft.plugins.simple.SimpleTriggerPlugin`.
+Since this recipe does not use PostgREST, simply omit the
+``APIView`` call.
 
 Shared models module
 ~~~~~~~~~~~~~~~~~~~~
@@ -146,8 +135,6 @@ application import:
    from sqlalchemy import Column, Integer, MetaData, String
 
    from pgcraft.declarative import register
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import SimpleTablePlugin
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
@@ -155,13 +142,7 @@ application import:
    )
 
 
-   @register(
-       metadata=metadata,
-       plugins=[
-           SerialPKPlugin(),
-           SimpleTablePlugin(),
-       ],
-   )
+   @register(metadata=metadata)
    class Users:
        __tablename__ = "users"
        __table_args__ = {"schema": "public"}
@@ -262,45 +243,38 @@ Adding PostgREST API views
 
 pgcraft can generate PostgREST-compatible API views, INSTEAD OF
 triggers for write operations, and the role/grant declarations that
-PostgREST expects. This is the default behaviour — the built-in
-factory plugins include
-:class:`~pgcraft.plugins.api.APIPlugin` and
-:class:`~pgcraft.plugins.simple.SimpleTriggerPlugin` out of the box.
+PostgREST expects.  Create a factory, then call
+:class:`~pgcraft.views.api.APIView` to expose it.
 
 How it works
 ~~~~~~~~~~~~
 
-When :class:`~pgcraft.plugins.api.APIPlugin` runs it:
+When :class:`~pgcraft.views.api.APIView` is called it:
 
 1. Creates a view in the ``api`` schema (configurable) that
    ``SELECT *`` s from the backing table.
 2. Registers an :class:`~pgcraft.resource.APIResource` on the
    metadata so that pgcraft can generate role and grant statements.
-
-:class:`~pgcraft.plugins.simple.SimpleTriggerPlugin` then creates
-INSTEAD OF ``INSERT`` / ``UPDATE`` / ``DELETE`` triggers on that
-view so PostgREST clients can write through it.
+3. Creates INSTEAD OF ``INSERT`` / ``UPDATE`` / ``DELETE`` triggers
+   on the view so PostgREST clients can write through it.
 
 Minimal example
 ~~~~~~~~~~~~~~~
-
-Use the factory defaults — no explicit plugin list needed:
 
 .. code-block:: python
 
    # models.py
    from sqlalchemy import Column, Integer, MetaData, Numeric, String
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.views import APIView
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
    )
 
-   SimpleDimensionResourceFactory(
+   products = PGCraftSimple(
        tablename="products",
        schemaname="inventory",
        metadata=metadata,
@@ -310,6 +284,8 @@ Use the factory defaults — no explicit plugin list needed:
            Column("price", Numeric(10, 2), nullable=False),
        ],
    )
+
+   APIView(source=products)
 
 This creates:
 
@@ -322,30 +298,15 @@ This creates:
 Customising grants
 ~~~~~~~~~~~~~~~~~~
 
-By default the ``anon`` role gets only ``SELECT``. Pass a ``grants``
-list to :class:`~pgcraft.plugins.api.APIPlugin` to allow writes:
+By default the ``anon`` role gets only ``SELECT``. Pass a
+``grants`` list to :class:`~pgcraft.views.api.APIView` to allow
+writes:
 
 .. code-block:: python
 
-   from pgcraft.plugins.api import APIPlugin
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
-
-   SimpleDimensionResourceFactory(
-       tablename="products",
-       schemaname="inventory",
-       metadata=metadata,
-       schema_items=[
-           Column("name", String, nullable=False),
-           Column("sku", String(32), nullable=False),
-           Column("price", Numeric(10, 2), nullable=False),
-       ],
-       plugins=[
-           SerialPKPlugin(),
-           SimpleTablePlugin(),
-           APIPlugin(grants=["select", "insert", "update", "delete"]),
-           SimpleTriggerPlugin(),
-       ],
+   APIView(
+       source=products,
+       grants=["select", "insert", "update", "delete"],
    )
 
 Changing the API schema
@@ -356,7 +317,7 @@ parameter:
 
 .. code-block:: python
 
-   APIPlugin(schema="reporting")
+   APIView(source=products, schema="reporting")
 
 PostgREST setup
 ~~~~~~~~~~~~~~~
@@ -397,31 +358,24 @@ the full query syntax and configuration reference.
 Exposing a subset of columns
 -----------------------------
 
-By default :class:`~pgcraft.plugins.api.APIPlugin` creates a
-``SELECT *`` view.  Pass a ``columns`` list to expose only specific
-columns through the API — useful when a table has internal columns
-that should not be visible to API consumers.
+By default :class:`~pgcraft.views.api.APIView` creates a
+``SELECT *`` view.  Pass a ``columns`` list to expose only
+specific columns through the API — useful when a table has
+internal columns that should not be visible to API consumers.
 
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, Numeric, String, Text
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
-   from pgcraft.plugins.api import APIPlugin
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import (
-       SimpleTablePlugin,
-       SimpleTriggerPlugin,
-   )
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.views import APIView
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
    )
 
-   SimpleDimensionResourceFactory(
+   products = PGCraftSimple(
        tablename="products",
        schemaname="inventory",
        metadata=metadata,
@@ -431,12 +385,11 @@ that should not be visible to API consumers.
            Column("price", Numeric(10, 2), nullable=False),
            Column("internal_notes", Text),  # hidden from API
        ],
-       plugins=[
-           SerialPKPlugin(),
-           SimpleTablePlugin(),
-           APIPlugin(columns=["id", "name", "sku", "price"]),
-           SimpleTriggerPlugin(),
-       ],
+   )
+
+   APIView(
+       source=products,
+       columns=["id", "name", "sku", "price"],
    )
 
 The generated view selects only the listed columns:
@@ -457,7 +410,10 @@ tables:
 
 .. code-block:: python
 
-   APIPlugin(exclude_columns=["internal_notes"])
+   APIView(
+       source=products,
+       exclude_columns=["internal_notes"],
+   )
 
 
 .. _cookbook-statistics-views:
@@ -495,10 +451,9 @@ statistics:
        select,
    )
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
+   from pgcraft.factory import PGCraftSimple
    from pgcraft.statistics import PGCraftStatisticsView
+   from pgcraft.views import APIView
    from pgcraft import (
        pgcraft_build_naming_conventions,
    )
@@ -545,7 +500,7 @@ statistics:
 
    # -- Dimension with statistics -----------------------------
 
-   SimpleDimensionResourceFactory(
+   customer = PGCraftSimple(
        tablename="customer",
        schemaname="dim",
        metadata=metadata,
@@ -564,6 +519,8 @@ statistics:
            ),
        ],
    )
+
+   APIView(source=customer)
 
 This creates:
 
@@ -597,10 +554,10 @@ How it works
 1. ``PGCraftStatisticsView`` items are filtered out of
    ``schema_items`` before table creation — they do not add
    columns to the backing table.
-2. ``StatisticsViewPlugin`` (a default plugin) compiles each
+2. ``StatisticsViewPlugin`` (an internal plugin) compiles each
    query to SQL and creates a view (or materialized view) named
    ``{tablename}_{name}_statistics``.
-3. ``APIPlugin`` reads the view info and generates LEFT JOINs
+3. ``APIView`` reads the view info and generates LEFT JOINs
    into the API view automatically.
 
 Column names are derived from the ``select()`` expression
@@ -672,24 +629,14 @@ which works when the statistics query uses the same name:
 Combining column selection with statistics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Use ``columns`` on ``APIPlugin`` to control which table columns
+Use ``columns`` on ``APIView`` to control which table columns
 appear, while statistics columns are always appended:
 
 .. code-block:: python
 
-   from pgcraft.plugins.api import APIPlugin
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import (
-       SimpleTablePlugin,
-       SimpleTriggerPlugin,
-   )
+   from pgcraft.views import APIView
 
-   plugins=[
-       SerialPKPlugin(),
-       SimpleTablePlugin(),
-       APIPlugin(columns=["id", "name"]),
-       SimpleTriggerPlugin(),
-   ]
+   APIView(source=customer, columns=["id", "name"])
 
 
 .. _cookbook-computed-and-statistics:

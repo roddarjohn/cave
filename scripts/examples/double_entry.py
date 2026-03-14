@@ -3,17 +3,17 @@
 from sqlalchemy import Column, ForeignKey, MetaData, String
 
 from pgcraft import pgcraft_build_naming_conventions
-from pgcraft.factory.dimension import SimpleDimensionResourceFactory
-from pgcraft.factory.ledger import LedgerResourceFactory
+from pgcraft.factory import PGCraftLedger, PGCraftSimple
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
 )
+from pgcraft.views import APIView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
 # --- example start ---
-SimpleDimensionResourceFactory(
+accounts = PGCraftSimple(
     tablename="accounts",
     schemaname="finance",
     metadata=metadata,
@@ -23,7 +23,9 @@ SimpleDimensionResourceFactory(
     ],
 )
 
-LedgerResourceFactory(
+APIView(source=accounts)
+
+journal = PGCraftLedger(
     tablename="journal",
     schemaname="finance",
     metadata=metadata,
@@ -38,6 +40,11 @@ LedgerResourceFactory(
         DoubleEntryPlugin(),
         DoubleEntryTriggerPlugin(),
     ],
+)
+
+APIView(
+    source=journal,
+    grants=["select", "insert"],
 )
 # --- example end ---
 

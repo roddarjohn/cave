@@ -21,11 +21,17 @@ if TYPE_CHECKING:
     from pgcraft.statistics import PGCraftStatisticsView
 
 
+def _has_pk_producer(plugins: list[Plugin]) -> bool:
+    """Return True if any plugin produces ``pk_columns``."""
+    return any("pk_columns" in p.resolved_produces() for p in plugins)
+
+
 def _resolve_plugins(
     config: object | None,  # PGCraftConfig, avoiding circular import
     plugins: list[Plugin] | None,
     extra_plugins: list[Plugin] | None,
     defaults: list[Plugin],
+    internal: list[Plugin] | None = None,
 ) -> list[Plugin]:
     """Resolve the effective plugin list for a factory invocation.
 
@@ -36,6 +42,7 @@ def _resolve_plugins(
             ``defaults`` is used.
         extra_plugins: Always appended to the resolved list.
         defaults: The factory's ``DEFAULT_PLUGINS``.
+        internal: Internal plugins always appended last.
 
     Returns:
         Ordered list of plugins to run.
@@ -44,7 +51,17 @@ def _resolve_plugins(
     global_plugins: list[Plugin] = getattr(config, "plugins", [])
     factory_plugins = plugins if plugins is not None else list(defaults)
     local = extra_plugins or []
-    return global_plugins + factory_plugins + local
+    user_plugins = global_plugins + factory_plugins + local
+
+    # Auto-add SerialPKPlugin if no user plugin produces pk_columns
+    # and internal plugins need it.
+    internal_plugins = list(internal or [])
+    if internal_plugins and not _has_pk_producer(user_plugins):
+        from pgcraft.plugins.pk import SerialPKPlugin  # noqa: PLC0415
+
+        user_plugins = [SerialPKPlugin(), *user_plugins]
+
+    return user_plugins + internal_plugins
 
 
 def _run_plugin_validators(
@@ -130,10 +147,11 @@ def _sort_plugins(plugins: list[Plugin]) -> list[Plugin]:
 class ResourceFactory:
     """Core factory: resolves plugins and runs them in dependency order.
 
-    Subclasses declare ``DEFAULT_PLUGINS`` to establish their
-    standard behaviour.  Callers can override or extend the plugin
-    list via ``plugins`` / ``extra_plugins``, and inject global
-    plugins via ``config``.
+    Subclasses declare ``DEFAULT_PLUGINS`` for user-facing defaults
+    and ``_INTERNAL_PLUGINS`` for always-present built-in logic.
+    Callers can override or extend the plugin list via
+    ``plugins`` / ``extra_plugins``, and inject global plugins via
+    ``config``.
 
     Plugin execution order is determined by each plugin's
     :attr:`~pgcraft.plugin.Plugin.produces` and
@@ -141,15 +159,12 @@ class ResourceFactory:
     with no declared dependencies run in the order they appear in
     the list.
 
-    Example::
+    Resolution order: ``global_plugins + user_plugins +
+    internal_plugins``, then topological sort.
 
-        class SimpleDimensionResourceFactory(ResourceFactory):
-            DEFAULT_PLUGINS: ClassVar[list[Plugin]] = [
-                SerialPKPlugin(),
-                SimpleTablePlugin(),
-                APIPlugin(),
-                SimpleTriggerPlugin(),
-            ]
+    If no user or global plugin produces ``pk_columns`` and
+    internal plugins are present, a
+    :class:`~pgcraft.plugins.pk.SerialPKPlugin` is auto-prepended.
 
     Args:
         tablename: Name of the dimension table.
@@ -170,6 +185,7 @@ class ResourceFactory:
     """
 
     DEFAULT_PLUGINS: ClassVar[list[Plugin]] = []
+    _INTERNAL_PLUGINS: ClassVar[list[Plugin]] = []
 
     table: FromClause
     """The root selectable created by the factory.
@@ -177,6 +193,14 @@ class ResourceFactory:
     This is the ``__root__`` context value set by the table
     plugin, exposing the column metadata for use in queries,
     foreign key references, and ledger event lambdas.
+    """
+
+    ctx: FactoryContext
+    """The factory context after plugin execution.
+
+    Downstream view factories (e.g.
+    :class:`~pgcraft.views.api.APIView`) read this to access
+    tables, columns, and other plugin outputs.
     """
 
     def __init__(  # noqa: PLR0913
@@ -197,7 +221,11 @@ class ResourceFactory:
             metadata.info["pgcraft_config"] = config
 
         resolved = _resolve_plugins(
-            config, plugins, extra_plugins, self.DEFAULT_PLUGINS
+            config,
+            plugins,
+            extra_plugins,
+            self.DEFAULT_PLUGINS,
+            self._INTERNAL_PLUGINS,
         )
         _run_plugin_validators(resolved)
 
@@ -212,5 +240,6 @@ class ResourceFactory:
         for p in _sort_plugins(resolved):
             p.run(ctx)
 
+        self.ctx = ctx
         if "__root__" in ctx:
             self.table = ctx["__root__"]
