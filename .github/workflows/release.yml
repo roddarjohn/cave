@@ -13,8 +13,28 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
+      pr_number: ${{ steps.release.outputs.pr }}
     steps:
       - id: release
         uses: googleapis/release-please-action@v4
         with:
           token: ${{ secrets.RELEASE_TOKEN }}
+
+  update-lockfile:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.pr_number }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release-please--branches--main
+          token: ${{ secrets.RELEASE_TOKEN }}
+      - uses: astral-sh/setup-uv@v5
+      - run: uv lock
+      - name: Commit updated lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add uv.lock
+          git diff --cached --quiet || git commit -m "chore: update uv.lock"
+          git push
