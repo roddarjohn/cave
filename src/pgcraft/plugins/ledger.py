@@ -226,15 +226,15 @@ class LedgerTriggerPlugin(Plugin):
             ops=[
                 (
                     "insert",
-                    load_template(_TEMPLATES / "insert.mako"),
+                    load_template(_TEMPLATES / "insert.plpgsql.mako"),
                 ),
                 (
                     "update",
-                    load_template(_TEMPLATES / "reject_update.mako"),
+                    load_template(_TEMPLATES / "reject_update.plpgsql.mako"),
                 ),
                 (
                     "delete",
-                    load_template(_TEMPLATES / "reject_delete.mako"),
+                    load_template(_TEMPLATES / "reject_delete.plpgsql.mako"),
                 ),
             ],
             naming_defaults=_NAMING_DEFAULTS,
@@ -465,7 +465,7 @@ class LedgerBalanceCheckPlugin(Plugin):
         dim_format = ", ".join("%" for _ in self.dimensions)
         dim_values = ", ".join(f"_bad.{d}" for d in self.dimensions)
 
-        template = load_template(_TEMPLATES / "balance_check.mako")
+        template = load_template(_TEMPLATES / "balance_check.plpgsql.mako")
         body = template.render(
             table=table_fullname,
             dim_cols=dim_cols,
@@ -600,7 +600,7 @@ class DoubleEntryTriggerPlugin(Plugin):
         entry_id_col = ctx["entry_id_column"]
         table_fullname = f"{ctx.schemaname}.{table.name}"
 
-        template = load_template(_TEMPLATES / "double_entry_check.mako")
+        template = load_template(_TEMPLATES / "double_entry_check.plpgsql.mako")
         body = template.render(
             table=table_fullname,
             direction_col=direction_col,

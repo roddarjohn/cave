@@ -388,15 +388,15 @@ class EAVTriggerPlugin(Plugin):
         ops = [
             (
                 "insert",
-                load_template(_TEMPLATES / "insert.mako"),
+                load_template(_TEMPLATES / "insert.plpgsql.mako"),
             ),
             (
                 "update",
-                load_template(_TEMPLATES / "update.mako"),
+                load_template(_TEMPLATES / "update.plpgsql.mako"),
             ),
             (
                 "delete",
-                load_template(_TEMPLATES / "delete.mako"),
+                load_template(_TEMPLATES / "delete.plpgsql.mako"),
             ),
         ]
 

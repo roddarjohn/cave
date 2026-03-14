@@ -6,13 +6,13 @@ setup:
 lint:
     uv run --group lint ruff check && uv run --group lint ruff format --check && just sql-lint
 
-# Lint SQL and Mako template files with sqlfluff
+# Lint .sql files with sqlfluff
 sql-lint:
-    uv run --group lint sqlfluff lint src/ scripts/ playground/
+    uv run --group lint sqlfluff lint .
 
-# Fix SQL and Mako template files with sqlfluff
+# Fix .sql files with sqlfluff
 sql-format:
-    uv run --group lint sqlfluff fix src/ scripts/ playground/
+    uv run --group lint sqlfluff fix .
 
 # Run ty type checker
 type-check:

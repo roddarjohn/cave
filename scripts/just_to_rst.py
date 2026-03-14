@@ -6,9 +6,9 @@ from pathlib import Path
 
 from mako.template import Template
 
-# S702: Mako templates are flagged for XSS risk, but we're generating RST files
-# from trusted just --list output, not rendering user input as HTML.
-TEMPLATE = Template(filename=str(Path(__file__).parent / "just_to_rst.mako"))  # noqa: S702
+TEMPLATE = Template(  # noqa: S702
+    filename=str(Path(__file__).parent / "just_to_rst.rst.mako")
+)
 
 
 def _format_args(args: list[str]) -> str:

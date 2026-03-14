@@ -266,7 +266,7 @@ class LedgerActionsPlugin(Plugin):
             all_cols = [col.name for col in input_select.selected_columns]
             template_ctx["all_cols"] = all_cols
 
-        fn_body = load_template(_TEMPLATES / "event.mako").render(
+        fn_body = load_template(_TEMPLATES / "event.sql.mako").render(
             **template_ctx
         )
 
