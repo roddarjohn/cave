@@ -8,7 +8,7 @@ from sqlalchemy import (
     MetaData,
     Numeric,
     String,
-    Table,
+
     func,
     select,
 )
@@ -29,11 +29,7 @@ from pgcraft.plugins.check import (
     TriggerCheckPlugin,
 )
 from pgcraft.plugins.ledger import (
-    DoubleEntryPlugin,
-    DoubleEntryTriggerPlugin,
-    LedgerBalanceCheckPlugin,
     LedgerBalanceViewPlugin,
-    LedgerLatestViewPlugin,
 )
 from pgcraft.plugins.pk import SerialPKPlugin
 from pgcraft.plugins.simple import (
@@ -82,17 +78,33 @@ AppendOnlyDimensionResourceFactory(
     ],
 )
 
-# -- Invoices (EAV dimension) ------------------------------------------
+# -- Invoices (append-only dimension) ----------------------------------
 
-EAVDimensionResourceFactory(
+_invoices = AppendOnlyDimensionResourceFactory(
     tablename="invoices",
     schemaname="private",
     metadata=metadata,
     schema_items=[
-        Column("customer_id", Integer),
-        Column("amount", Numeric(10, 2)),
-        Column("paid", Boolean),
-        Column("description", String),
+        Column("customer_id", Integer, nullable=False),
+        Column("amount", Numeric(10, 2), nullable=False),
+    ],
+)
+
+# -- Invoice lines (EAV dimension, FK to invoices) --------------------
+
+_invoice_lines = EAVDimensionResourceFactory(
+    tablename="invoice_lines",
+    schemaname="private",
+    metadata=metadata,
+    schema_items=[
+        Column(
+            "invoice_id",
+            Integer,
+            ForeignKey("private.invoices_root.id"),
+            nullable=False,
+        ),
+        Column("account", String, nullable=False),
+        Column("amount", Integer, nullable=False),
     ],
     extra_plugins=[
         TriggerCheckPlugin(),
@@ -121,45 +133,34 @@ EAVDimensionResourceFactory(
     ],
 )
 
-# -- Reference tables for statistics queries ----------------------------
-# These reflect tables that already exist in the database.
-# They are not managed by pgcraft — they only provide column
-# metadata so SQLAlchemy can compile the statistics queries.
+# -- Orders (simple dimension) -----------------------------------------
 
-_orders_ref = Table(
-    "orders",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("customer_id", Integer),
-    Column("total", Numeric(10, 2)),
-    schema="public",
-    extend_existing=True,
-)
-
-_invoices_ref = Table(
-    "invoices_entity",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("customer_id", Integer),
-    Column("amount", Numeric(10, 2)),
-    Column("paid", Boolean),
-    schema="private",
-    extend_existing=True,
+_orders = SimpleDimensionResourceFactory(
+    tablename="orders",
+    schemaname="public",
+    metadata=metadata,
+    schema_items=[
+        Column("customer_id", Integer, nullable=False),
+        Column("total", Numeric(10, 2), nullable=False),
+    ],
 )
 
 # -- Customers with statistics ------------------------------------------
 
+_orders_t = _orders.table
+_invoices_t = _invoices.table
+
 _order_stats = select(
-    _orders_ref.c.customer_id,
+    _orders_t.c.customer_id,
     func.count().label("order_count"),
-    func.sum(_orders_ref.c.total).label("order_total"),
-).group_by(_orders_ref.c.customer_id)
+    func.sum(_orders_t.c.total).label("order_total"),
+).group_by(_orders_t.c.customer_id)
 
 _invoice_stats = select(
-    _invoices_ref.c.customer_id,
+    _invoices_t.c.customer_id,
     func.count().label("invoice_count"),
-    func.sum(_invoices_ref.c.amount).label("invoiced_total"),
-).group_by(_invoices_ref.c.customer_id)
+    func.sum(_invoices_t.c.amount).label("invoiced_total"),
+).group_by(_invoices_t.c.customer_id)
 
 SimpleDimensionResourceFactory(
     tablename="customers",
@@ -181,39 +182,7 @@ SimpleDimensionResourceFactory(
     ],
 )
 
-# -- Ledger models ------------------------------------------------------
-
-LedgerResourceFactory(
-    tablename="order_events",
-    schemaname="private",
-    metadata=metadata,
-    schema_items=[
-        Column("order_id", String, nullable=False),
-        Column("status", String, nullable=False),
-    ],
-    extra_plugins=[
-        LedgerLatestViewPlugin(dimensions=["order_id"]),
-    ],
-)
-
-LedgerResourceFactory(
-    tablename="stock_movements",
-    schemaname="private",
-    metadata=metadata,
-    schema_items=[
-        Column("warehouse", String, nullable=False),
-        Column("sku", String, nullable=False),
-    ],
-    extra_plugins=[
-        LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
-        LedgerBalanceCheckPlugin(
-            dimensions=["warehouse", "sku"],
-        ),
-    ],
-)
-
-# -- Inventory ledger with events -----------------------------------
-# Simple event: record an ad-hoc stock adjustment (fire-and-forget).
+# -- Inventory ledger (simple event) -----------------------------------
 
 _inv_adjust = LedgerEvent(
     name="adjust",
@@ -240,22 +209,12 @@ LedgerResourceFactory(
     events=[_inv_adjust],
 )
 
-# -- Invoice lines (source table for revenue reconciliation) --------
-
-_invoice_lines = Table(
-    "invoice_lines",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("invoice_id", Integer, nullable=False),
-    Column("account", String, nullable=False),
-    Column("amount", Integer, nullable=False),
-    schema="private",
-)
-
 # -- Revenue ledger with transactional reconciliation ---------------
 # The reconcile event accepts invoice IDs, joins against the
-# invoice_lines table to produce the desired state, and diffs
+# invoice_lines view to produce the desired state, and diffs
 # against existing balances per (invoice_id, account).
+
+_il = _invoice_lines.table
 
 _rev_recognize = LedgerEvent(
     name="recognize",
@@ -264,11 +223,11 @@ _rev_recognize = LedgerEvent(
         .label("invoice_id"),
     ),
     desired=lambda pginput: select(
-        _invoice_lines.c.invoice_id,
-        _invoice_lines.c.account,
-        _invoice_lines.c.amount.label("value"),
+        _il.c.invoice_id,
+        _il.c.account,
+        _il.c.amount.label("value"),
     ).where(
-        _invoice_lines.c.invoice_id.in_(
+        _il.c.invoice_id.in_(
             select(pginput.c.invoice_id)
         )
     ),
@@ -290,33 +249,6 @@ LedgerResourceFactory(
         ),
     ],
     events=[_rev_recognize],
-)
-
-SimpleDimensionResourceFactory(
-    tablename="accounts",
-    schemaname="private",
-    metadata=metadata,
-    schema_items=[
-        Column("name", String, nullable=False),
-        Column("category", String, nullable=False),
-    ],
-)
-
-LedgerResourceFactory(
-    tablename="journal",
-    schemaname="private",
-    metadata=metadata,
-    schema_items=[
-        Column(
-            "account_id",
-            ForeignKey("private.accounts.id"),
-            nullable=False,
-        ),
-    ],
-    extra_plugins=[
-        DoubleEntryPlugin(),
-        DoubleEntryTriggerPlugin(),
-    ],
 )
 
 # -- Declarative models -------------------------------------------------

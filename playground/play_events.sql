@@ -9,30 +9,36 @@
 -- =====================================================================
 
 -- =====================================================================
--- 1. Seed invoice line items (the transactional source)
+-- 1. Create invoices (append-only) and invoice lines (EAV)
 -- =====================================================================
 
-INSERT INTO private.invoice_lines (id, invoice_id, account, amount)
+INSERT INTO private.invoices (customer_id, amount) VALUES (1, 700), (2, 450);
+
+\echo ''
+\echo '=== Invoices ==='
+SELECT * FROM private.invoices ORDER BY id;
+
+INSERT INTO private.invoice_lines (invoice_id, account, amount)
 VALUES
-    (1, 1001, 'consulting',  500),
-    (2, 1001, 'hosting',     200),
-    (3, 1002, 'consulting',  300),
-    (4, 1002, 'support',     150);
+    (1, 'consulting',  500),
+    (1, 'hosting',     200),
+    (2, 'consulting',  300),
+    (2, 'support',     150);
 
 \echo ''
 \echo '=== Invoice lines ==='
 SELECT * FROM private.invoice_lines ORDER BY id;
 
 -- =====================================================================
--- 2. Recognize revenue for invoices 1001 and 1002
+-- 2. Recognize revenue for invoices 1 and 2
 -- =====================================================================
 -- The reconcile event joins invoice_lines to produce one ledger entry
 -- per line item, diffing against existing balances.
 
 \echo ''
-\echo '=== Recognize revenue for invoices 1001, 1002 ==='
+\echo '=== Recognize revenue for invoices 1, 2 ==='
 SELECT * FROM private.private_revenue_recognize(
-    p_invoice_ids => ARRAY[1001, 1002]
+    p_invoice_ids => ARRAY[1, 2]
 );
 
 \echo ''
@@ -48,21 +54,23 @@ ORDER BY invoice_id, account;
 \echo ''
 \echo '=== Recognize again (should return 0 rows) ==='
 SELECT * FROM private.private_revenue_recognize(
-    p_invoice_ids => ARRAY[1001, 1002]
+    p_invoice_ids => ARRAY[1, 2]
 );
 
 -- =====================================================================
--- 4. Amend a line item, then re-reconcile
+-- 4. Amend a line item via EAV, then re-reconcile
 -- =====================================================================
--- Update invoice 1001 consulting from 500 to 600.
+-- Update invoice 1 consulting from 500 to 600 (EAV update).
 -- Re-reconciling inserts a single correcting +100 entry.
 
-UPDATE private.invoice_lines SET amount = 600 WHERE id = 1;
+UPDATE private.invoice_lines
+SET amount = 600
+WHERE invoice_id = 1 AND account = 'consulting';
 
 \echo ''
-\echo '=== Re-reconcile after amending invoice 1001 ==='
+\echo '=== Re-reconcile after amending invoice 1 ==='
 SELECT * FROM private.private_revenue_recognize(
-    p_invoice_ids => ARRAY[1001]
+    p_invoice_ids => ARRAY[1]
 );
 
 \echo ''
@@ -78,7 +86,7 @@ ORDER BY invoice_id, account;
 \echo ''
 \echo '=== Full revenue ledger ==='
 SELECT id, invoice_id, account, value, created_at
-FROM private.api_revenue
+FROM private.revenue
 ORDER BY id;
 
 -- =====================================================================

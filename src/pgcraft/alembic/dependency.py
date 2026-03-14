@@ -185,6 +185,60 @@ def _plpgsql_queries(obj: object) -> list[str]:
     return queries
 
 
+def _function_return_refs(
+    op: AnyOp,
+) -> set[tuple[str, str]]:
+    """Extract ``(schema, name)`` from a function's return type.
+
+    Parses ``SETOF schema.name`` patterns from the ``returns``
+    attribute of function/procedure ops.
+
+    Returns an empty set for non-function ops or non-SETOF returns.
+    """
+    func = getattr(op, "function", None)
+    if func is None:
+        return set()
+
+    returns = getattr(func, "returns", None)
+    if not returns or not isinstance(returns, str):
+        return set()
+
+    # Match "SETOF schema.name" (case-insensitive).
+    stripped = returns.strip()
+    upper = stripped.upper()
+    if not upper.startswith("SETOF "):
+        return set()
+
+    ref = stripped[6:].strip()
+    schema, sep, name = ref.partition(".")
+    if sep:
+        return {(schema.lower(), name.lower())}
+    return set()
+
+
+def _sql_function_table_refs(
+    op: AnyOp,
+) -> set[tuple[str, str]]:
+    """Extract ``(schema, table)`` pairs from a LANGUAGE sql function.
+
+    Uses ``pglast.parse_sql`` to find table references in the
+    function body.
+
+    Returns an empty set for non-sql-language ops or if parsing
+    fails.
+    """
+    func = getattr(op, "function", None)
+    if func is None:
+        return set()
+
+    defn = getattr(func, "definition", None)
+    language = getattr(func, "language", "")
+    if not defn or language.lower() != "sql":
+        return set()
+
+    return _view_table_refs(defn)
+
+
 def _plpgsql_table_refs(
     op: AnyOp,
 ) -> set[tuple[str, str]]:
@@ -493,7 +547,7 @@ def _refs_from_definitions(
     op: AnyOp,
     phase: Phase | None,
 ) -> set[EntityIdentifier]:
-    """Extract entity refs from view SQL and PL/pgSQL function bodies."""
+    """Extract entity refs from view SQL and function bodies/returns."""
     refs: set[EntityIdentifier] = set()
 
     # View definitions: parse with pglast.
@@ -503,6 +557,12 @@ def _refs_from_definitions(
 
     # PL/pgSQL function bodies: parse with pglast.
     _add_table_refs(refs, _plpgsql_table_refs(op), phase)
+
+    # LANGUAGE sql function bodies: parse with pglast.
+    _add_table_refs(refs, _sql_function_table_refs(op), phase)
+
+    # Function return types: SETOF schema.view.
+    _add_table_refs(refs, _function_return_refs(op), phase)
 
     return refs
 

@@ -12,7 +12,7 @@ from pgcraft.validator import validate_schema_items
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from sqlalchemy import MetaData
+    from sqlalchemy import MetaData, Table
     from sqlalchemy.schema import SchemaItem
 
     from pgcraft.check import PGCraftCheck
@@ -170,6 +170,14 @@ class ResourceFactory:
 
     DEFAULT_PLUGINS: ClassVar[list[Plugin]] = []
 
+    table: Table
+    """The root table or view proxy created by the factory.
+
+    This is the ``__root__`` context value set by the table
+    plugin, exposing the column metadata for use in queries,
+    foreign key references, and ledger event lambdas.
+    """
+
     def __init__(  # noqa: PLR0913
         self,
         tablename: str,
@@ -202,3 +210,6 @@ class ResourceFactory:
 
         for p in _sort_plugins(resolved):
             p.run(ctx)
+
+        if "__root__" in ctx:
+            self.table = ctx["__root__"]

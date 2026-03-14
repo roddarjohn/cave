@@ -119,3 +119,7 @@ Source of truth tables should be very very clear.
 
 - How to store currency?
 - Other ways to use a ledger
+
+- FK handling is scuffed because of the root table issue
+
+- Switch to alabaster theme?
