@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy import MetaData
     from sqlalchemy.schema import SchemaItem
+    from sqlalchemy.sql.expression import FromClause
 
     from pgcraft.check import PGCraftCheck
     from pgcraft.plugin import Plugin
@@ -170,6 +171,14 @@ class ResourceFactory:
 
     DEFAULT_PLUGINS: ClassVar[list[Plugin]] = []
 
+    table: FromClause
+    """The root selectable created by the factory.
+
+    This is the ``__root__`` context value set by the table
+    plugin, exposing the column metadata for use in queries,
+    foreign key references, and ledger event lambdas.
+    """
+
     def __init__(  # noqa: PLR0913
         self,
         tablename: str,
@@ -183,6 +192,9 @@ class ResourceFactory:
     ) -> None:
         """Create the dimension and register it on *metadata*."""
         validate_schema_items(schema_items)
+
+        if config is not None and "pgcraft_config" not in metadata.info:
+            metadata.info["pgcraft_config"] = config
 
         resolved = _resolve_plugins(
             config, plugins, extra_plugins, self.DEFAULT_PLUGINS
@@ -199,3 +211,6 @@ class ResourceFactory:
 
         for p in _sort_plugins(resolved):
             p.run(ctx)
+
+        if "__root__" in ctx:
+            self.table = ctx["__root__"]

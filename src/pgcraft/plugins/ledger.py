@@ -62,6 +62,26 @@ DIRECTION_CREDIT = "credit"
 _VALID_DIRECTIONS = (DIRECTION_DEBIT, DIRECTION_CREDIT)
 
 
+def _dim_column_names(ctx: FactoryContext) -> list[str]:
+    """Extract writable (non-PK, non-computed) column names.
+
+    Includes user-declared columns and plugin-injected columns,
+    but excludes ``entry_id`` and ``created_at`` which have
+    their own handling in the trigger.
+    """
+    skip: set[str] = set()
+    if "entry_id_column" in ctx:
+        skip.add(ctx["entry_id_column"].name)
+    if "created_at_column" in ctx:
+        skip.add(ctx["created_at_column"])
+    all_cols = ctx.columns + ctx.injected_columns
+    return [
+        col.key
+        for col in all_cols
+        if not col.primary_key and not col.computed and col.key not in skip
+    ]
+
+
 def _require_dimensions(dimensions: list[str]) -> None:
     """Raise if *dimensions* is empty.
 
@@ -464,6 +484,7 @@ class LedgerBalanceCheckPlugin(Plugin):
             },
             _NAMING_DEFAULTS,
         )
+
         trigger_name = resolve_name(
             ctx.metadata,
             "balance_check_trigger",

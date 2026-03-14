@@ -292,6 +292,19 @@ key with ``gen_random_uuid()`` as the server default:
    )
 
 
+Ledger events
+-------------
+
+Use :doc:`ledger_actions` to attach named PostgreSQL functions to a
+ledger.  Two modes are provided:
+
+- **Diff mode** -- declarative reconciliation from a desired-state
+  snapshot (uses ``desired``, ``existing``, ``diff_keys``).
+- **Simple mode** -- explicit delta insert (``input`` only).
+
+See the :doc:`ledger_actions` page for full documentation.
+
+
 Plugin Reference
 ----------------
 

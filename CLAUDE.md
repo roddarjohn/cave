@@ -58,6 +58,8 @@ Tests require a running PostgreSQL instance with `DATABASE_URL` set
 - **Naming:** `snake_case` for functions/variables, `PascalCase` for classes,
   `UPPER_CASE` for constants. Use descriptive names -- `requires_python` not
   `rp`.
+- **Documentation headings:** Use sentence case for all RST headings
+  (e.g. "Ledger events", not "Ledger Events").
 
 ### Testing
 

@@ -27,9 +27,18 @@ class PGCraftConfig:
         AppendOnlyDimensionResourceFactory(
             "events", "public", metadata, ..., config=config
         )
+
+    Args:
+        plugins: Global plugins prepended to every factory.
+        utility_schema: PostgreSQL schema for pgcraft-managed
+            utility functions (e.g. ``ledger_apply_state``).
+            Defaults to ``"pgcraft"``.  Override only if your
+            project already uses a schema named ``"pgcraft"``.
+
     """
 
     plugins: list[Plugin] = field(default_factory=list)
+    utility_schema: str = "pgcraft"
 
     def register(self, *plugins: Plugin) -> PGCraftConfig:
         """Register one or more plugins globally.

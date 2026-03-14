@@ -102,45 +102,26 @@ Source of truth tables should be very very clear.
 
 - Figure out auth / OPA w/ RLS
 - Figure out approvals?
-- Figure out ledgers
-  - Should be declarative + diff!!
-- [done] Figure out how to implement e.g. check constraints or nullable
-  constraints on all the types of dimensional tables
-- [done] In theory this could be used within e.g. FastAPI or Flask
-
-- Try and upstream some stuff?
-
-- For EAV
-  - [fixing] How do null values work?
-  - [fixing] Check constraint should be num_nonnulls
-  - [fixing] Only need to insert if it's a change
-
-- Tests
 
 - Indices??
 
 - Figure out how to benchmark / do performance analysis on this
+
 - Allow loading a dynamic configuration and dynamic migrations
-
-- Is a transaction simply a dimensional object, that has some declarative configuration from it?
-
-- [done] I don't think I need the different phases because ALEMBIC will take care of the ordering if needed
-  - And the PK needs to be taken care of by the singleton fw
-
-- How does dynamic configuration work?
 
 - Declarative ledgering
 
-- Something about customizing what is in the API view
-
 - Default plugins can perhaps go in metadata??
 
-- Different PK types
-
-- build naming convention should be namespaced to pgcraft naming conventions
+- [ip] Different PK types
+- [ip] Add constraints that prevent updating or deleting unless yo uknow what you're doing on tables that are supposed to be updated via trigger.
+- [ip] build naming convention should be namespaced to pgcraft naming conventions
 
 - How to store currency?
-
 - Other ways to use a ledger
 
-- Add constraints that prevent updating or deleting unless yo uknow what you're doing on tables that are supposed to be updated via trigger.
+- FK handling is scuffed because of the root table issue
+
+- Switch to alabaster theme?
+
+- Why are all these dependencies needed?

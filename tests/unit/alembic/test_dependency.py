@@ -58,6 +58,7 @@ from pgcraft.alembic.dependency import (
     EntityIdentifier,
     _entity_identifier,
     _entity_schema,
+    _function_return_refs,
     _op_phase,
     _parse_qualified_name,
     _plpgsql_queries,
@@ -66,6 +67,7 @@ from pgcraft.alembic.dependency import (
     _refs_for_role,
     _refs_for_trigger,
     _role_name,
+    _sql_function_table_refs,
     _view_table_refs,
     build_fk_graph_from_metadata,
     expand_update_ops,
@@ -886,6 +888,125 @@ class TestPlpgsqlTableRefs:
 
 
 # ---------------------------------------------------------------------------
+# Function return refs
+# ---------------------------------------------------------------------------
+
+
+class TestFunctionReturnRefs:
+    def _make_op(self, fn):
+        op = MagicMock()
+        op.function = fn
+        return op
+
+    def test_setof_schema_qualified(self):
+        fn = Function(
+            "fn",
+            "SELECT 1",
+            returns="SETOF api.inventory",
+            language="sql",
+            schema="private",
+        )
+        refs = _function_return_refs(self._make_op(fn))
+        assert ("api", "inventory") in refs
+
+    def test_setof_case_insensitive(self):
+        fn = Function(
+            "fn",
+            "SELECT 1",
+            returns="setof Api.Revenue",
+            language="sql",
+            schema="private",
+        )
+        refs = _function_return_refs(self._make_op(fn))
+        assert ("api", "revenue") in refs
+
+    def test_non_setof_returns_empty(self):
+        fn = Function(
+            "fn",
+            "BEGIN END;",
+            returns="trigger",
+            language="plpgsql",
+            schema="s",
+        )
+        refs = _function_return_refs(self._make_op(fn))
+        assert refs == set()
+
+    def test_setof_unqualified_returns_empty(self):
+        fn = Function(
+            "fn",
+            "SELECT 1",
+            returns="SETOF mytable",
+            language="sql",
+            schema="s",
+        )
+        refs = _function_return_refs(self._make_op(fn))
+        assert refs == set()
+
+    def test_no_function_attr_returns_empty(self):
+        op = MagicMock()
+        op.function = None
+        assert _function_return_refs(op) == set()
+
+    def test_no_returns_attr_returns_empty(self):
+        fn = Function(
+            "fn",
+            "SELECT 1",
+            language="sql",
+            schema="s",
+        )
+        refs = _function_return_refs(self._make_op(fn))
+        assert refs == set()
+
+
+# ---------------------------------------------------------------------------
+# SQL function table refs
+# ---------------------------------------------------------------------------
+
+
+class TestSqlFunctionTableRefs:
+    def _make_op(self, fn):
+        op = MagicMock()
+        op.function = fn
+        return op
+
+    def test_extracts_schema_qualified_table(self):
+        fn = Function(
+            "fn",
+            "INSERT INTO api.inventory (sku) SELECT p_sku RETURNING *",
+            returns="SETOF api.inventory",
+            language="sql",
+            schema="private",
+        )
+        refs = _sql_function_table_refs(self._make_op(fn))
+        assert ("api", "inventory") in refs
+
+    def test_non_sql_language_returns_empty(self):
+        fn = Function(
+            "fn",
+            "BEGIN END;",
+            language="plpgsql",
+            schema="s",
+        )
+        refs = _sql_function_table_refs(self._make_op(fn))
+        assert refs == set()
+
+    def test_no_function_attr_returns_empty(self):
+        op = MagicMock()
+        op.function = None
+        assert _sql_function_table_refs(op) == set()
+
+    def test_invalid_sql_returns_empty(self):
+        fn = Function(
+            "fn",
+            "NOT VALID SQL !!!",
+            language="sql",
+            schema="s",
+        )
+        refs = _sql_function_table_refs(self._make_op(fn))
+        assert refs == set()
+
+
+# ---------------------------------------------------------------------------
 # _entity_identifier — additional cases
 # ---------------------------------------------------------------------------
 
@@ -985,3 +1106,25 @@ class TestSortMigrationOpsWithFkGraph:
         )
         result = sort_migration_ops([sentinel, create_op])
         assert result[-1] is sentinel
+
+    def test_setof_function_after_referenced_view(self):
+        """Function with SETOF return must be created after the view."""
+        schema_op = CreateSchemaOp(Schema("api"))
+        view_op = CreateViewOp(View("inventory", "SELECT 1", schema="api"))
+        fn = Function(
+            "inventory_adjust",
+            "INSERT INTO api.inventory (sku) SELECT p_sku RETURNING *",
+            returns="SETOF api.inventory",
+            language="sql",
+            schema="private",
+        )
+        fn_schema_op = CreateSchemaOp(Schema("private"))
+        fn_op = CreateFunctionOp(fn)
+        result = sort_migration_ops([fn_op, fn_schema_op, view_op, schema_op])
+        view_idx = next(
+            i for i, op in enumerate(result) if isinstance(op, CreateViewOp)
+        )
+        fn_idx = next(
+            i for i, op in enumerate(result) if isinstance(op, CreateFunctionOp)
+        )
+        assert view_idx < fn_idx

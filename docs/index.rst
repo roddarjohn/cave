@@ -12,6 +12,7 @@ pgcraft
    naming_conventions
    dimensions
    ledgers
+   ledger_actions
    builtin_plugins
    plugins
    cookbook
