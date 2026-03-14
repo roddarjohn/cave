@@ -11,18 +11,18 @@
 -- Reconcile to desired stock levels:
 SELECT * FROM ops.ops_inventory_reconcile(
     p_warehouse => 'east',
-    p_sku       => 'WIDGET-A',
-    p_value     => 200,
-    p_source    => 'monthly_count'
+    p_sku => 'WIDGET-A',
+    p_value => 200,
+    p_source => 'monthly_count'
 );
 -- Returns the inserted correcting rows.
 
 -- Run again with the same desired state — idempotent, no new rows:
 SELECT * FROM ops.ops_inventory_reconcile(
     p_warehouse => 'east',
-    p_sku       => 'WIDGET-A',
-    p_value     => 200,
-    p_source    => 'monthly_count'
+    p_sku => 'WIDGET-A',
+    p_value => 200,
+    p_source => 'monthly_count'
 );
 -- Returns empty set (no correction needed).
 

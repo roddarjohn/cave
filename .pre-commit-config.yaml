@@ -29,3 +29,12 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: sqlfluff-lint
+        name: sqlfluff-lint
+        language: system
+        entry: uv run --group lint sqlfluff lint
+        files: \.(sql|mako)$
+        types_or: [file]

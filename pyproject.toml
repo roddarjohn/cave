@@ -11,11 +11,15 @@ dependencies = [
   "pglast>=7.11",
   "pydantic>=2.12.5",
   "sqlalchemy-declarative-extensions>=0.16.8",
+  "sqlfluff>=3.3",
   "typer>=0.24.1",
 ]
 
 [project.scripts]
 pgcraft = "pgcraft.cli:app"
+
+[project.entry-points.sqlfluff]
+sqlfluff_templater_mako = "pgcraft.sqlfluff"
 
 [build-system]
 requires = ["uv_build>=0.10.8,<0.11.0"]
@@ -41,7 +45,7 @@ docs = [
   "sphinx-autodoc-typehints>=3.0.1",
   "sphinx-copybutton>=0.5.2",
 ]
-lint = ["ruff>=0.15.5", "ty>=0.0.20"]
+lint = ["ruff>=0.15.5", "sqlfluff>=3.3", "ty>=0.0.20"]
 
 [tool.ruff]
 line-length = 80
@@ -98,7 +102,7 @@ extra-paths = ["tests/db"]
 
 [tool.ty.analysis]
 # pglast has no type stubs.
-allowed-unresolved-imports = ["pglast.**"]
+allowed-unresolved-imports = ["pglast.**", "sqlfluff.**"]
 
 [tool.tox]
 requires = ["tox-uv>=1"]
