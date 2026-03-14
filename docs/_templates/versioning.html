@@ -1,0 +1,47 @@
+<div id="version-selector">
+  <h3>Versions</h3>
+  <ul id="version-list">
+    <li>{{ version }}</li>
+  </ul>
+</div>
+<script>
+(function () {
+  // Walk up from the current page to find versions.json at the root.
+  var depth = window.location.pathname.replace(/\/+$/, "").split("/").length - 1;
+  var rootPrefix = "";
+  // Detect root by looking for versions.json relative to the version subdir.
+  // The structure is: /<root>/main/page.html or /<root>/v0.4.0/page.html
+  // We need to go up to the parent of the version directory.
+  var parts = window.location.pathname.replace(/\/+$/, "").split("/");
+  // Find which part is the version segment (main, v0.4.0, etc.)
+  // It's always the segment right after the site root.
+  // For GH pages: /pgcraft/main/index.html -> root is /pgcraft/
+  // For local: /main/index.html -> root is /
+  var versionSegment = null;
+  for (var i = 1; i < parts.length; i++) {
+    if (parts[i] === "main" || parts[i].match(/^v\d+/)) {
+      versionSegment = i;
+      break;
+    }
+  }
+  if (versionSegment === null) return;
+  var root = parts.slice(0, versionSegment).join("/") || "";
+  var jsonUrl = root + "/versions.json";
+
+  fetch(jsonUrl)
+    .then(function (r) { return r.json(); })
+    .then(function (versions) {
+      var ul = document.getElementById("version-list");
+      ul.innerHTML = "";
+      versions.forEach(function (v) {
+        var li = document.createElement("li");
+        var a = document.createElement("a");
+        a.href = root + "/" + v + "/index.html";
+        a.textContent = v;
+        li.appendChild(a);
+        ul.appendChild(li);
+      });
+    })
+    .catch(function () {});
+})();
+</script>
