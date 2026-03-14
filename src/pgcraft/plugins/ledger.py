@@ -55,11 +55,22 @@ _VALID_DIRECTIONS = (DIRECTION_DEBIT, DIRECTION_CREDIT)
 
 
 def _dim_column_names(ctx: FactoryContext) -> list[str]:
-    """Extract writable (non-PK, non-computed) column names."""
+    """Extract writable (non-PK, non-computed) column names.
+
+    Includes user-declared columns and plugin-injected columns,
+    but excludes ``entry_id`` and ``created_at`` which have
+    their own handling in the trigger.
+    """
+    skip: set[str] = set()
+    if "entry_id_column" in ctx:
+        skip.add(ctx["entry_id_column"].name)
+    if "created_at_column" in ctx:
+        skip.add(ctx["created_at_column"])
+    all_cols = ctx.columns + ctx.injected_columns
     return [
         col.key
-        for col in ctx.columns
-        if not col.primary_key and not col.computed
+        for col in all_cols
+        if not col.primary_key and not col.computed and col.key not in skip
     ]
 
 

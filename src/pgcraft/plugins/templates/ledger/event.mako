@@ -26,14 +26,14 @@ WITH
     GROUP BY ${group_cols}
     HAVING SUM(combined.value) != 0
   )
-INSERT INTO ${api_view} (${entry_insert_cols})
+INSERT INTO ${backing_table} (${entry_insert_cols})
 SELECT (SELECT eid FROM _eid), ${insert_cols} FROM deltas
 RETURNING *
 % else:
 WITH
   _eid AS (SELECT gen_random_uuid() AS eid),
   input AS (${input_sql})
-INSERT INTO ${api_view} (${entry_insert_cols})
+INSERT INTO ${backing_table} (${entry_insert_cols})
 SELECT (SELECT eid FROM _eid), ${insert_cols} FROM input
 RETURNING *
 % endif

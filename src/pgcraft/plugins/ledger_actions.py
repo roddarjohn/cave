@@ -151,6 +151,7 @@ class LedgerActionsPlugin(Plugin):
         root_table: Table = ctx["__root__"]
         api_view = ctx[self.view_key]
         api_view_fullname = f"{api_view.schema or 'api'}.{ctx.tablename}"
+        backing_table = f"{ctx.schemaname}.{root_table.name}"
 
         _validate_events(self.events, root_table)
 
@@ -160,6 +161,7 @@ class LedgerActionsPlugin(Plugin):
                 ctx,
                 root_table,
                 api_view_fullname,
+                backing_table,
             )
 
     def _generate_event(
@@ -168,6 +170,7 @@ class LedgerActionsPlugin(Plugin):
         ctx: FactoryContext,
         root_table: Table,
         api_view_fullname: str,
+        backing_table: str,
     ) -> None:
         """Generate the SQL function for a single event.
 
@@ -176,6 +179,8 @@ class LedgerActionsPlugin(Plugin):
             ctx: Factory context.
             root_table: Ledger backing table.
             api_view_fullname: Fully-qualified API view name.
+            backing_table: Fully-qualified backing table name
+                for direct inserts.
 
         """
         schema = ctx.schemaname
@@ -189,6 +194,7 @@ class LedgerActionsPlugin(Plugin):
         template_ctx: dict = {
             "input_sql": input_sql,
             "api_view": api_view_fullname,
+            "backing_table": backing_table,
             "diff_mode": diff_mode,
         }
 
@@ -270,7 +276,7 @@ class LedgerActionsPlugin(Plugin):
             Function(
                 fn_name,
                 fn_body,
-                returns=f"SETOF {api_view_fullname}",
+                returns=f"SETOF {backing_table}",
                 language="sql",
                 schema=schema,
                 parameters=collector.function_params,
