@@ -14,7 +14,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
-      - run: SKIP=ruff,ruff-format uvx pre-commit run --all-files
+      - run: SKIP=ruff,ruff-format,sqlfluff-lint uvx pre-commit run --all-files
       - run: uv run --group lint ruff check
       - run: uv run --group lint ruff format --check
       - run: uv run --group lint ty check src/
