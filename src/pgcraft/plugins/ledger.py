@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import (
     CheckConstraint,
     Column,
+    DateTime,
     Integer,
     Numeric,
     Select,
@@ -118,6 +119,7 @@ class LedgerTablePlugin(Plugin):
     def run(self, ctx: FactoryContext) -> None:
         """Create the ledger table and store it in ctx."""
         pk_columns = ctx["pk_columns"]
+        created_at_col = ctx["created_at_column"]
         sa_type = _VALUE_TYPES[self.value_type]
 
         table = Table(
@@ -125,6 +127,11 @@ class LedgerTablePlugin(Plugin):
             ctx.metadata,
             *pk_columns,
             *ctx.injected_columns,
+            Column(
+                created_at_col,
+                DateTime(timezone=True),
+                server_default="now()",
+            ),
             Column("value", sa_type(), nullable=False),
             *ctx.table_items,
             schema=ctx.schemaname,
