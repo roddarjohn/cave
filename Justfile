@@ -8,11 +8,11 @@ lint:
 
 # Lint SQL and Mako template files with sqlfluff
 sql-lint:
-    uv run --group lint sqlfluff lint src/pgcraft/plugins/templates/ scripts/examples/ playground/*.sql
+    uv run --group lint sqlfluff lint src/ scripts/ playground/
 
 # Fix SQL and Mako template files with sqlfluff
 sql-format:
-    uv run --group lint sqlfluff fix src/pgcraft/plugins/templates/ scripts/examples/ playground/*.sql
+    uv run --group lint sqlfluff fix src/ scripts/ playground/
 
 # Run ty type checker
 type-check:

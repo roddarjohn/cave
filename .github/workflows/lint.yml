@@ -18,4 +18,4 @@ jobs:
       - run: uv run --group lint ruff check
       - run: uv run --group lint ruff format --check
       - run: uv run --group lint ty check src/
-      - run: uv run --group lint sqlfluff lint src/pgcraft/plugins/templates/ scripts/examples/ playground/*.sql
+      - run: uv run --group lint sqlfluff lint src/ scripts/ playground/

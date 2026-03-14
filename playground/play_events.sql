@@ -16,7 +16,8 @@ INSERT INTO private.invoices (customer_id, amount) VALUES (1, 700), (2, 450);
 
 +AFw-echo ''
 +AFw-echo '=== Invoices ==='
-SELECT * FROM private.invoices ORDER BY id;
+SELECT * FROM private.invoices
+ORDER BY id;
 
 INSERT INTO private.invoice_lines (invoice_id, department, amount)
 VALUES
@@ -27,7 +28,8 @@ VALUES
 
 +AFw-echo ''
 +AFw-echo '=== Invoice lines ==='
-SELECT * FROM private.invoice_lines ORDER BY id;
+SELECT * FROM private.invoice_lines
+ORDER BY id;
 
 -- =====================================================================
 -- 2. Post invoices 1 and 2 to the ledger
@@ -44,7 +46,11 @@ SELECT * FROM private.private_ledger_post(
 
 +AFw-echo ''
 +AFw-echo '=== Ledger balances after posting ==='
-SELECT invoice_id, department, account, balance
+SELECT
+    invoice_id,
+    department,
+    account,
+    balance
 FROM private.ledger_balances
 ORDER BY invoice_id, department, account;
 
@@ -76,7 +82,11 @@ SELECT * FROM private.private_ledger_post(
 
 +AFw-echo ''
 +AFw-echo '=== Ledger balances after amendment ==='
-SELECT invoice_id, department, account, balance
+SELECT
+    invoice_id,
+    department,
+    account,
+    balance
 FROM private.ledger_balances
 ORDER BY invoice_id, department, account;
 
@@ -87,7 +97,14 @@ ORDER BY invoice_id, department, account;
 +AFw-echo ''
 +AFw-echo '=== Full ledger ==='
 SELECT
-    id, entry_id, invoice_id, department, account, direction, value, created_at
+    id,
+    entry_id,
+    invoice_id,
+    department,
+    account,
+    direction,
+    value,
+    created_at
 FROM private.ledger
 ORDER BY id;
 
@@ -112,6 +129,9 @@ SELECT * FROM private.private_inventory_adjust(
 
 +AFw-echo ''
 +AFw-echo '=== Inventory balances ==='
-SELECT warehouse, sku, balance
+SELECT
+    warehouse,
+    sku,
+    balance
 FROM private.inventory_balances
 ORDER BY warehouse, sku;

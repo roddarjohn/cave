@@ -11,4 +11,5 @@ UPDATE api.users
 SET email = 'alice@newdomain.com'
 WHERE id = 1;
 
-DELETE FROM api.users WHERE id = 2;
+DELETE FROM api.users
+WHERE id = 2;

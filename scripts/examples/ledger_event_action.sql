@@ -26,6 +26,9 @@ SELECT * FROM ops.ops_inventory_adjust(
 );
 
 -- Current balances:
-SELECT warehouse, sku, balance
+SELECT
+    warehouse,
+    sku,
+    balance
 FROM ops.inventory_balances
 ORDER BY warehouse, sku;

@@ -2,12 +2,11 @@
 dialect = postgres
 templater = mako
 max_line_length = 80
+sql_file_exts = .sql,.mako
 
 # LT12: Files must end with a single trailing newline (handled by pre-commit).
 # AM04: SELECT * is intentional in example/seed scripts.
-# LT14: WHERE on same line is fine for short statements.
-# LT09: Multiple select targets on one line is fine for short queries.
-exclude_rules = LT12, AM04, LT14, LT09
+exclude_rules = LT12, AM04
 
 [sqlfluff:templater:mako]
 

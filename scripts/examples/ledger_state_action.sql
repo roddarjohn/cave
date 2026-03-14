@@ -27,6 +27,9 @@ SELECT * FROM ops.ops_inventory_reconcile(
 -- Returns empty set (no correction needed).
 
 -- Current balances are visible through the balance view:
-SELECT warehouse, sku, balance
+SELECT
+    warehouse,
+    sku,
+    balance
 FROM ops.inventory_balances
 ORDER BY warehouse, sku;
