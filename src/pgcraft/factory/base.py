@@ -12,8 +12,9 @@ from pgcraft.validator import validate_schema_items
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from sqlalchemy import MetaData, Table
+    from sqlalchemy import MetaData
     from sqlalchemy.schema import SchemaItem
+    from sqlalchemy.sql.expression import FromClause
 
     from pgcraft.check import PGCraftCheck
     from pgcraft.plugin import Plugin
@@ -170,8 +171,8 @@ class ResourceFactory:
 
     DEFAULT_PLUGINS: ClassVar[list[Plugin]] = []
 
-    table: Table
-    """The root table or view proxy created by the factory.
+    table: FromClause
+    """The root selectable created by the factory.
 
     This is the ``__root__`` context value set by the table
     plugin, exposing the column metadata for use in queries,
