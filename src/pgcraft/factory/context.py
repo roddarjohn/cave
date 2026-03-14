@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from sqlalchemy import MetaData
     from sqlalchemy.schema import SchemaItem
 
+    from pgcraft.columns import PrimaryKeyColumns
     from pgcraft.plugin import Plugin
 
 _MISSING = object()
@@ -77,6 +78,36 @@ class FactoryContext:
         definitions (e.g. to extract column names or types).
         """
         return [item for item in self.schema_items if isinstance(item, Column)]
+
+    @property
+    def dim_column_names(self) -> list[str]:
+        """Return writable (non-PK, non-computed) column names.
+
+        Filters out primary-key and computed columns from
+        ``schema_items``, leaving only the user-defined
+        dimension columns that a plugin should read or write.
+        Equivalent to the ``_dim_column_names`` helper that was
+        previously duplicated across multiple plugin modules.
+        """
+        return [
+            col.key
+            for col in self.columns
+            if not col.primary_key and not col.computed
+        ]
+
+    @property
+    def pk_column_name(self) -> str:
+        """Return the primary key column name.
+
+        Shorthand for ``ctx["pk_columns"].first_key``.  Requires
+        a PK plugin (e.g. ``SerialPKPlugin``) to have run first.
+
+        Raises:
+            KeyError: If ``pk_columns`` has not been set yet.
+
+        """
+        pk_columns: PrimaryKeyColumns = self["pk_columns"]
+        return pk_columns.first_key
 
     @property
     def table_items(self) -> list[SchemaItem]:

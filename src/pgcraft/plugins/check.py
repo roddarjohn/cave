@@ -25,6 +25,56 @@ from pgcraft.utils.trigger import register_view_triggers
 if TYPE_CHECKING:
     from pgcraft.factory.context import FactoryContext
 
+
+class _CheckPlugin(Plugin):
+    """Base class for check-constraint enforcement plugins.
+
+    Handles the shared logic of collecting
+    :class:`~pgcraft.check.PGCraftCheck` items, performing an early
+    exit when there are none, and validating that each check only
+    references known columns.  Concrete subclasses supply the column
+    name set and the application logic.
+
+    """
+
+    def _column_names(self, ctx: FactoryContext) -> set[str]:
+        """Return the set of column names available for validation.
+
+        Args:
+            ctx: The active factory context.
+
+        Returns:
+            Set of known column names for this plugin's target.
+
+        """
+        raise NotImplementedError
+
+    def _apply(
+        self,
+        ctx: FactoryContext,
+        checks: list[PGCraftCheck],
+    ) -> None:
+        """Apply validated checks to the target.
+
+        Args:
+            ctx: The active factory context.
+            checks: Validated :class:`~pgcraft.check.PGCraftCheck`
+                items to apply.
+
+        """
+        raise NotImplementedError
+
+    def run(self, ctx: FactoryContext) -> None:
+        """Collect, validate, and apply checks."""
+        checks = collect_checks(ctx.schema_items)
+        if not checks:
+            return
+        col_names = self._column_names(ctx)
+        for cave_check in checks:
+            _validate_columns(cave_check, col_names)
+        self._apply(ctx, checks)
+
+
 _TEMPLATES = Path(__file__).resolve().parent / "templates" / "check"
 
 _NAMING_DEFAULTS = {
@@ -34,7 +84,7 @@ _NAMING_DEFAULTS = {
 
 
 @requires(Dynamic("table_key"))
-class TableCheckPlugin(Plugin):
+class TableCheckPlugin(_CheckPlugin):
     """Materialize :class:`~pgcraft.check.PGCraftCheck` as table constraints.
 
     Reads ``PGCraftCheck`` items from ``ctx.schema_items``, resolves
@@ -51,24 +101,25 @@ class TableCheckPlugin(Plugin):
         """Store the context key."""
         self.table_key = table_key
 
-    def run(self, ctx: FactoryContext) -> None:
-        """Append check constraints to the target table."""
-        checks = collect_checks(ctx.schema_items)
-        if not checks:
-            return
+    def _column_names(self, ctx: FactoryContext) -> set[str]:
+        """Return column names from the physical table."""
+        return {c.name for c in ctx[self.table_key].columns}
 
+    def _apply(
+        self,
+        ctx: FactoryContext,
+        checks: list[PGCraftCheck],
+    ) -> None:
+        """Append SQLAlchemy CheckConstraints to the table."""
         table = ctx[self.table_key]
-        col_names = {c.name for c in table.columns}
-
         for cave_check in checks:
-            _validate_columns(cave_check, col_names)
             expr = cave_check.resolve(lambda c: c)
             constraint = CheckConstraint(expr, name=cave_check.name)
             table.append_constraint(constraint)
 
 
 @requires(Dynamic("view_key"))
-class TriggerCheckPlugin(Plugin):
+class TriggerCheckPlugin(_CheckPlugin):
     """Enforce checks via INSTEAD OF triggers (EAV dimensions).
 
     Generates a single trigger function per view per operation
@@ -87,51 +138,47 @@ class TriggerCheckPlugin(Plugin):
         """Store the context key."""
         self.view_key = view_key
 
-    def run(self, ctx: FactoryContext) -> None:
-        """Register check-enforcement triggers."""
-        checks = collect_checks(ctx.schema_items)
-        if not checks:
-            return
+    def _column_names(self, ctx: FactoryContext) -> set[str]:
+        """Return column names from the virtual (schema_items) columns."""
+        return {col.key for col in ctx.columns}
 
-        col_names = {col.key for col in ctx.columns}
-        for cave_check in checks:
-            _validate_columns(cave_check, col_names)
-
+    def _apply(
+        self,
+        ctx: FactoryContext,
+        checks: list[PGCraftCheck],
+    ) -> None:
+        """Register INSTEAD OF trigger functions for each check."""
         resolved_checks = [
-            (
-                cave_check.resolve(lambda c: f"NEW.{c}"),
-                cave_check.name,
-            )
+            (cave_check.resolve(lambda c: f"NEW.{c}"), cave_check.name)
             for cave_check in checks
         ]
 
         template = load_template(_TEMPLATES / "validate.mako")
         template_vars = {"checks": resolved_checks}
 
-        views_to_trigger: list[tuple[str, str]] = []
-        if self.view_key in ctx:
-            view = ctx[self.view_key]
-            view_schema = view.schema or ctx.schemaname
-            view_fullname = f"{view_schema}.{ctx.tablename}"
-            views_to_trigger.append((view_schema, view_fullname))
+        if self.view_key not in ctx:
+            return
 
-        for view_schema, view_fullname in views_to_trigger:
-            register_view_triggers(
-                metadata=ctx.metadata,
-                view_schema=view_schema,
-                view_fullname=view_fullname,
-                tablename=ctx.tablename,
-                template_vars=template_vars,
-                ops=[
-                    ("insert", template),
-                    ("update", template),
-                ],
-                naming_defaults=_NAMING_DEFAULTS,
-                function_key="check_function",
-                trigger_key="check_trigger",
-            )
+        view = ctx[self.view_key]
+        view_schema = view.schema or ctx.schemaname
+        view_fullname = f"{view_schema}.{ctx.tablename}"
 
-            _validate_trigger_ordering(ctx, view_fullname)
+        register_view_triggers(
+            metadata=ctx.metadata,
+            view_schema=view_schema,
+            view_fullname=view_fullname,
+            tablename=ctx.tablename,
+            template_vars=template_vars,
+            ops=[
+                ("insert", template),
+                ("update", template),
+            ],
+            naming_defaults=_NAMING_DEFAULTS,
+            function_key="check_function",
+            trigger_key="check_trigger",
+        )
+
+        _validate_trigger_ordering(ctx, view_fullname)
 
 
 def _validate_columns(

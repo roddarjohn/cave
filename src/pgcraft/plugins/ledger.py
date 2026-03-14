@@ -10,6 +10,7 @@ from sqlalchemy import (
     Column,
     Integer,
     Numeric,
+    Select,
     String,
     Table,
     func,
@@ -42,6 +43,12 @@ _TEMPLATES = Path(__file__).resolve().parent / "templates" / "ledger"
 _NAMING_DEFAULTS = {
     "ledger_function": "%(schema)s_%(table_name)s_%(op)s",
     "ledger_trigger": "%(schema)s_%(table_name)s_%(op)s",
+    "ledger_balance_view": "%(table_name)s_balances",
+    "ledger_latest_view": "%(table_name)s_latest",
+    "balance_check_function": "%(schema)s_%(table_name)s_%(op)s",
+    "balance_check_trigger": "%(schema)s_%(table_name)s_%(op)s",
+    "double_entry_function": "%(schema)s_%(table_name)s_%(op)s",
+    "double_entry_trigger": "%(schema)s_%(table_name)s_%(op)s",
 }
 
 _VALUE_TYPES = {
@@ -54,13 +61,19 @@ DIRECTION_CREDIT = "credit"
 _VALID_DIRECTIONS = (DIRECTION_DEBIT, DIRECTION_CREDIT)
 
 
-def _dim_column_names(ctx: FactoryContext) -> list[str]:
-    """Extract writable (non-PK, non-computed) column names."""
-    return [
-        col.key
-        for col in ctx.columns
-        if not col.primary_key and not col.computed
-    ]
+def _require_dimensions(dimensions: list[str]) -> None:
+    """Raise if *dimensions* is empty.
+
+    Args:
+        dimensions: The list to validate.
+
+    Raises:
+        PGCraftValidationError: If *dimensions* is empty.
+
+    """
+    if not dimensions:
+        msg = "dimensions must be a non-empty list"
+        raise PGCraftValidationError(msg)
 
 
 @produces(Dynamic("table_key"), "__root__")
@@ -156,7 +169,7 @@ class LedgerTriggerPlugin(Plugin):
         primary = ctx[self.table_key]
         base_fullname = f"{ctx.schemaname}.{primary.name}"
         entry_id_col = ctx["entry_id_column"]
-        dim_cols = _dim_column_names(ctx)
+        dim_cols = ctx.dim_column_names
 
         # Include entry_id and value alongside dimension columns.
         all_cols = [entry_id_col.name, "value", *dim_cols]
@@ -203,14 +216,78 @@ class LedgerTriggerPlugin(Plugin):
         )
 
 
-_BALANCE_NAMING_DEFAULTS = {
-    "ledger_balance_view": "%(table_name)s_balances",
-}
+class _LedgerDerivedViewPlugin(Plugin):
+    """Base class for ledger views derived from the backing table.
+
+    Handles the shared infrastructure of dimension validation, name
+    resolution, view registration, and ctx storage.  Concrete
+    subclasses supply the query and the naming key.
+
+    Subclasses must set ``_view_name_key`` as a class attribute and
+    implement ``_build_query``.
+
+    """
+
+    _view_name_key: str
+
+    def __init__(
+        self,
+        dimensions: list[str],
+        table_key: str,
+        view_key: str,
+    ) -> None:
+        """Validate dimensions and store configuration."""
+        _require_dimensions(dimensions)
+        self.dimensions = list(dimensions)
+        self.table_key = table_key
+        self.view_key = view_key
+
+    def _build_query(
+        self,
+        table: Table,
+        dim_columns: list,
+        ctx: FactoryContext,
+    ) -> Select:
+        """Build the view SELECT query.
+
+        Args:
+            table: The backing ledger table.
+            dim_columns: Resolved dimension column objects.
+            ctx: The active factory context.
+
+        Returns:
+            The SELECT statement for the view body.
+
+        """
+        raise NotImplementedError
+
+    def run(self, ctx: FactoryContext) -> None:
+        """Create and register the derived view."""
+        table = ctx[self.table_key]
+        dim_columns = [table.c[d] for d in self.dimensions]
+        query = self._build_query(table, dim_columns, ctx)
+
+        view_name = resolve_name(
+            ctx.metadata,
+            self._view_name_key,
+            {"table_name": ctx.tablename, "schema": ctx.schemaname},
+            _NAMING_DEFAULTS,
+        )
+
+        register_view(
+            ctx.metadata,
+            View(
+                view_name,
+                compile_query(query),
+                schema=ctx.schemaname,
+            ),
+        )
+        ctx[self.view_key] = view_name
 
 
 @produces(Dynamic("balance_view_key"))
 @requires(Dynamic("table_key"))
-class LedgerBalanceViewPlugin(Plugin):
+class LedgerBalanceViewPlugin(_LedgerDerivedViewPlugin):
     """Create a view that shows current balances per dimension group.
 
     Generates ``SELECT dim_cols, SUM(value) AS balance FROM ledger
@@ -230,6 +307,8 @@ class LedgerBalanceViewPlugin(Plugin):
 
     """
 
+    _view_name_key = "ledger_balance_view"
+
     def __init__(
         self,
         dimensions: list[str],
@@ -237,19 +316,17 @@ class LedgerBalanceViewPlugin(Plugin):
         balance_view_key: str = "balance_view",
     ) -> None:
         """Store configuration."""
-        if not dimensions:
-            msg = "dimensions must be a non-empty list"
-            raise PGCraftValidationError(msg)
-        self.dimensions = list(dimensions)
-        self.table_key = table_key
+        super().__init__(dimensions, table_key, balance_view_key)
         self.balance_view_key = balance_view_key
 
-    def run(self, ctx: FactoryContext) -> None:
-        """Create and register the balance view."""
-        table = ctx[self.table_key]
-        dim_columns = [table.c[d] for d in self.dimensions]
-
-        query = (
+    def _build_query(
+        self,
+        table: Table,
+        dim_columns: list,
+        ctx: FactoryContext,  # noqa: ARG002
+    ) -> Select:
+        """Build a SUM(value) GROUP BY query."""
+        return (
             select(
                 *[c.label(c.key) for c in dim_columns],
                 func.sum(table.c["value"]).label("balance"),
@@ -258,35 +335,10 @@ class LedgerBalanceViewPlugin(Plugin):
             .group_by(*dim_columns)
         )
 
-        view_name = resolve_name(
-            ctx.metadata,
-            "ledger_balance_view",
-            {
-                "table_name": ctx.tablename,
-                "schema": ctx.schemaname,
-            },
-            _BALANCE_NAMING_DEFAULTS,
-        )
-
-        register_view(
-            ctx.metadata,
-            View(
-                view_name,
-                compile_query(query),
-                schema=ctx.schemaname,
-            ),
-        )
-        ctx[self.balance_view_key] = view_name
-
-
-_LATEST_NAMING_DEFAULTS = {
-    "ledger_latest_view": "%(table_name)s_latest",
-}
-
 
 @produces(Dynamic("latest_view_key"))
 @requires(Dynamic("table_key"), "created_at_column")
-class LedgerLatestViewPlugin(Plugin):
+class LedgerLatestViewPlugin(_LedgerDerivedViewPlugin):
     """Create a view showing the most recent row per dimension group.
 
     Uses PostgreSQL ``DISTINCT ON`` to select the latest row
@@ -308,6 +360,8 @@ class LedgerLatestViewPlugin(Plugin):
 
     """
 
+    _view_name_key = "ledger_latest_view"
+
     def __init__(
         self,
         dimensions: list[str],
@@ -315,20 +369,18 @@ class LedgerLatestViewPlugin(Plugin):
         latest_view_key: str = "latest_view",
     ) -> None:
         """Store configuration."""
-        if not dimensions:
-            msg = "dimensions must be a non-empty list"
-            raise PGCraftValidationError(msg)
-        self.dimensions = list(dimensions)
-        self.table_key = table_key
+        super().__init__(dimensions, table_key, latest_view_key)
         self.latest_view_key = latest_view_key
 
-    def run(self, ctx: FactoryContext) -> None:
-        """Create and register the latest-row view."""
-        table = ctx[self.table_key]
+    def _build_query(
+        self,
+        table: Table,
+        dim_columns: list,
+        ctx: FactoryContext,
+    ) -> Select:
+        """Build a DISTINCT ON query ordered by created_at DESC."""
         created_at_col = ctx["created_at_column"]
-        dim_columns = [table.c[d] for d in self.dimensions]
-
-        query = (
+        return (
             select(table)
             .distinct(*dim_columns)
             .order_by(
@@ -336,32 +388,6 @@ class LedgerLatestViewPlugin(Plugin):
                 table.c[created_at_col].desc(),
             )
         )
-
-        view_name = resolve_name(
-            ctx.metadata,
-            "ledger_latest_view",
-            {
-                "table_name": ctx.tablename,
-                "schema": ctx.schemaname,
-            },
-            _LATEST_NAMING_DEFAULTS,
-        )
-
-        register_view(
-            ctx.metadata,
-            View(
-                view_name,
-                compile_query(query),
-                schema=ctx.schemaname,
-            ),
-        )
-        ctx[self.latest_view_key] = view_name
-
-
-_BALANCE_CHECK_NAMING_DEFAULTS = {
-    "balance_check_function": "%(schema)s_%(table_name)s_%(op)s",
-    "balance_check_trigger": "%(schema)s_%(table_name)s_%(op)s",
-}
 
 
 @requires(Dynamic("table_key"))
@@ -398,9 +424,7 @@ class LedgerBalanceCheckPlugin(Plugin):
         table_key: str = "primary",
     ) -> None:
         """Store configuration."""
-        if not dimensions:
-            msg = "dimensions must be a non-empty list"
-            raise PGCraftValidationError(msg)
+        _require_dimensions(dimensions)
         self.dimensions = list(dimensions)
         self.min_balance = min_balance
         self.table_key = table_key
@@ -431,7 +455,7 @@ class LedgerBalanceCheckPlugin(Plugin):
                 "schema": ctx.schemaname,
                 "op": "balance_check",
             },
-            _BALANCE_CHECK_NAMING_DEFAULTS,
+            _NAMING_DEFAULTS,
         )
         trigger_name = resolve_name(
             ctx.metadata,
@@ -441,7 +465,7 @@ class LedgerBalanceCheckPlugin(Plugin):
                 "schema": ctx.schemaname,
                 "op": "balance_check",
             },
-            _BALANCE_CHECK_NAMING_DEFAULTS,
+            _NAMING_DEFAULTS,
         )
 
         register_function(
@@ -467,12 +491,6 @@ class LedgerBalanceCheckPlugin(Plugin):
             .for_each_statement()
             .referencing_new_table_as("new_entries"),
         )
-
-
-_DOUBLE_ENTRY_NAMING_DEFAULTS = {
-    "double_entry_function": "%(schema)s_%(table_name)s_%(op)s",
-    "double_entry_trigger": "%(schema)s_%(table_name)s_%(op)s",
-}
 
 
 @produces("double_entry_columns")
@@ -571,7 +589,7 @@ class DoubleEntryTriggerPlugin(Plugin):
                 "schema": ctx.schemaname,
                 "op": "double_entry_check",
             },
-            _DOUBLE_ENTRY_NAMING_DEFAULTS,
+            _NAMING_DEFAULTS,
         )
         trigger_name = resolve_name(
             ctx.metadata,
@@ -581,7 +599,7 @@ class DoubleEntryTriggerPlugin(Plugin):
                 "schema": ctx.schemaname,
                 "op": "double_entry_check",
             },
-            _DOUBLE_ENTRY_NAMING_DEFAULTS,
+            _NAMING_DEFAULTS,
         )
 
         register_function(
