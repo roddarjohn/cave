@@ -7,16 +7,32 @@ pgcraft
 
 .. toctree::
    :maxdepth: 2
+   :caption: Getting started
 
    setup
-   naming_conventions
+   playground
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Guides
+
    dimensions
    ledgers
    ledger_actions
-   builtin_plugins
-   plugins
+   naming_conventions
    cookbook
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
+
+   plugins
+   builtin_plugins
    api
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Contributing
+
    development
-   playground
    changelog
