@@ -66,7 +66,7 @@ _NATIVE_OP_TYPES: tuple[type, ...] = (
 )
 
 
-def _to_executables(
+def _to_executables(  # noqa: PLR0911
     op: alembic_ops.MigrateOperation,
     conn: Connection,
 ) -> list[Executable]:
@@ -132,7 +132,7 @@ def apply_ops(
     conn: Connection,
     ops: list[alembic_ops.MigrateOperation],
 ) -> str:
-    """Execute *ops* against *conn* and return the captured SQL.
+    r"""Execute *ops* against *conn* and return the captured SQL.
 
     Applies each op in order.  Standard Alembic ops are invoked via
     ``Operations``; declarative-extensions ops are applied via their
@@ -147,7 +147,7 @@ def apply_ops(
             through :func:`~pgcraft.runtime.filter.filter_safe_ops`.
 
     Returns:
-        All SQL statements executed, joined by ``"\\n\\n"``.  Empty string
+        All SQL statements executed, joined by ``"\n\n"``.  Empty string
         if *ops* is empty.
 
     """
