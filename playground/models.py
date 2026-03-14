@@ -40,10 +40,10 @@ from pgcraft.plugins.simple import (
     SimpleTriggerPlugin,
 )
 from pgcraft.statistics import PGCraftStatisticsView
-from pgcraft.utils.naming_convention import build_naming_convention
+from pgcraft import pgcraft_build_naming_conventions
 
 metadata = MetaData(
-    naming_convention=build_naming_convention(),
+    naming_convention=pgcraft_build_naming_conventions(),
 )
 
 # -- Factory-based models -----------------------------------------------

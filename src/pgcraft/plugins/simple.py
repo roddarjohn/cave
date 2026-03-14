@@ -22,15 +22,6 @@ _NAMING_DEFAULTS = {
 }
 
 
-def _dim_column_names(ctx: FactoryContext) -> list[str]:
-    """Extract writable (non-PK, non-computed) column names."""
-    return [
-        col.key
-        for col in ctx.columns
-        if not col.primary_key and not col.computed
-    ]
-
-
 @produces(Dynamic("table_key"), "__root__")
 @requires("pk_columns")
 @singleton("__table__")
@@ -90,7 +81,7 @@ class SimpleTriggerPlugin(Plugin):
         api_view = ctx[self.view_key]
         primary = ctx[self.table_key]
         base_fullname = f"{ctx.schemaname}.{primary.name}"
-        dim_cols = _dim_column_names(ctx)
+        dim_cols = ctx.dim_column_names
 
         template_vars = {
             "base_table": base_fullname,

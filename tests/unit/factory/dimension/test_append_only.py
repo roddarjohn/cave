@@ -168,8 +168,9 @@ class TestAppendOnlyDimensionResourceFactoryTriggers:
         )
         functions = metadata.info.get("functions")
         assert functions is not None
-        # Two views × three ops = 6 functions
-        assert len(functions.functions) == 6
+        # Two views × 3 ops = 6 INSTEAD OF functions
+        # + 2 protection functions (one per raw table: root + attributes)
+        assert len(functions.functions) == 8
 
     def test_triggers_registered(self):
         metadata = MetaData()
@@ -178,7 +179,9 @@ class TestAppendOnlyDimensionResourceFactoryTriggers:
         )
         triggers = metadata.info.get("triggers")
         assert triggers is not None
-        assert len(triggers.triggers) == 6
+        # 6 INSTEAD OF triggers + 6 BEFORE protection triggers
+        # (2 tables × 3 ops)
+        assert len(triggers.triggers) == 12
 
     def test_function_names_include_op(self):
         metadata = MetaData()
@@ -186,7 +189,9 @@ class TestAppendOnlyDimensionResourceFactoryTriggers:
             "product", "dim", metadata, [Column("name", String)]
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
-        # Each op appears twice (once per view schema)
+        # Each op appears twice (once per view schema).
+        # Protection functions are named without an op suffix, so they
+        # do not match this filter.
         insert_fns = [n for n in fn_names if "insert" in n]
         assert len(insert_fns) == 2
 

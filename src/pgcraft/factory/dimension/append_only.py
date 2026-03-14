@@ -12,6 +12,7 @@ from pgcraft.plugins.append_only import (
 )
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.protect import RawTableProtectionPlugin
 from pgcraft.plugins.statistics import StatisticsViewPlugin
 
 
@@ -32,6 +33,8 @@ class AppendOnlyDimensionResourceFactory(ResourceFactory):
     6. :class:`~pgcraft.plugins.api.APIPlugin` -- API view + resource.
     7. :class:`~pgcraft.plugins.append_only.AppendOnlyTriggerPlugin` --
        INSTEAD OF triggers.
+    8. :class:`~pgcraft.plugins.protect.RawTableProtectionPlugin` --
+       BEFORE triggers blocking direct DML on root and attributes tables.
     """
 
     DEFAULT_PLUGINS: ClassVar[list[Plugin]] = [
@@ -42,4 +45,5 @@ class AppendOnlyDimensionResourceFactory(ResourceFactory):
         StatisticsViewPlugin(),
         APIPlugin(),
         AppendOnlyTriggerPlugin(),
+        RawTableProtectionPlugin("root_table", "attributes"),
     ]

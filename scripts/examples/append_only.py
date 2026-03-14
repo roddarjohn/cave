@@ -2,12 +2,12 @@
 
 from sqlalchemy import Column, MetaData, String
 
+from pgcraft import pgcraft_build_naming_conventions
 from pgcraft.factory.dimension import (
     AppendOnlyDimensionResourceFactory,
 )
-from pgcraft.utils.naming_convention import build_naming_convention
 
-metadata = MetaData(naming_convention=build_naming_convention())
+metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
 # --- example start ---
 AppendOnlyDimensionResourceFactory(

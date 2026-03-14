@@ -151,7 +151,8 @@ class TestSimpleDimensionResourceFactoryTriggers:
         )
         functions = metadata.info.get("functions")
         assert functions is not None
-        assert len(functions.functions) == len(_CRUD_OPS)
+        # 3 INSTEAD OF functions for the API view + 1 protection function
+        assert len(functions.functions) == len(_CRUD_OPS) + 1
 
     def test_triggers_registered(self):
         metadata = MetaData()
@@ -160,7 +161,8 @@ class TestSimpleDimensionResourceFactoryTriggers:
         )
         triggers = metadata.info.get("triggers")
         assert triggers is not None
-        assert len(triggers.triggers) == len(_CRUD_OPS)
+        # 3 INSTEAD OF triggers on the API view + 3 BEFORE protection triggers
+        assert len(triggers.triggers) == len(_CRUD_OPS) * 2
 
     def test_insert_function_exists(self):
         metadata = MetaData()
@@ -192,8 +194,12 @@ class TestSimpleDimensionResourceFactoryTriggers:
             "product", "dim", metadata, [Column("name", String)]
         )
         triggers = metadata.info["triggers"].triggers
-        insert_tr = next(t for t in triggers if "insert" in t.name)
-        assert insert_tr.time == TriggerTimes.instead_of
+        instead_of_inserts = [
+            t
+            for t in triggers
+            if "insert" in t.name and t.time == TriggerTimes.instead_of
+        ]
+        assert len(instead_of_inserts) == 1
 
 
 class TestSimpleDimensionResourceFactoryAPIResource:

@@ -23,7 +23,7 @@ from pgcraft.plugin import Dynamic, Plugin, produces, requires, singleton
 from pgcraft.utils.naming import resolve_name
 from pgcraft.utils.query import compile_query
 from pgcraft.utils.template import load_template
-from pgcraft.utils.trigger import register_view_triggers
+from pgcraft.utils.trigger import collect_trigger_views, register_view_triggers
 
 _TEMPLATES = Path(__file__).resolve().parent / "templates" / "append_only"
 
@@ -53,10 +53,6 @@ def _resolve_attributes_name(ctx: FactoryContext) -> str:
     )
 
 
-def _dim_column_names(ctx: FactoryContext) -> list[str]:
-    return [col.key for col in ctx.columns if not col.computed]
-
-
 @produces(Dynamic("root_key"), Dynamic("attributes_key"))
 @requires("pk_columns", "created_at_column")
 @singleton("__table__")
@@ -82,7 +78,7 @@ class AppendOnlyTablePlugin(Plugin):
 
     def run(self, ctx: FactoryContext) -> None:
         """Create root and attributes tables."""
-        pk_col_name = ctx["pk_columns"].first_key
+        pk_col_name = ctx.pk_column_name
         created_at_col = ctx["created_at_column"]
 
         attr_name = _resolve_attributes_name(ctx)
@@ -155,7 +151,7 @@ class AppendOnlyViewPlugin(Plugin):
 
     def run(self, ctx: FactoryContext) -> None:
         """Register the join view and store the proxy in ctx."""
-        pk_col_name = ctx["pk_columns"].first_key
+        pk_col_name = ctx.pk_column_name
         created_at_col = ctx["created_at_column"]
         root_table = ctx[self.root_key]
         attribute_table = ctx[self.attributes_key]
@@ -238,7 +234,7 @@ class AppendOnlyTriggerPlugin(Plugin):
         root_fullname = f"{ctx.schemaname}.{root_table.name}"
         attr_fullname = f"{ctx.schemaname}.{attribute_table.name}"
 
-        dim_cols = _dim_column_names(ctx)
+        dim_cols = ctx.dim_column_names
         template_vars = {
             "attr_table": attr_fullname,
             "root_table": root_fullname,
@@ -262,23 +258,9 @@ class AppendOnlyTriggerPlugin(Plugin):
             ),
         ]
 
-        views_to_trigger = [
-            (
-                ctx.schemaname,
-                f"{ctx.schemaname}.{ctx.tablename}",
-            ),
-        ]
-        if self.view_key in ctx:
-            api_view = ctx[self.view_key]
-            api_schema = api_view.schema or "api"
-            views_to_trigger.append(
-                (
-                    api_schema,
-                    f"{api_schema}.{ctx.tablename}",
-                )
-            )
-
-        for view_schema, view_fullname in views_to_trigger:
+        for view_schema, view_fullname in collect_trigger_views(
+            ctx, self.view_key
+        ):
             register_view_triggers(
                 metadata=ctx.metadata,
                 view_schema=view_schema,

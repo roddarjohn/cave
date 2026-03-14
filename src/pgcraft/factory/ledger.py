@@ -14,6 +14,7 @@ from pgcraft.plugins.ledger import (
 )
 from pgcraft.plugins.ledger_actions import LedgerActionsPlugin
 from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.protect import RawTableProtectionPlugin
 
 if TYPE_CHECKING:
     from sqlalchemy import MetaData
@@ -41,6 +42,8 @@ class LedgerResourceFactory(ResourceFactory):
        resource (select + insert grants).
     6. :class:`~pgcraft.plugins.ledger.LedgerTriggerPlugin` --
        INSERT INSTEAD OF trigger.
+    7. :class:`~pgcraft.plugins.protect.RawTableProtectionPlugin` --
+       BEFORE triggers blocking direct DML on the backing table.
 
     Pass ``plugins=[...]`` to replace these entirely, or
     ``extra_plugins=[...]`` to append to them.
@@ -64,6 +67,7 @@ class LedgerResourceFactory(ResourceFactory):
         LedgerTablePlugin(),
         APIPlugin(grants=["select", "insert"]),
         LedgerTriggerPlugin(),
+        RawTableProtectionPlugin("primary"),
     ]
 
     def __init__(  # noqa: PLR0913

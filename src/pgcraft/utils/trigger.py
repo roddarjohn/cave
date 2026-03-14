@@ -1,7 +1,9 @@
 """Shared trigger registration for dimension factories."""
 
-from mako.template import Template
-from sqlalchemy import MetaData
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from sqlalchemy_declarative_extensions import (
     register_function,
     register_trigger,
@@ -13,6 +15,41 @@ from sqlalchemy_declarative_extensions.dialects.postgresql import (
 )
 
 from pgcraft.utils.naming import resolve_name
+
+if TYPE_CHECKING:
+    from mako.template import Template
+    from sqlalchemy import MetaData
+
+    from pgcraft.factory.context import FactoryContext
+
+
+def collect_trigger_views(
+    ctx: FactoryContext,
+    view_key: str,
+) -> list[tuple[str, str]]:
+    """Return ``(schema, fullname)`` pairs for all views to trigger on.
+
+    Always includes the private dimension view in ``ctx.schemaname``.
+    If ``view_key`` is present in ``ctx`` (e.g. the API view created
+    by ``APIPlugin``), that view's schema and fullname are appended.
+
+    Args:
+        ctx: The active factory context.
+        view_key: Key under which an additional trigger target
+            (e.g. ``"api"``) may be stored in ``ctx``.
+
+    Returns:
+        List of ``(schema, fully_qualified_name)`` tuples.
+
+    """
+    views: list[tuple[str, str]] = [
+        (ctx.schemaname, f"{ctx.schemaname}.{ctx.tablename}"),
+    ]
+    if view_key in ctx:
+        api_view = ctx[view_key]
+        api_schema = api_view.schema or "api"
+        views.append((api_schema, f"{api_schema}.{ctx.tablename}"))
+    return views
 
 
 def register_view_triggers(  # noqa: PLR0913

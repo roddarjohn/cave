@@ -9,6 +9,7 @@ pgcraft
    :maxdepth: 2
 
    setup
+   naming_conventions
    dimensions
    ledgers
    ledger_actions
