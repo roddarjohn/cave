@@ -24,7 +24,7 @@ _SIMPLE_TEMPLATES = (
 def _render_simple_insert(
     base_table: str, cols: str, new_cols: str, set_clause: str
 ) -> str:
-    tpl = load_template(_SIMPLE_TEMPLATES / "insert.mako")
+    tpl = load_template(_SIMPLE_TEMPLATES / "insert.plpgsql.mako")
     return tpl.render(
         base_table=base_table,
         cols=cols,
@@ -36,7 +36,7 @@ def _render_simple_insert(
 def _render_simple_update(
     base_table: str, cols: str, new_cols: str, set_clause: str
 ) -> str:
-    tpl = load_template(_SIMPLE_TEMPLATES / "update.mako")
+    tpl = load_template(_SIMPLE_TEMPLATES / "update.plpgsql.mako")
     return tpl.render(
         base_table=base_table,
         cols=cols,
@@ -48,7 +48,7 @@ def _render_simple_update(
 def _render_simple_delete(
     base_table: str, cols: str, new_cols: str, set_clause: str
 ) -> str:
-    tpl = load_template(_SIMPLE_TEMPLATES / "delete.mako")
+    tpl = load_template(_SIMPLE_TEMPLATES / "delete.plpgsql.mako")
     return tpl.render(
         base_table=base_table,
         cols=cols,

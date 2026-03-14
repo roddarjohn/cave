@@ -29,7 +29,7 @@ _EAV_TEMPLATES = (
 
 
 def _render_insert(mappings: list[_EAVMapping], schema: str) -> str:
-    tpl = load_template(_EAV_TEMPLATES / "insert.mako")
+    tpl = load_template(_EAV_TEMPLATES / "insert.plpgsql.mako")
     return tpl.render(
         entity_table=f"{schema}.things_entity",
         attr_table=f"{schema}.things_attribute",
@@ -40,7 +40,7 @@ def _render_insert(mappings: list[_EAVMapping], schema: str) -> str:
 
 
 def _render_update(mappings: list[_EAVMapping], schema: str) -> str:
-    tpl = load_template(_EAV_TEMPLATES / "update.mako")
+    tpl = load_template(_EAV_TEMPLATES / "update.plpgsql.mako")
     return tpl.render(
         attr_table=f"{schema}.things_attribute",
         mappings=[
