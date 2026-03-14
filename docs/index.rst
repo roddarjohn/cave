@@ -19,3 +19,4 @@ pgcraft
    api
    development
    playground
+   changelog

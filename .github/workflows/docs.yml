@@ -34,12 +34,14 @@ jobs:
       DATABASE_URL: postgresql+psycopg://postgres@localhost/pgcraft
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.14"
       - uses: extractions/setup-just@v3
       - run: sudo apt-get install -y graphviz
-      - run: mkdir -p docs/_generated && just docs
+      - run: just docs
       - uses: actions/upload-pages-artifact@v4
         with:
           path: docs/_build/html
