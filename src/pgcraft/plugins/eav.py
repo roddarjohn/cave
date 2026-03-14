@@ -33,7 +33,7 @@ from pgcraft.plugin import Dynamic, Plugin, produces, requires, singleton
 from pgcraft.utils.naming import resolve_name
 from pgcraft.utils.query import compile_query
 from pgcraft.utils.template import load_template
-from pgcraft.utils.trigger import register_view_triggers
+from pgcraft.utils.trigger import collect_trigger_views, register_view_triggers
 
 _TEMPLATES = Path(__file__).resolve().parent / "templates" / "eav"
 
@@ -185,7 +185,7 @@ class EAVTablePlugin(Plugin):
 
     def run(self, ctx: FactoryContext) -> None:
         """Create entity and attribute tables."""
-        pk_col_name = ctx["pk_columns"].first_key
+        pk_col_name = ctx.pk_column_name
         created_at_col = ctx["created_at_column"]
         mappings = _build_eav_mappings(ctx.columns)
         ctx[self.mappings_key] = mappings
@@ -295,7 +295,7 @@ class EAVViewPlugin(Plugin):
         mappings: list[_EAVMapping] = ctx[self.mappings_key]
         entity_table = ctx[self.entity_key]
         attribute_table = ctx[self.attribute_key]
-        pk_col_name = ctx["pk_columns"].first_key
+        pk_col_name = ctx.pk_column_name
         created_at_col = ctx["created_at_column"]
 
         view_sql = compile_query(
@@ -400,23 +400,9 @@ class EAVTriggerPlugin(Plugin):
             ),
         ]
 
-        views_to_trigger = [
-            (
-                ctx.schemaname,
-                f"{ctx.schemaname}.{ctx.tablename}",
-            ),
-        ]
-        if self.view_key in ctx:
-            api_view = ctx[self.view_key]
-            api_schema = api_view.schema or "api"
-            views_to_trigger.append(
-                (
-                    api_schema,
-                    f"{api_schema}.{ctx.tablename}",
-                )
-            )
-
-        for view_schema, view_fullname in views_to_trigger:
+        for view_schema, view_fullname in collect_trigger_views(
+            ctx, self.view_key
+        ):
             register_view_triggers(
                 metadata=ctx.metadata,
                 view_schema=view_schema,

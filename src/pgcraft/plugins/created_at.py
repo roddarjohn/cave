@@ -1,10 +1,8 @@
-"""Plugin that adds a created_at timestamp column."""
+"""Plugin that provides a created_at timestamp column name."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-
-from sqlalchemy import Column, DateTime
 
 if TYPE_CHECKING:
     from pgcraft.factory.context import FactoryContext
@@ -14,14 +12,12 @@ from pgcraft.plugin import Plugin, produces
 
 @produces("created_at_column")
 class CreatedAtPlugin(Plugin):
-    """Provide a ``created_at`` timestamp column for table plugins.
+    """Provide the ``created_at`` column name for table plugins.
 
-    Stores the column name as a string in ``ctx["created_at_column"]``
-    (for plugins like ``AppendOnlyTablePlugin`` and ``EAVTablePlugin``
-    that build their own column) **and** appends a
-    :class:`~sqlalchemy.Column` to ``ctx.injected_columns`` (for
-    plugins like ``LedgerTablePlugin`` that consume injected columns
-    directly).
+    Stores the column name as a string in ``ctx["created_at_column"]``.
+    Each table plugin that needs a ``created_at`` column is responsible
+    for constructing it from this name (see ``AppendOnlyTablePlugin``,
+    ``EAVTablePlugin``, ``LedgerTablePlugin``).
 
     Args:
         column_name: Name of the timestamp column
@@ -34,12 +30,5 @@ class CreatedAtPlugin(Plugin):
         self._column_name = column_name
 
     def run(self, ctx: FactoryContext) -> None:
-        """Store the column name and inject the column."""
+        """Store the column name in ctx."""
         ctx["created_at_column"] = self._column_name
-        ctx.injected_columns.append(
-            Column(
-                self._column_name,
-                DateTime(timezone=True),
-                server_default="now()",
-            )
-        )
