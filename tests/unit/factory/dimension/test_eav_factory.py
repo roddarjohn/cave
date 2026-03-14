@@ -341,7 +341,9 @@ class TestEAVDimensionResourceFactoryTriggers:
         )
         functions = metadata.info.get("functions")
         assert functions is not None
-        assert len(functions.functions) == 6  # 2 views × 3 ops
+        # 6 INSTEAD OF functions (2 views × 3 ops)
+        # + 2 protection functions (one per raw table: entity + attribute)
+        assert len(functions.functions) == 8
 
     def test_triggers_registered(self):
         metadata = MetaData()
@@ -350,7 +352,9 @@ class TestEAVDimensionResourceFactoryTriggers:
         )
         triggers = metadata.info.get("triggers")
         assert triggers is not None
-        assert len(triggers.triggers) == 6
+        # 6 INSTEAD OF triggers + 6 BEFORE protection triggers
+        # (2 tables × 3 ops)
+        assert len(triggers.triggers) == 12
 
 
 class TestEAVDimensionResourceFactoryValidation:

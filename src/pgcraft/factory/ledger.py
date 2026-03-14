@@ -12,6 +12,7 @@ from pgcraft.plugins.ledger import (
     LedgerTriggerPlugin,
 )
 from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.protect import RawTableProtectionPlugin
 
 
 class LedgerResourceFactory(ResourceFactory):
@@ -30,6 +31,8 @@ class LedgerResourceFactory(ResourceFactory):
        resource (select + insert grants).
     6. :class:`~pgcraft.plugins.ledger.LedgerTriggerPlugin` --
        INSERT INSTEAD OF trigger.
+    7. :class:`~pgcraft.plugins.protect.RawTableProtectionPlugin` --
+       BEFORE triggers blocking direct DML on the backing table.
 
     Pass ``plugins=[...]`` to replace these entirely, or
     ``extra_plugins=[...]`` to append to them.
@@ -42,4 +45,5 @@ class LedgerResourceFactory(ResourceFactory):
         LedgerTablePlugin(),
         APIPlugin(grants=["select", "insert"]),
         LedgerTriggerPlugin(),
+        RawTableProtectionPlugin("primary"),
     ]
