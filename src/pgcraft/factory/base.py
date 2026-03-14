@@ -184,6 +184,9 @@ class ResourceFactory:
         """Create the dimension and register it on *metadata*."""
         validate_schema_items(schema_items)
 
+        if config is not None and "pgcraft_config" not in metadata.info:
+            metadata.info["pgcraft_config"] = config
+
         resolved = _resolve_plugins(
             config, plugins, extra_plugins, self.DEFAULT_PLUGINS
         )

@@ -1,9 +1,10 @@
 """Ledger resource factory convenience class."""
 
-from typing import ClassVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 
 from pgcraft.factory.base import ResourceFactory
-from pgcraft.plugin import Plugin
 from pgcraft.plugins.api import APIPlugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
@@ -11,7 +12,17 @@ from pgcraft.plugins.ledger import (
     LedgerTablePlugin,
     LedgerTriggerPlugin,
 )
+from pgcraft.plugins.ledger_actions import LedgerActionsPlugin
 from pgcraft.plugins.pk import SerialPKPlugin
+
+if TYPE_CHECKING:
+    from sqlalchemy import MetaData
+    from sqlalchemy.schema import SchemaItem
+
+    from pgcraft.check import PGCraftCheck
+    from pgcraft.ledger.actions import Action
+    from pgcraft.plugin import Plugin
+    from pgcraft.statistics import PGCraftStatisticsView
 
 
 class LedgerResourceFactory(ResourceFactory):
@@ -33,6 +44,17 @@ class LedgerResourceFactory(ResourceFactory):
 
     Pass ``plugins=[...]`` to replace these entirely, or
     ``extra_plugins=[...]`` to append to them.
+
+    When ``actions`` is provided, a
+    :class:`~pgcraft.plugins.ledger_actions.LedgerActionsPlugin`
+    is automatically appended to ``extra_plugins`` so it runs
+    after the table and API view have been created.
+
+    Args:
+        actions: Optional list of
+            :class:`~pgcraft.ledger.actions.Action` instances
+            to generate SQL functions for.
+
     """
 
     DEFAULT_PLUGINS: ClassVar[list[Plugin]] = [
@@ -43,3 +65,43 @@ class LedgerResourceFactory(ResourceFactory):
         APIPlugin(grants=["select", "insert"]),
         LedgerTriggerPlugin(),
     ]
+
+    def __init__(  # noqa: PLR0913
+        self,
+        tablename: str,
+        schemaname: str,
+        metadata: MetaData,
+        schema_items: list[SchemaItem | PGCraftCheck | PGCraftStatisticsView],
+        *,
+        actions: list[Action] | None = None,
+        config: object | None = None,
+        plugins: list[Plugin] | None = None,
+        extra_plugins: list[Plugin] | None = None,
+    ) -> None:
+        """Create the ledger and register it on *metadata*.
+
+        Args:
+            tablename: Name of the ledger table.
+            schemaname: PostgreSQL schema for generated objects.
+            metadata: SQLAlchemy ``MetaData`` to register on.
+            schema_items: Dimension column definitions.
+            actions: Optional ledger actions to generate functions for.
+            config: Optional global :class:`~pgcraft.config.PGCraftConfig`.
+            plugins: If given, replaces ``DEFAULT_PLUGINS`` entirely.
+            extra_plugins: Appended to the resolved plugin list.
+
+        """
+        if actions:
+            extra_plugins = [
+                *(extra_plugins or []),
+                LedgerActionsPlugin(actions),
+            ]
+        super().__init__(
+            tablename,
+            schemaname,
+            metadata,
+            schema_items,
+            config=config,
+            plugins=plugins,
+            extra_plugins=extra_plugins,
+        )

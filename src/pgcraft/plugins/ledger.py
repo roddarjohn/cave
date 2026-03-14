@@ -433,6 +433,7 @@ class LedgerBalanceCheckPlugin(Plugin):
             },
             _BALANCE_CHECK_NAMING_DEFAULTS,
         )
+
         trigger_name = resolve_name(
             ctx.metadata,
             "balance_check_trigger",
