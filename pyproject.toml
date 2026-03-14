@@ -35,7 +35,6 @@ dev = [
   "tox-uv>=1.33.2",
 ]
 docs = [
-  "furo>=2025.12.19",
   "sphinx>=7.0",
   "sphinx-autobuild>=2025.8.25",
   "sphinx-autodoc-typehints>=3.0.1",
