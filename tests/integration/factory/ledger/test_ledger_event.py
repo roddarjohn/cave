@@ -151,7 +151,7 @@ def _create_simple_event_fn(  # noqa: PLR0913
     param_defs = ", ".join(
         f"p_{k} {t}" for k, t in zip(dim_keys, dim_types, strict=False)
     )
-    select_cols = ", ".join(f"p_{k}" for k in dim_keys)
+    select_cols = ", ".join(f"p_{k} AS {k}" for k in dim_keys)
 
     conn.execute(
         text(f"""
@@ -197,9 +197,9 @@ def _create_simple_event_fn_with_extra(  # noqa: PLR0913
     )
     select_cols = ", ".join(
         [
-            *(f"p_{k}" for k in dim_keys),
+            *(f"p_{k} AS {k}" for k in dim_keys),
             "p_value AS value",
-            *(f"p_{k}" for k in extra_cols),
+            *(f"p_{k} AS {k}" for k in extra_cols),
         ]
     )
 
@@ -251,9 +251,9 @@ def _create_diff_event_fn(  # noqa: PLR0913
 
     desired_select = ", ".join(
         [
-            *(f"p_{k}" for k in dim_keys),
+            *(f"p_{k} AS {k}" for k in dim_keys),
             "p_value AS value",
-            *(f"p_{k}" for k in extra_cols),
+            *(f"p_{k} AS {k}" for k in extra_cols),
         ]
     )
 
@@ -278,6 +278,16 @@ def _create_diff_event_fn(  # noqa: PLR0913
     ]
     existing_union_cols = ", ".join(existing_union_parts)
 
+    # Build GROUP BY + aggregation for deltas CTE.
+    group_cols = ", ".join(dim_keys)
+    agg_select = ", ".join(
+        [
+            *(f"combined.{k}" for k in dim_keys),
+            "SUM(combined.value) AS value",
+            *(f"MAX(combined.{c}) AS {c}" for c in extra_cols),
+        ]
+    )
+
     conn.execute(
         text(f"""
         CREATE FUNCTION {schema}.{schema}_{tablename}_{name}(
@@ -292,13 +302,14 @@ def _create_diff_event_fn(  # noqa: PLR0913
               ),
               existing AS ({existing_select}),
               deltas AS (
-                SELECT {all_cols}
+                SELECT {agg_select}
                 FROM (
                   SELECT {desired_union_cols} FROM desired
                   UNION ALL
                   SELECT {existing_union_cols} FROM existing
                 ) combined
-                WHERE value != 0
+                GROUP BY {group_cols}
+                HAVING SUM(combined.value) != 0
               )
             INSERT INTO {view} ({all_cols})
             SELECT {all_cols} FROM deltas
