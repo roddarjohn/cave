@@ -292,6 +292,20 @@ key with ``gen_random_uuid()`` as the server default:
    )
 
 
+Ledger Actions
+--------------
+
+Use :doc:`ledger_actions` to attach named PostgreSQL functions to a
+ledger.  Two types are provided:
+
+- :class:`~pgcraft.ledger.actions.StateAction` -- declarative
+  reconciliation from a desired-state snapshot.
+- :class:`~pgcraft.ledger.actions.EventAction` -- explicit typed
+  delta insert.
+
+See the :doc:`ledger_actions` page for full documentation.
+
+
 Plugin Reference
 ----------------
 

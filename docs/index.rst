@@ -11,6 +11,7 @@ pgcraft
    setup
    dimensions
    ledgers
+   ledger_actions
    builtin_plugins
    plugins
    cookbook

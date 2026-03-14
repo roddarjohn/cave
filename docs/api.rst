@@ -46,6 +46,18 @@ Ledger resource factory
 .. automodule:: pgcraft.factory.ledger
    :members:
 
+Ledger actions
+--------------
+
+.. automodule:: pgcraft.ledger.actions
+   :members:
+
+.. automodule:: pgcraft.plugins.ledger_actions
+   :members:
+
+.. automodule:: pgcraft.runtime.ledger
+   :members:
+
 Built-in plugins
 ----------------
 

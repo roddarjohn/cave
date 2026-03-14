@@ -21,6 +21,7 @@ from pgcraft.factory.dimension import (
     SimpleDimensionResourceFactory,
 )
 from pgcraft.factory.ledger import LedgerResourceFactory
+from pgcraft.ledger.actions import EventAction, StateAction
 from pgcraft.plugins.api import APIPlugin
 from pgcraft.plugins.check import (
     TableCheckPlugin,
@@ -208,6 +209,39 @@ LedgerResourceFactory(
             dimensions=["warehouse", "sku"],
         ),
     ],
+)
+
+# -- Inventory ledger with actions ----------------------------------
+# StateAction: reconcile desired stock levels against current balance.
+# EventAction: record an ad-hoc stock adjustment.
+
+_inv_reconcile = StateAction(
+    name="reconcile",
+    diff_keys=["warehouse", "sku"],
+    partial=False,
+    write_only_keys=["source"],
+)
+
+_inv_adjust = EventAction(
+    name="adjust",
+    # dim_keys inherits from sibling StateAction: ["warehouse", "sku"]
+    write_only_keys=["reason"],
+)
+
+LedgerResourceFactory(
+    tablename="inventory",
+    schemaname="private",
+    metadata=metadata,
+    schema_items=[
+        Column("warehouse", String, nullable=False),
+        Column("sku", String, nullable=False),
+        Column("source", String, nullable=True),
+        Column("reason", String, nullable=True),
+    ],
+    extra_plugins=[
+        LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
+    ],
+    actions=[_inv_reconcile, _inv_adjust],
 )
 
 SimpleDimensionResourceFactory(
