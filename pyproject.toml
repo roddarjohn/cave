@@ -8,8 +8,10 @@ authors = [{ name = "Rodda John", email = "roddarjohn@protonmail.com" }]
 requires-python = ">=3.12"
 classifiers = ["Development Status :: 2 - Pre-Alpha"]
 dependencies = [
+  "alembic>=1.18.4",
+  "mako>=1.3.10",
   "pglast>=7.11",
-  "pydantic>=2.12.5",
+  "sqlalchemy>=2.0.48",
   "sqlalchemy-declarative-extensions>=0.16.8",
   "sqlfluff>=3.3",
   "typer>=0.24.1",
@@ -28,18 +30,15 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-  "alembic>=1.18.4",
   "psycopg[binary]>=3.3.3",
   "pytest>=8",
   "pytest-alembic>=0.12.1",
   "python-dotenv>=1.2.2",
   "slipcover>=1.0.17",
-  "sqlalchemy>=2.0.48",
   "tox>=4.49.1",
   "tox-uv>=1.33.2",
 ]
 docs = [
-  "furo>=2025.12.19",
   "sphinx>=7.0",
   "sphinx-autobuild>=2025.8.25",
   "sphinx-autodoc-typehints>=3.0.1",
