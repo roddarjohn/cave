@@ -1,4 +1,4 @@
-"""Custom alembic renderers that format SQL with sqlfluff."""
+"""Custom alembic renderers that format SQL with pglast."""
 
 import re
 from textwrap import indent
@@ -56,9 +56,16 @@ _BODY_RE = re.compile(r"(AS \$\$)(.*?)(\$\$)", re.DOTALL)
 # ---------------------------------------------------------------------------
 
 
-def _prettify(sql: str) -> str:
-    """Format a SQL statement using sqlfluff."""
-    return format_sql(sql).rstrip("\n")
+def _prettify(
+    sql: str,
+    *,
+    compact_lists_margin: int = 76,
+) -> str:
+    """Format a SQL statement using pglast."""
+    return format_sql(
+        sql,
+        compact_lists_margin=compact_lists_margin,
+    ).rstrip("\n")
 
 
 def _format_function_body(sql: str) -> str:
@@ -124,7 +131,7 @@ def _render_sql_op(
     autogen_context: AutogenContext,
     op: Any,  # noqa: ANN401
 ) -> list[str]:
-    """Render ops whose SQL sqlfluff can format (views, etc.)."""
+    """Render ops whose SQL pglast can format (views, etc.)."""
     assert autogen_context.connection  # noqa: S101
 
     commands = op.to_sql(autogen_context.connection.dialect)
@@ -184,7 +191,7 @@ def _render_role(
     autogen_context: AutogenContext,
     op: Any,  # noqa: ANN401
 ) -> list[str]:
-    """Render a role op with sqlfluff-formatted SQL."""
+    """Render a role op with pglast-formatted SQL."""
     is_dynamic = op.role.is_dynamic
 
     if is_dynamic:
@@ -200,8 +207,10 @@ def _render_grant(
     _autogen_context: AutogenContext,
     op: Any,  # noqa: ANN401
 ) -> str:
-    """Render a grant/revoke with sqlfluff-formatted SQL."""
-    return _render_execute_text(_prettify(str(op.to_sql())))
+    """Render a grant/revoke with pglast-formatted SQL."""
+    return _render_execute_text(
+        _prettify(str(op.to_sql()), compact_lists_margin=72)
+    )
 
 
 _RENDERER_MAP: dict[type, Any] = {
@@ -228,6 +237,6 @@ _RENDERER_MAP: dict[type, Any] = {
 
 
 def register_renderers() -> None:
-    """Override the library's renderers with sqlfluff-formatted versions."""
+    """Override the library's renderers with pglast-formatted versions."""
     for op_type, renderer in _RENDERER_MAP.items():
         renderers.dispatch_for(op_type, replace=True)(renderer)

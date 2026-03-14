@@ -94,10 +94,12 @@ ignore = [
   "RUF059",  # unpacked dummy variables are fine in tests
 ]
 "**/migrations/versions/*.py" = [
-  "INP001", # migration versions aren't a package
-  "D400",   # migration docstrings don't need to end with a period
-  "D415",   # migration docstrings don't need closing punctuation
-  "W291",   # trailing whitespace on "Revises:" line when there's no parent
+  "INP001",  # migration versions aren't a package
+  "D400",    # migration docstrings don't need to end with a period
+  "D415",    # migration docstrings don't need closing punctuation
+  "W291",    # trailing whitespace on "Revises:" line when there's no parent
+  "E501",    # SQL in op.execute() blocks can exceed 80 chars
+  "PLR0915", # migrations have many statements by nature
 ]
 
 [tool.ty.environment]
