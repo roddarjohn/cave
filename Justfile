@@ -2,9 +2,17 @@
 setup:
     uvx pre-commit install
 
-# Run ruff linter and formatter check
+# Run ruff linter, formatter check, and sqlfluff lint
 lint:
-    uv run --group lint ruff check && uv run --group lint ruff format --check
+    uv run --group lint ruff check && uv run --group lint ruff format --check && just sql-lint
+
+# Lint .sql files with sqlfluff
+sql-lint:
+    uv run --group lint sqlfluff lint .
+
+# Fix .sql files with sqlfluff
+sql-format:
+    uv run --group lint sqlfluff fix .
 
 # Run ty type checker
 type-check:

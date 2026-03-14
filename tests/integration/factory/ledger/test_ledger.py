@@ -23,7 +23,7 @@ _LEDGER_TEMPLATES = (
 
 
 def _render_ledger_insert(base_table: str, cols: str, new_cols: str) -> str:
-    tpl = load_template(_LEDGER_TEMPLATES / "insert.mako")
+    tpl = load_template(_LEDGER_TEMPLATES / "insert.plpgsql.mako")
     return tpl.render(
         base_table=base_table,
         cols=cols,
@@ -356,7 +356,7 @@ def _setup_double_entry_ledger(conn, schema, tablename):
     )
 
     # Double-entry constraint trigger (AFTER INSERT, statement-level).
-    tpl = load_template(_LEDGER_TEMPLATES / "double_entry_check.mako")
+    tpl = load_template(_LEDGER_TEMPLATES / "double_entry_check.plpgsql.mako")
     check_body = tpl.render(
         table=base_table,
         direction_col="direction",

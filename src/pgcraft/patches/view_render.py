@@ -6,14 +6,13 @@ and reading it back via ``pg_get_viewdef()``.  When the view references
 a column that is being added in the same migration, this ``CREATE VIEW``
 fails with an ``UndefinedColumn`` error.
 
-This patch catches that error and falls back to pglast-based
+This patch catches that error and falls back to sqlfluff-based
 normalization, which doesn't require the column to exist yet.
 """
 
 import logging
 import uuid
 
-import pglast
 from sqlalchemy import Connection, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy_declarative_extensions.dialects import get_view
@@ -21,6 +20,8 @@ from sqlalchemy_declarative_extensions.view.base import (
     View,
     escape_params,
 )
+
+from pgcraft.utils.sqlformat import format_sql
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ def _patched_render_definition(
     conn: Connection,
     using_connection: bool = True,  # noqa: FBT001, FBT002
 ) -> str:
-    """Render with DB normalization, falling back to pglast on error."""
+    """Render with DB normalization, falling back to sqlfluff on error."""
     dialect = conn.engine.dialect
     compiled_definition = self.compile_definition(dialect)
 
@@ -60,7 +61,7 @@ def _patched_render_definition(
             except SQLAlchemyError:
                 logger.debug(
                     "DB normalization failed for view %r;"
-                    " falling back to pglast",
+                    " falling back to sqlfluff",
                     self.name,
                     exc_info=True,
                 )
@@ -68,8 +69,8 @@ def _patched_render_definition(
             finally:
                 trans.rollback()
 
-    # pglast fallback — works without the column existing.
-    return escape_params(pglast.prettify(compiled_definition)) + ";"
+    # sqlfluff fallback — works without the column existing.
+    return escape_params(format_sql(compiled_definition).rstrip("\n")) + ";"
 
 
 def apply() -> None:

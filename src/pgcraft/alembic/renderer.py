@@ -1,10 +1,9 @@
-"""Custom alembic renderers that format SQL with pglast."""
+"""Custom alembic renderers that format SQL with sqlfluff."""
 
 import re
 from textwrap import indent
 from typing import Any
 
-import pglast
 from alembic.autogenerate.api import AutogenContext
 from alembic.autogenerate.render import renderers
 from sqlalchemy.sql.ddl import CreateSchema, DropSchema
@@ -43,10 +42,10 @@ from sqlalchemy_declarative_extensions.view.compare import (
     UpdateViewOp,
 )
 
+from pgcraft.utils.sqlformat import format_sql
+
 # Maximum line width for inline SQL before forcing multi-line.
 _MAX_LINE = 80
-# Margin at which pglast keeps comma-separated lists on one line.
-_COMPACT_LISTS_MARGIN = 80
 
 # Regex matching a ``$$ ... $$`` function body in prettified output.
 _BODY_RE = re.compile(r"(AS \$\$)(.*?)(\$\$)", re.DOTALL)
@@ -58,8 +57,8 @@ _BODY_RE = re.compile(r"(AS \$\$)(.*?)(\$\$)", re.DOTALL)
 
 
 def _prettify(sql: str) -> str:
-    """Format a SQL statement using pglast."""
-    return pglast.prettify(sql, compact_lists_margin=_COMPACT_LISTS_MARGIN)
+    """Format a SQL statement using sqlfluff."""
+    return format_sql(sql).rstrip("\n")
 
 
 def _format_function_body(sql: str) -> str:
@@ -125,7 +124,7 @@ def _render_sql_op(
     autogen_context: AutogenContext,
     op: Any,  # noqa: ANN401
 ) -> list[str]:
-    """Render ops whose SQL pglast can format (views, etc.)."""
+    """Render ops whose SQL sqlfluff can format (views, etc.)."""
     assert autogen_context.connection  # noqa: S101
 
     commands = op.to_sql(autogen_context.connection.dialect)
@@ -185,7 +184,7 @@ def _render_role(
     autogen_context: AutogenContext,
     op: Any,  # noqa: ANN401
 ) -> list[str]:
-    """Render a role op with pglast-formatted SQL."""
+    """Render a role op with sqlfluff-formatted SQL."""
     is_dynamic = op.role.is_dynamic
 
     if is_dynamic:
@@ -201,7 +200,7 @@ def _render_grant(
     _autogen_context: AutogenContext,
     op: Any,  # noqa: ANN401
 ) -> str:
-    """Render a grant/revoke with pglast-formatted SQL."""
+    """Render a grant/revoke with sqlfluff-formatted SQL."""
     return _render_execute_text(_prettify(str(op.to_sql())))
 
 
@@ -229,6 +228,6 @@ _RENDERER_MAP: dict[type, Any] = {
 
 
 def register_renderers() -> None:
-    """Override the library's renderers with pglast-formatted versions."""
+    """Override the library's renderers with sqlfluff-formatted versions."""
     for op_type, renderer in _RENDERER_MAP.items():
         renderers.dispatch_for(op_type, replace=True)(renderer)

@@ -153,7 +153,7 @@ class TriggerCheckPlugin(_CheckPlugin):
             for cave_check in checks
         ]
 
-        template = load_template(_TEMPLATES / "validate.mako")
+        template = load_template(_TEMPLATES / "validate.plpgsql.mako")
         template_vars = {"checks": resolved_checks}
 
         if self.view_key not in ctx:

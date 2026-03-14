@@ -43,7 +43,7 @@ def _render_check_validate(
     checks: list[PGCraftCheck],
 ) -> str:
     """Render the check-enforcement trigger body."""
-    tpl = load_template(_CHECK_TEMPLATES / "validate.mako")
+    tpl = load_template(_CHECK_TEMPLATES / "validate.plpgsql.mako")
     resolved = [
         (
             check.resolve(lambda c: f"NEW.{c}"),
@@ -55,7 +55,7 @@ def _render_check_validate(
 
 
 def _render_eav_insert(mappings: list[_EAVMapping], schema: str) -> str:
-    tpl = load_template(_EAV_TEMPLATES / "insert.mako")
+    tpl = load_template(_EAV_TEMPLATES / "insert.plpgsql.mako")
     return tpl.render(
         entity_table=f"{schema}.products_entity",
         attr_table=f"{schema}.products_attribute",
@@ -66,7 +66,7 @@ def _render_eav_insert(mappings: list[_EAVMapping], schema: str) -> str:
 
 
 def _render_eav_update(mappings: list[_EAVMapping], schema: str) -> str:
-    tpl = load_template(_EAV_TEMPLATES / "update.mako")
+    tpl = load_template(_EAV_TEMPLATES / "update.plpgsql.mako")
     return tpl.render(
         attr_table=f"{schema}.products_attribute",
         mappings=[

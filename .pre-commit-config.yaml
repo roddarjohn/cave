@@ -29,3 +29,20 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: sqlfluff-lint
+        name: sqlfluff-lint
+        language: system
+        entry: uv run --group lint sqlfluff lint
+        files: \.(sql|sql\.mako)$
+        types_or: [file]
+
+      - id: mako-naming
+        name: mako-naming
+        language: fail
+        entry: >-
+          Mako templates must use a format prefix:
+          .sql.mako, .plpgsql.mako, .py.mako, .rst.mako, etc.
+        files: (?:^|/)(?!\.)(?:[^./]+)\.mako$
