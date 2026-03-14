@@ -1,6 +1,17 @@
+import tomllib
+from pathlib import Path
+
+_pyproject = tomllib.loads(
+    (Path(__file__).resolve().parent.parent / "pyproject.toml")
+    .read_text()
+)
+
 project = "pgcraft"
 author = "Rodda John"
+version = _pyproject["project"]["version"]
+release = version
 extensions = [
+    "myst_parser",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.graphviz",
@@ -26,7 +37,8 @@ html_theme_options = {
     "sidebar_collapse": True,
     "extra_nav_links": {},
     "font_family": (
-        "'Source Sans Pro', 'Segoe UI', Helvetica, Arial, sans-serif"
+        "'Source Sans Pro', 'Segoe UI', Helvetica, Arial,"
+        " sans-serif"
     ),
     "code_font_family": (
         "'Source Code Pro', 'SFMono-Regular', Menlo,"
@@ -41,11 +53,13 @@ html_sidebars = {
         "searchbox.html",
         "navigation.html",
         "relations.html",
+        "versioning.html",
     ],
 }
 
 # -- General ---------------------------------------------------------
 exclude_patterns = ["_generated"]
+myst_heading_anchors = 3
 add_module_names = False
 nitpicky = True
 nitpick_ignore = [
@@ -62,3 +76,5 @@ intersphinx_mapping = {
     "sqlalchemy": ("https://docs.sqlalchemy.org/en/20", None),
     "typer": ("https://typer.tiangolo.com", None),
 }
+
+templates_path = ["_templates"]

@@ -219,8 +219,8 @@ def _psql_url(sqlalchemy_url: str) -> str:
 
 def _psql(url: str, command: str) -> str:
     """Run a psql command and return its stdout."""
-    result = subprocess.run(  # noqa: S603
-        ["psql", url, "-c", command],  # noqa: S607
+    result = subprocess.run(
+        ["psql", url, "-c", command],
         capture_output=True,
         text=True,
         check=True,
