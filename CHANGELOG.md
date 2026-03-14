@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.5.0...pgcraft-v0.5.1) (2026-03-14)
+
+
+### Features
+
+* fixing version upon release ([#40](https://github.com/roddarjohn/pgcraft/issues/40)) ([a33f011](https://github.com/roddarjohn/pgcraft/commit/a33f0115b88abe44e7ee470d4380a42c50720658))
+* speeding up revisions ([#41](https://github.com/roddarjohn/pgcraft/issues/41)) ([3955919](https://github.com/roddarjohn/pgcraft/commit/39559193779e74354f50e3febc945d4db14be26a))
+* use sqlfluff experimental python API ([772de34](https://github.com/roddarjohn/pgcraft/commit/772de346166c4c730ddebdff2ea0aade40a62a62))
+
 ## [0.5.0](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.4.0...pgcraft-v0.5.0) (2026-03-14)
 
 
