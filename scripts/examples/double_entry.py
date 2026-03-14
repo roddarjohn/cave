@@ -2,15 +2,15 @@
 
 from sqlalchemy import Column, ForeignKey, MetaData, String
 
+from pgcraft import pgcraft_build_naming_conventions
 from pgcraft.factory.dimension import SimpleDimensionResourceFactory
 from pgcraft.factory.ledger import LedgerResourceFactory
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
 )
-from pgcraft.utils.naming_convention import build_naming_convention
 
-metadata = MetaData(naming_convention=build_naming_convention())
+metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
 # --- example start ---
 SimpleDimensionResourceFactory(

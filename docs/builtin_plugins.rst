@@ -285,12 +285,12 @@ Example — order and invoice statistics
        SimpleDimensionResourceFactory,
    )
    from pgcraft.statistics import PGCraftStatisticsView
-   from pgcraft.utils.naming_convention import (
-       build_naming_convention,
+   from pgcraft import (
+       pgcraft_build_naming_conventions,
    )
 
    metadata = MetaData(
-       naming_convention=build_naming_convention(),
+       naming_convention=pgcraft_build_naming_conventions(),
    )
 
    # Reference tables (already exist in the database)
