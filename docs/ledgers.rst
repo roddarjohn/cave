@@ -292,7 +292,7 @@ key with ``gen_random_uuid()`` as the server default:
    )
 
 
-Ledger Events
+Ledger events
 -------------
 
 Use :doc:`ledger_actions` to attach named PostgreSQL functions to a

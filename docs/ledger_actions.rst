@@ -1,4 +1,4 @@
-Ledger Events
+Ledger events
 =============
 
 Events are named, user-defined operations on a ledger.  Each event
@@ -19,7 +19,7 @@ Import from the top-level ``pgcraft`` package::
     from pgcraft import LedgerEvent, ledger_balances
 
 
-Choosing a Mode
+Choosing a mode
 ---------------
 
 Use **simple mode** when a discrete event occurs (a shipment departs,
@@ -34,7 +34,7 @@ diff mode for bulk reconciliation and simple mode for intraday
 adjustments.
 
 
-Simple Event
+Simple event
 ------------
 
 A simple event takes parameters via a ``ParamCollector`` and inserts
@@ -56,7 +56,7 @@ The generated function accepts the declared parameters and returns
 ``SETOF api_view`` (the inserted rows).
 
 
-Diff Event (Reconciliation)
+Diff event (reconciliation)
 ---------------------------
 
 A diff event compares desired state against existing ledger balances
@@ -104,7 +104,7 @@ groups ``SUM(value) * -1`` by the specified keys, filtered to only
 groups present in the desired CTE.
 
 
-Factory Integration
+Factory integration
 -------------------
 
 Pass a list of events to :class:`~pgcraft.factory.ledger.LedgerResourceFactory`
@@ -153,7 +153,7 @@ via the ``events`` parameter::
 and runs after the table and API view have been created.
 
 
-Declarative Style
+Declarative style
 ~~~~~~~~~~~~~~~~~
 
 The ``@register`` decorator works with ledger events too.  Pass
@@ -208,7 +208,7 @@ plugin list directly::
         sku = Column(String, nullable=False)
 
 
-Prefer Diff Mode Over Simple
+Prefer diff mode over simple
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When a simple event maps one-to-one with an external identifier
@@ -239,7 +239,7 @@ simple mode for fire-and-forget deltas where idempotency is not
 needed.
 
 
-Naming Convention
+Naming convention
 ~~~~~~~~~~~~~~~~~
 
 Generated function names follow the pattern
