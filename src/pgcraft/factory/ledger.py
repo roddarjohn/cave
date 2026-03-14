@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from sqlalchemy.schema import SchemaItem
 
     from pgcraft.check import PGCraftCheck
-    from pgcraft.ledger.actions import Action
+    from pgcraft.ledger.events import LedgerEvent
     from pgcraft.plugin import Plugin
     from pgcraft.statistics import PGCraftStatisticsView
 
@@ -45,14 +45,14 @@ class LedgerResourceFactory(ResourceFactory):
     Pass ``plugins=[...]`` to replace these entirely, or
     ``extra_plugins=[...]`` to append to them.
 
-    When ``actions`` is provided, a
+    When ``events`` is provided, a
     :class:`~pgcraft.plugins.ledger_actions.LedgerActionsPlugin`
     is automatically appended to ``extra_plugins`` so it runs
     after the table and API view have been created.
 
     Args:
-        actions: Optional list of
-            :class:`~pgcraft.ledger.actions.Action` instances
+        events: Optional list of
+            :class:`~pgcraft.ledger.events.LedgerEvent` instances
             to generate SQL functions for.
 
     """
@@ -73,7 +73,7 @@ class LedgerResourceFactory(ResourceFactory):
         metadata: MetaData,
         schema_items: list[SchemaItem | PGCraftCheck | PGCraftStatisticsView],
         *,
-        actions: list[Action] | None = None,
+        events: list[LedgerEvent] | None = None,
         config: object | None = None,
         plugins: list[Plugin] | None = None,
         extra_plugins: list[Plugin] | None = None,
@@ -85,16 +85,16 @@ class LedgerResourceFactory(ResourceFactory):
             schemaname: PostgreSQL schema for generated objects.
             metadata: SQLAlchemy ``MetaData`` to register on.
             schema_items: Dimension column definitions.
-            actions: Optional ledger actions to generate functions for.
+            events: Optional ledger events to generate functions for.
             config: Optional global :class:`~pgcraft.config.PGCraftConfig`.
             plugins: If given, replaces ``DEFAULT_PLUGINS`` entirely.
             extra_plugins: Appended to the resolved plugin list.
 
         """
-        if actions:
+        if events:
             extra_plugins = [
                 *(extra_plugins or []),
-                LedgerActionsPlugin(actions),
+                LedgerActionsPlugin(events),
             ]
         super().__init__(
             tablename,

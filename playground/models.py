@@ -21,7 +21,7 @@ from pgcraft.factory.dimension import (
     SimpleDimensionResourceFactory,
 )
 from pgcraft.factory.ledger import LedgerResourceFactory
-from pgcraft.ledger.actions import EventAction, StateAction
+from pgcraft.ledger.events import LedgerEvent, ledger_balances
 from pgcraft.plugins.api import APIPlugin
 from pgcraft.plugins.check import (
     TableCheckPlugin,
@@ -211,21 +211,36 @@ LedgerResourceFactory(
     ],
 )
 
-# -- Inventory ledger with actions ----------------------------------
-# StateAction: reconcile desired stock levels against current balance.
-# EventAction: record an ad-hoc stock adjustment.
+# -- Inventory ledger with events -----------------------------------
+# LedgerEvent: reconcile desired stock levels against current balance.
+# LedgerEvent: record an ad-hoc stock adjustment.
 
-_inv_reconcile = StateAction(
+_inv_reconcile = LedgerEvent(
     name="reconcile",
+    input=lambda p: select(
+        p("warehouse", String).label("warehouse"),
+        p("sku", String).label("sku"),
+        p("value", Integer).label("value"),
+        p("source", String).label("source"),
+    ),
+    desired=lambda pginput: select(
+        pginput.c.warehouse,
+        pginput.c.sku,
+        pginput.c.value,
+        pginput.c.source,
+    ),
+    existing=ledger_balances("warehouse", "sku"),
     diff_keys=["warehouse", "sku"],
-    partial=False,
-    write_only_keys=["source"],
 )
 
-_inv_adjust = EventAction(
+_inv_adjust = LedgerEvent(
     name="adjust",
-    # dim_keys inherits from sibling StateAction: ["warehouse", "sku"]
-    write_only_keys=["reason"],
+    input=lambda p: select(
+        p("warehouse", String).label("warehouse"),
+        p("sku", String).label("sku"),
+        p("value", Integer).label("value"),
+        p("reason", String).label("reason"),
+    ),
 )
 
 LedgerResourceFactory(
@@ -241,7 +256,7 @@ LedgerResourceFactory(
     extra_plugins=[
         LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
     ],
-    actions=[_inv_reconcile, _inv_adjust],
+    events=[_inv_reconcile, _inv_adjust],
 )
 
 SimpleDimensionResourceFactory(
