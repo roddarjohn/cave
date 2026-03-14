@@ -121,17 +121,22 @@ Typical workflow
 Adding models
 -------------
 
-Define new models in ``playground/models.py`` using the pgcraft dimension
+Define new models in ``playground/models.py`` using the pgcraft
 factory classes::
 
-    SimpleDimensionFactory(
+    from pgcraft.factory import PGCraftSimple
+    from pgcraft.views import APIView
+
+    users = PGCraftSimple(
         tablename="users",
         schemaname="public",
         metadata=metadata,
-        dimensions=[
-            Column("name", Integer),
+        schema_items=[
+            Column("name", String),
         ],
     )
+
+    APIView(source=users)
 
 Then generate and apply a migration::
 

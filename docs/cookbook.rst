@@ -666,10 +666,9 @@ are separate views that get LEFT JOINed into the API.
        select,
    )
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
+   from pgcraft.factory import PGCraftSimple
    from pgcraft.statistics import PGCraftStatisticsView
+   from pgcraft.views import APIView
    from pgcraft import (
        pgcraft_build_naming_conventions,
    )
@@ -694,7 +693,7 @@ are separate views that get LEFT JOINed into the API.
        func.sum(orders.c.total).label("order_total"),
    ).group_by(orders.c.customer_id)
 
-   SimpleDimensionResourceFactory(
+   products = PGCraftSimple(
        tablename="products",
        schemaname="inventory",
        metadata=metadata,
@@ -716,6 +715,8 @@ are separate views that get LEFT JOINed into the API.
            ),
        ],
    )
+
+   APIView(source=products)
 
 This creates:
 

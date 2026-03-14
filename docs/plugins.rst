@@ -59,13 +59,12 @@ The three built-in dimension factories are thin wrappers:
 
 .. code-block:: python
 
-   class SimpleDimensionResourceFactory(ResourceFactory):
-       DEFAULT_PLUGINS = [
-           SerialPKPlugin(),
+   class PGCraftSimple(ResourceFactory):
+       DEFAULT_PLUGINS = []
+
+       _INTERNAL_PLUGINS = [
            SimpleTablePlugin(),
-           StatisticsViewPlugin(),
-           APIPlugin(),
-           SimpleTriggerPlugin(),
+           TableCheckPlugin(),
        ]
 
 
@@ -202,9 +201,9 @@ in this order:
    pgcraft_cfg = PGCraftConfig()
    pgcraft_cfg.register(AuditPlugin())         # prepended to every factory
 
-   SimpleDimensionResourceFactory(
+   PGCraftSimple(
        "users", "app", metadata, schema_items,
-       config=pgcraft_cfg,                        # global plugins first
+       config=pgcraft_cfg,                   # global plugins first
        extra_plugins=[TenantPlugin()],       # appended after defaults
    )
 
@@ -212,15 +211,14 @@ To replace the default plugin list entirely:
 
 .. code-block:: python
 
-   SimpleDimensionResourceFactory(
+   events = PGCraftSimple(
        "events", "app", metadata, schema_items,
        plugins=[                             # replaces DEFAULT_PLUGINS
-           SerialPKPlugin(column_name="event_id"),
-           SimpleTablePlugin(),
-           APIPlugin(schema="reporting"),
-           SimpleTriggerPlugin(),
+           UUIDV4PKPlugin(),
        ],
    )
+
+   APIView(source=events, schema="reporting")
 
 
 Singleton groups
@@ -368,24 +366,25 @@ Register it globally so it applies to every factory in the project:
 .. code-block:: python
 
    from pgcraft.config import PGCraftConfig
-   from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
-   from pgcraft.factory.dimension.append_only import AppendOnlyDimensionResourceFactory
+   from pgcraft.factory import PGCraftAppendOnly, PGCraftSimple
 
    pgcraft_cfg = PGCraftConfig()
    pgcraft_cfg.register(TimestampPlugin())
 
-   SimpleDimensionResourceFactory(
-       "products", "app", metadata, schema_items, config=pgcraft_cfg
+   PGCraftSimple(
+       "products", "app", metadata, schema_items,
+       config=pgcraft_cfg,
    )
-   AppendOnlyDimensionResourceFactory(
-       "orders", "app", metadata, schema_items, config=pgcraft_cfg
+   PGCraftAppendOnly(
+       "orders", "app", metadata, schema_items,
+       config=pgcraft_cfg,
    )
 
 Or apply it to a single factory only:
 
 .. code-block:: python
 
-   SimpleDimensionResourceFactory(
+   PGCraftSimple(
        "products", "app", metadata, schema_items,
        extra_plugins=[TimestampPlugin()],
    )
@@ -438,7 +437,7 @@ and makes it available to a downstream trigger plugin via a ctx key.
 
    # Use them together — order in the list doesn't matter because the
    # dependency declarations ensure ShadowTablePlugin runs first.
-   SimpleDimensionResourceFactory(
+   PGCraftSimple(
        "products", "app", metadata, schema_items,
        extra_plugins=[ShadowTriggerPlugin(), ShadowTablePlugin()],
    )
@@ -475,10 +474,11 @@ defined:
 
    # models.py
    from myapp.pgcraft_setup import pgcraft_cfg
-   from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
+   from pgcraft.factory import PGCraftSimple
 
-   SimpleDimensionResourceFactory(
-       "users", "app", metadata, schema_items, config=pgcraft_cfg
+   PGCraftSimple(
+       "users", "app", metadata, schema_items,
+       config=pgcraft_cfg,
    )
 
 
