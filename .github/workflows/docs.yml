@@ -41,6 +41,12 @@ jobs:
           python-version: "3.14"
       - uses: extractions/setup-just@v3
       - run: sudo apt-get install -y graphviz
+      - name: Cache versioned tag builds
+        uses: actions/cache@v4
+        with:
+          path: docs/_build/html/v*
+          key: docs-tags-${{ hashFiles('.release-please-manifest.json') }}
+          restore-keys: docs-tags-
       - run: just docs
       - uses: actions/upload-pages-artifact@v4
         with:
