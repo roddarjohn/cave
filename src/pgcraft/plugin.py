@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from pgcraft.errors import PGCraftValidationError
 
@@ -227,6 +227,8 @@ class Plugin:
     Use the :func:`singleton` decorator to declare that at most one
     plugin of a given group may appear in any resolved plugin list.
     """
+
+    required_pg_extensions: ClassVar[frozenset[str]] = frozenset()
 
     def resolved_produces(self) -> list[str]:
         """Return the ctx keys this plugin writes, with Dynamic refs resolved.

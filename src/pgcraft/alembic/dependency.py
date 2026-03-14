@@ -49,6 +49,8 @@ from sqlalchemy_declarative_extensions.role.compare import (
 )
 from sqlalchemy_declarative_extensions.role.generic import Role
 
+from pgcraft.alembic.extension import CreateExtensionOp
+
 logger = logging.getLogger(__name__)
 
 # Union of alembic's built-in ops and sqlalchemy-declarative-extensions ops,
@@ -699,6 +701,13 @@ def sort_migration_ops(
         [_op_label(op) for op in migration_ops],
     )
 
+    # Extension ops must come first so that any DDL that uses them
+    # (e.g. a column with a server default from pg_uuidv7) can succeed.
+    ext_ops = [op for op in migration_ops if isinstance(op, CreateExtensionOp)]
+    migration_ops = [
+        op for op in migration_ops if not isinstance(op, CreateExtensionOp)
+    ]
+
     # Build a mapping from entity identifier to op.  Ops without a
     # recognised identifier are appended at the end in original order.
     op_by_entity: dict[EntityIdentifier, AnyOp] = {}
@@ -766,9 +775,11 @@ def sort_migration_ops(
                 )
                 sorter.add(node, prerequisite)
 
-    sorted_ops = [
-        op_by_entity[eid] for eid in sorter.static_order()
-    ] + unkeyed_ops
+    sorted_ops = (
+        ext_ops
+        + [op_by_entity[eid] for eid in sorter.static_order()]
+        + unkeyed_ops
+    )
 
     logger.debug(
         "Sorted order: %s",

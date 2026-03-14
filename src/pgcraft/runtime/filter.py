@@ -123,8 +123,9 @@ def filter_safe_ops(
 ) -> list[alembic_ops.MigrateOperation]:
     """Return *ops* unchanged after verifying every op is safe to apply.
 
-    Iterates the op list and raises :class:`~pgcraft.errors.DestructiveOperationError`
-    on the first op that is not in the allowlist.  If all ops are safe the
+    Iterates the op list and raises
+    :class:`~pgcraft.errors.DestructiveOperationError` on the first op
+    that is not in the allowlist.  If all ops are safe the
     original list is returned unmodified so callers can chain this call
     directly into the apply step.
 
