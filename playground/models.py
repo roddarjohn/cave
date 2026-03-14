@@ -12,6 +12,7 @@ from sqlalchemy import (
     func,
     select,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 
 from pgcraft.check import PGCraftCheck
 from pgcraft.declarative import register
@@ -212,26 +213,7 @@ LedgerResourceFactory(
 )
 
 # -- Inventory ledger with events -----------------------------------
-# LedgerEvent: reconcile desired stock levels against current balance.
-# LedgerEvent: record an ad-hoc stock adjustment.
-
-_inv_reconcile = LedgerEvent(
-    name="reconcile",
-    input=lambda p: select(
-        p("warehouse", String).label("warehouse"),
-        p("sku", String).label("sku"),
-        p("value", Integer).label("value"),
-        p("source", String).label("source"),
-    ),
-    desired=lambda pginput: select(
-        pginput.c.warehouse,
-        pginput.c.sku,
-        pginput.c.value,
-        pginput.c.source,
-    ),
-    existing=ledger_balances("warehouse", "sku"),
-    diff_keys=["warehouse", "sku"],
-)
+# Simple event: record an ad-hoc stock adjustment (fire-and-forget).
 
 _inv_adjust = LedgerEvent(
     name="adjust",
@@ -250,13 +232,64 @@ LedgerResourceFactory(
     schema_items=[
         Column("warehouse", String, nullable=False),
         Column("sku", String, nullable=False),
-        Column("source", String, nullable=True),
         Column("reason", String, nullable=True),
     ],
     extra_plugins=[
         LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
     ],
-    events=[_inv_reconcile, _inv_adjust],
+    events=[_inv_adjust],
+)
+
+# -- Invoice lines (source table for revenue reconciliation) --------
+
+_invoice_lines = Table(
+    "invoice_lines",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("invoice_id", Integer, nullable=False),
+    Column("account", String, nullable=False),
+    Column("amount", Integer, nullable=False),
+    schema="private",
+)
+
+# -- Revenue ledger with transactional reconciliation ---------------
+# The reconcile event accepts invoice IDs, joins against the
+# invoice_lines table to produce the desired state, and diffs
+# against existing balances per (invoice_id, account).
+
+_rev_recognize = LedgerEvent(
+    name="recognize",
+    input=lambda p: select(
+        func.unnest(p("invoice_ids", ARRAY(Integer)))
+        .label("invoice_id"),
+    ),
+    desired=lambda pginput: select(
+        _invoice_lines.c.invoice_id,
+        _invoice_lines.c.account,
+        _invoice_lines.c.amount.label("value"),
+    ).where(
+        _invoice_lines.c.invoice_id.in_(
+            select(pginput.c.invoice_id)
+        )
+    ),
+    existing=ledger_balances("invoice_id", "account"),
+    diff_keys=["invoice_id", "account"],
+)
+
+LedgerResourceFactory(
+    tablename="revenue",
+    schemaname="private",
+    metadata=metadata,
+    schema_items=[
+        Column("invoice_id", Integer, nullable=False),
+        Column("account", String, nullable=False),
+    ],
+    extra_plugins=[
+        LedgerBalanceViewPlugin(
+            dimensions=["invoice_id", "account"]
+        ),
+    ],
+    events=[_rev_recognize],
 )
 
 SimpleDimensionResourceFactory(

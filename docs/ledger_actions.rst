@@ -6,41 +6,118 @@ compiles into a single PostgreSQL function (``LANGUAGE sql``) that
 inserts rows into the ledger API view and returns the inserted rows
 via ``RETURNING *``.
 
-Two modes are available:
-
-- **Simple mode** — provide only ``input``.  The input select's
-  columns are inserted directly into the ledger.
-- **Diff mode** — provide ``input``, ``desired``, ``existing``, and
-  ``diff_keys``.  The desired and existing selects are unioned and
-  only non-zero deltas are inserted.
-
 Import from the top-level ``pgcraft`` package::
 
     from pgcraft import LedgerEvent, ledger_balances
 
 
-Choosing a mode
----------------
+Reconciliation (diff mode)
+--------------------------
 
-Use **simple mode** when a discrete event occurs (a shipment departs,
-a charge is applied) and you want to record the exact delta value.
+The primary pattern is **reconciliation**: you have a transactional
+object (invoices, shipments, work orders) with line items, and you
+want the ledger to reflect the current state of those line items.
+The system handles the arithmetic — it diffs the desired state against
+existing balances and inserts only the correcting deltas.
 
-Use **diff mode** when you receive a snapshot of desired state (e.g.
-a nightly inventory feed from a WMS, an ERP sync) and need the ledger
-to reflect that snapshot.  The system handles the arithmetic.
+This makes the operation **idempotent**: calling the same event twice
+with the same input produces zero new rows the second time.  Amending
+the source and re-calling inserts exactly the correcting entries.
 
-Both modes can coexist on the same ledger; a common pattern is to use
-diff mode for bulk reconciliation and simple mode for intraday
-adjustments.
+**Example** — revenue recognition from invoice line items::
+
+    from sqlalchemy import Integer, String, func, select
+    from sqlalchemy.dialects.postgresql import ARRAY
+
+    from pgcraft import LedgerEvent, ledger_balances
+
+    # Assume `invoice_lines` is a SQLAlchemy Table with columns:
+    #   id, invoice_id, account, amount
+
+    recognize = LedgerEvent(
+        name="recognize",
+        input=lambda p: select(
+            func.unnest(p("invoice_ids", ARRAY(Integer)))
+            .label("invoice_id"),
+        ),
+        desired=lambda pginput: select(
+            invoice_lines.c.invoice_id,
+            invoice_lines.c.account,
+            invoice_lines.c.amount.label("value"),
+        ).where(
+            invoice_lines.c.invoice_id.in_(
+                select(pginput.c.invoice_id)
+            )
+        ),
+        existing=ledger_balances("invoice_id", "account"),
+        diff_keys=["invoice_id", "account"],
+    )
+
+The generated SQL uses CTEs: ``input`` (the function parameters),
+``desired`` (the target state from the source table), ``existing``
+(negated current balances), and ``deltas`` (the union of desired +
+existing, filtered to non-zero values).  This is a single
+``INSERT ... RETURNING *`` statement.
+
+Key parameters:
+
+``input``
+    Lambda ``(p) -> Select`` that builds the input CTE.  ``p`` is a
+    :class:`~pgcraft.ledger.events.ParamCollector` — each call to
+    ``p("name", Type)`` records a function parameter and returns a
+    ``literal_column("p_name")`` reference.
+
+``desired``
+    Lambda ``(pginput) -> Select`` that builds the desired-state CTE.
+    ``pginput`` is a synthetic table reference to the ``input`` CTE.
+    Typically joins against a source table (e.g. ``invoice_lines``)
+    to produce the ledger entries.
+
+``existing``
+    Lambda ``(table, desired) -> Select`` that returns the negated
+    current balances.  Use :func:`~pgcraft.ledger.events.ledger_balances`
+    for the common pattern.
+
+``diff_keys``
+    Column names used for grouping.  Required when ``desired`` is set.
+
+The ``ledger_balances`` helper produces an ``existing`` callable that
+groups ``SUM(value) * -1`` by the specified keys, filtered to only
+groups present in the desired CTE.
 
 
-Simple event
-------------
+Usage
+~~~~~
 
-A simple event takes parameters via a ``ParamCollector`` and inserts
-them directly::
+.. code-block:: sql
 
-    from pgcraft import LedgerEvent
+   -- Recognize revenue for two invoices:
+   SELECT * FROM ops.ops_revenue_recognize(
+       p_invoice_ids => ARRAY[1001, 1002]
+   );
+
+   -- Call again — idempotent, returns 0 rows:
+   SELECT * FROM ops.ops_revenue_recognize(
+       p_invoice_ids => ARRAY[1001, 1002]
+   );
+
+   -- Amend invoice 1001's line items in the source table,
+   -- then re-reconcile — only correcting deltas are inserted:
+   SELECT * FROM ops.ops_revenue_recognize(
+       p_invoice_ids => ARRAY[1001]
+   );
+
+
+Simple event (input only)
+-------------------------
+
+A simple event is a special case — it provides only ``input`` and
+inserts directly, without diffing.  This is what happens when you
+omit ``desired``, ``existing``, and ``diff_keys``: there are no
+existing entries to diff against, so every call inserts new rows.
+
+Use this for fire-and-forget deltas where idempotency is not needed
+(stock adjustments, manual corrections, one-off charges)::
 
     adjust = LedgerEvent(
         name="adjust",
@@ -52,56 +129,13 @@ them directly::
         ),
     )
 
-The generated function accepts the declared parameters and returns
-``SETOF api_view`` (the inserted rows).
+.. tip::
 
-
-Diff event (reconciliation)
----------------------------
-
-A diff event compares desired state against existing ledger balances
-and inserts only the correcting deltas::
-
-    from pgcraft import LedgerEvent, ledger_balances
-
-    reconcile = LedgerEvent(
-        name="reconcile",
-        input=lambda p: select(
-            p("warehouse", String).label("warehouse"),
-            p("sku", String).label("sku"),
-            p("value", Integer).label("value"),
-            p("source", String).label("source"),
-        ),
-        desired=lambda pginput: select(
-            pginput.c.warehouse, pginput.c.sku,
-            pginput.c.value, pginput.c.source,
-        ),
-        existing=ledger_balances("warehouse", "sku"),
-        diff_keys=["warehouse", "sku"],
-    )
-
-Key parameters:
-
-``diff_keys``
-    Column names used for grouping.  Required when ``desired`` is set.
-
-``existing``
-    A callable ``(table, desired) -> Select`` that returns the negated
-    current balances.  Use :func:`~pgcraft.ledger.events.ledger_balances`
-    for the common pattern.
-
-``desired``
-    A callable ``(input) -> Select`` that builds the desired-state CTE
-    from the input CTE reference.
-
-The generated SQL uses CTEs: ``input``, ``desired``, ``existing``, and
-``deltas`` (the union of desired + existing, filtered to non-zero
-values).  This is a single ``INSERT ... RETURNING *`` statement using
-``LANGUAGE sql``.
-
-The ``ledger_balances`` helper produces an ``existing`` callable that
-groups ``SUM(value) * -1`` by the specified keys, filtered to only
-groups present in the desired CTE.
+   If your simple event maps one-to-one with an external identifier
+   (e.g. an ``invoice_id``), prefer diff mode instead.  Diffing over
+   that identifier makes the operation idempotent — calling the same
+   event twice with the same input produces zero new rows the second
+   time.
 
 
 Factory integration
@@ -113,40 +147,34 @@ via the ``events`` parameter::
     from pgcraft import LedgerEvent, ledger_balances
     from pgcraft.factory.ledger import LedgerResourceFactory
 
-    reconcile = LedgerEvent(
-        name="reconcile",
+    recognize = LedgerEvent(
+        name="recognize",
         input=lambda p: select(
-            p("warehouse", String).label("warehouse"),
-            p("sku", String).label("sku"),
-            p("value", Integer).label("value"),
+            func.unnest(p("invoice_ids", ARRAY(Integer)))
+            .label("invoice_id"),
         ),
         desired=lambda pginput: select(
-            pginput.c.warehouse, pginput.c.sku, pginput.c.value,
+            invoice_lines.c.invoice_id,
+            invoice_lines.c.account,
+            invoice_lines.c.amount.label("value"),
+        ).where(
+            invoice_lines.c.invoice_id.in_(
+                select(pginput.c.invoice_id)
+            )
         ),
-        existing=ledger_balances("warehouse", "sku"),
-        diff_keys=["warehouse", "sku"],
-    )
-
-    adjust = LedgerEvent(
-        name="adjust",
-        input=lambda p: select(
-            p("warehouse", String).label("warehouse"),
-            p("sku", String).label("sku"),
-            p("value", Integer).label("value"),
-            p("reason", String).label("reason"),
-        ),
+        existing=ledger_balances("invoice_id", "account"),
+        diff_keys=["invoice_id", "account"],
     )
 
     LedgerResourceFactory(
-        tablename="inventory",
+        tablename="revenue",
         schemaname="ops",
         metadata=metadata,
         schema_items=[
-            Column("warehouse", String, nullable=False),
-            Column("sku",       String, nullable=False),
-            Column("reason",    String, nullable=True),
+            Column("invoice_id", Integer, nullable=False),
+            Column("account",    String, nullable=False),
         ],
-        events=[reconcile, adjust],
+        events=[recognize],
     )
 
 ``LedgerActionsPlugin`` is appended to ``extra_plugins`` automatically
@@ -173,18 +201,23 @@ plugin list directly::
     from pgcraft.plugins.ledger_actions import LedgerActionsPlugin
     from pgcraft.plugins.pk import SerialPKPlugin
 
-    reconcile = LedgerEvent(
-        name="reconcile",
+    recognize = LedgerEvent(
+        name="recognize",
         input=lambda p: select(
-            p("warehouse", String).label("warehouse"),
-            p("sku", String).label("sku"),
-            p("value", Integer).label("value"),
+            func.unnest(p("invoice_ids", ARRAY(Integer)))
+            .label("invoice_id"),
         ),
         desired=lambda pginput: select(
-            pginput.c.warehouse, pginput.c.sku, pginput.c.value,
+            invoice_lines.c.invoice_id,
+            invoice_lines.c.account,
+            invoice_lines.c.amount.label("value"),
+        ).where(
+            invoice_lines.c.invoice_id.in_(
+                select(pginput.c.invoice_id)
+            )
         ),
-        existing=ledger_balances("warehouse", "sku"),
-        diff_keys=["warehouse", "sku"],
+        existing=ledger_balances("invoice_id", "account"),
+        diff_keys=["invoice_id", "account"],
     )
 
     @register(
@@ -196,47 +229,18 @@ plugin list directly::
             LedgerTablePlugin(),
             APIPlugin(grants=["select", "insert"]),
             LedgerTriggerPlugin(),
-            LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
-            LedgerActionsPlugin(events=[reconcile]),
+            LedgerBalanceViewPlugin(
+                dimensions=["invoice_id", "account"]
+            ),
+            LedgerActionsPlugin(events=[recognize]),
         ],
     )
-    class Inventory:
-        __tablename__ = "inventory"
+    class Revenue:
+        __tablename__ = "revenue"
         __table_args__ = {"schema": "ops"}
 
-        warehouse = Column(String, nullable=False)
-        sku = Column(String, nullable=False)
-
-
-Prefer diff mode over simple
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When a simple event maps one-to-one with an external identifier
-(e.g. an ``invoice_id``), prefer **diff mode** instead.  Diffing
-over that identifier makes the operation idempotent — calling the
-same event twice with the same input produces zero new rows the
-second time.
-
-For example, reconciling invoices by ``invoice_id``::
-
-    reconcile_invoice = LedgerEvent(
-        name="reconcile_invoice",
-        input=lambda p: select(
-            p("invoice_id", Integer).label("invoice_id"),
-            p("value", Integer).label("value"),
-        ),
-        desired=lambda pginput: select(
-            pginput.c.invoice_id, pginput.c.value,
-        ),
-        existing=ledger_balances("invoice_id"),
-        diff_keys=["invoice_id"],
-    )
-
-This is always preferred over a simple ``input``-only event because
-it is naturally safe to retry: the ledger converges to the correct
-state regardless of how many times the function is called.  Reserve
-simple mode for fire-and-forget deltas where idempotency is not
-needed.
+        invoice_id = Column(Integer, nullable=False)
+        account = Column(String, nullable=False)
 
 
 Naming convention
@@ -248,7 +252,7 @@ Generated function names follow the pattern
 =========================  =====================================
 Function                   Example
 =========================  =====================================
-``{table}_{name}``         ``ops_inventory_reconcile``
+``{table}_{name}``         ``ops_revenue_recognize``
 ``{table}_{name}``         ``ops_inventory_adjust``
 =========================  =====================================
 
