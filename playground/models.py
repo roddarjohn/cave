@@ -9,7 +9,9 @@ from sqlalchemy import (
     Numeric,
     String,
     func,
+    literal_column,
     select,
+    union_all,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 
@@ -28,6 +30,8 @@ from pgcraft.plugins.check import (
     TriggerCheckPlugin,
 )
 from pgcraft.plugins.ledger import (
+    DoubleEntryPlugin,
+    DoubleEntryTriggerPlugin,
     LedgerBalanceViewPlugin,
 )
 from pgcraft.plugins.pk import SerialPKPlugin
@@ -102,7 +106,7 @@ InvoiceLines = EAVDimensionResourceFactory(
             ForeignKey("private.invoices_root.id"),
             nullable=False,
         ),
-        Column("account", String, nullable=False),
+        Column("department", String, nullable=False),
         Column("amount", Integer, nullable=False),
     ],
     extra_plugins=[
@@ -205,41 +209,73 @@ LedgerResourceFactory(
     events=[_inv_adjust],
 )
 
-# -- Revenue ledger (transactional reconciliation) ---------------------
+# -- General ledger (double-entry reconciliation) ---------------------
+# Each invoice line produces two balanced ledger entries:
+#   - debit  to "accounts_receivable"
+#   - credit to "revenue"
 
-_rev_recognize = LedgerEvent(
-    name="recognize",
+_il = InvoiceLines.table
+
+_post_invoices = LedgerEvent(
+    name="post",
     input=lambda p: select(
         func.unnest(p("invoice_ids", ARRAY(Integer)))
         .label("invoice_id"),
     ),
-    desired=lambda pginput: select(
-        InvoiceLines.table.c.invoice_id,
-        InvoiceLines.table.c.account,
-        InvoiceLines.table.c.amount.label("value"),
-    ).where(
-        InvoiceLines.table.c.invoice_id.in_(
-            select(pginput.c.invoice_id)
-        )
+    desired=lambda pginput: union_all(
+        select(
+            _il.c.invoice_id,
+            _il.c.department,
+            literal_column("'accounts_receivable'")
+            .label("account"),
+            literal_column("'debit'").label("direction"),
+            _il.c.amount.label("value"),
+        ).where(
+            _il.c.invoice_id.in_(
+                select(pginput.c.invoice_id)
+            )
+        ),
+        select(
+            _il.c.invoice_id,
+            _il.c.department,
+            literal_column("'revenue'").label("account"),
+            literal_column("'credit'").label("direction"),
+            _il.c.amount.label("value"),
+        ).where(
+            _il.c.invoice_id.in_(
+                select(pginput.c.invoice_id)
+            )
+        ),
     ),
-    existing=ledger_balances("invoice_id", "account"),
-    diff_keys=["invoice_id", "account"],
+    existing=ledger_balances(
+        "invoice_id", "department", "account", "direction"
+    ),
+    diff_keys=[
+        "invoice_id", "department", "account", "direction"
+    ],
 )
 
 LedgerResourceFactory(
-    tablename="revenue",
+    tablename="ledger",
     schemaname="private",
     metadata=metadata,
     schema_items=[
         Column("invoice_id", Integer, nullable=False),
+        Column("department", String, nullable=False),
         Column("account", String, nullable=False),
     ],
     extra_plugins=[
+        DoubleEntryPlugin(),
+        DoubleEntryTriggerPlugin(),
         LedgerBalanceViewPlugin(
-            dimensions=["invoice_id", "account"]
+            dimensions=[
+                "invoice_id",
+                "department",
+                "account",
+            ]
         ),
     ],
-    events=[_rev_recognize],
+    events=[_post_invoices],
 )
 
 # -- Declarative models -------------------------------------------------
