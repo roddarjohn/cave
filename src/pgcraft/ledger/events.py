@@ -18,7 +18,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from sqlalchemy import column, func, literal_column, select, table
+from sqlalchemy import (
+    column,
+    func,
+    literal_column,
+    select,
+    table,
+)
 from sqlalchemy.dialects import postgresql as pg_dialect
 from sqlalchemy.sql.expression import tuple_
 
@@ -26,6 +32,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from sqlalchemy import FromClause, Table
+    from sqlalchemy.sql.elements import ColumnClause
     from sqlalchemy.sql.expression import Select
     from sqlalchemy.sql.sqltypes import TypeEngine
     from sqlalchemy_declarative_extensions.dialects.postgresql import (
@@ -60,7 +67,7 @@ class ParamCollector:
         self,
         name: str,
         sa_type: type[TypeEngine] | TypeEngine,
-    ) -> literal_column:
+    ) -> ColumnClause[str]:
         """Register a parameter and return a column reference.
 
         Args:

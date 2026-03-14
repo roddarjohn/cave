@@ -81,7 +81,7 @@ class TestLedgerEventValidation:
         event = LedgerEvent(
             name="rec",
             input=lambda p: select(p("sku", String).label("sku")),
-            desired=lambda inp: select(inp.c.sku),
+            desired=lambda pginput: select(pginput.c.sku),
         )
         with pytest.raises(PGCraftValidationError, match="diff_keys"):
             _validate_events([event], root)
@@ -101,7 +101,7 @@ class TestLedgerEventValidation:
         event = LedgerEvent(
             name="rec",
             input=lambda p: select(p("x", String).label("x")),
-            desired=lambda inp: select(inp.c.x),
+            desired=lambda pginput: select(pginput.c.x),
             diff_keys=["nonexistent"],
         )
         with pytest.raises(PGCraftValidationError, match="nonexistent"):
@@ -126,7 +126,7 @@ class TestLedgerEventValidation:
                 p("sku", String).label("sku"),
                 p("value", Integer).label("value"),
             ),
-            desired=lambda inp: select(inp.c.sku, inp.c.value),
+            desired=lambda pginput: select(pginput.c.sku, pginput.c.value),
             existing=ledger_balances("sku"),
             diff_keys=["sku"],
         )
@@ -179,10 +179,10 @@ class TestLedgerActionsPluginWiring:
                 p("sku", String).label("sku"),
                 p("value", Integer).label("value"),
             ),
-            desired=lambda inp: select(
-                inp.c.warehouse,
-                inp.c.sku,
-                inp.c.value,
+            desired=lambda pginput: select(
+                pginput.c.warehouse,
+                pginput.c.sku,
+                pginput.c.value,
             ),
             existing=ledger_balances("warehouse", "sku"),
             diff_keys=["warehouse", "sku"],

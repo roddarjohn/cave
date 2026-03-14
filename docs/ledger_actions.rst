@@ -153,6 +153,92 @@ via the ``events`` parameter::
 and runs after the table and API view have been created.
 
 
+Declarative Style
+~~~~~~~~~~~~~~~~~
+
+The ``@register`` decorator works with ledger events too.  Pass
+:class:`~pgcraft.plugins.ledger_actions.LedgerActionsPlugin` in the
+plugin list directly::
+
+    from pgcraft import LedgerEvent, ledger_balances
+    from pgcraft.declarative import register
+    from pgcraft.plugins.api import APIPlugin
+    from pgcraft.plugins.created_at import CreatedAtPlugin
+    from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
+    from pgcraft.plugins.ledger import (
+        LedgerBalanceViewPlugin,
+        LedgerTablePlugin,
+        LedgerTriggerPlugin,
+    )
+    from pgcraft.plugins.ledger_actions import LedgerActionsPlugin
+    from pgcraft.plugins.pk import SerialPKPlugin
+
+    reconcile = LedgerEvent(
+        name="reconcile",
+        input=lambda p: select(
+            p("warehouse", String).label("warehouse"),
+            p("sku", String).label("sku"),
+            p("value", Integer).label("value"),
+        ),
+        desired=lambda pginput: select(
+            pginput.c.warehouse, pginput.c.sku, pginput.c.value,
+        ),
+        existing=ledger_balances("warehouse", "sku"),
+        diff_keys=["warehouse", "sku"],
+    )
+
+    @register(
+        metadata=metadata,
+        plugins=[
+            SerialPKPlugin(),
+            UUIDEntryIDPlugin(),
+            CreatedAtPlugin(),
+            LedgerTablePlugin(),
+            APIPlugin(grants=["select", "insert"]),
+            LedgerTriggerPlugin(),
+            LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
+            LedgerActionsPlugin(events=[reconcile]),
+        ],
+    )
+    class Inventory:
+        __tablename__ = "inventory"
+        __table_args__ = {"schema": "ops"}
+
+        warehouse = Column(String, nullable=False)
+        sku = Column(String, nullable=False)
+
+
+Prefer Diff Mode Over Simple
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When a simple event maps one-to-one with an external identifier
+(e.g. an ``invoice_id``), prefer **diff mode** instead.  Diffing
+over that identifier makes the operation idempotent — calling the
+same event twice with the same input produces zero new rows the
+second time.
+
+For example, reconciling invoices by ``invoice_id``::
+
+    reconcile_invoice = LedgerEvent(
+        name="reconcile_invoice",
+        input=lambda p: select(
+            p("invoice_id", Integer).label("invoice_id"),
+            p("value", Integer).label("value"),
+        ),
+        desired=lambda pginput: select(
+            pginput.c.invoice_id, pginput.c.value,
+        ),
+        existing=ledger_balances("invoice_id"),
+        diff_keys=["invoice_id"],
+    )
+
+This is always preferred over a simple ``input``-only event because
+it is naturally safe to retry: the ledger converges to the correct
+state regardless of how many times the function is called.  Reserve
+simple mode for fire-and-forget deltas where idempotency is not
+needed.
+
+
 Naming Convention
 ~~~~~~~~~~~~~~~~~
 
