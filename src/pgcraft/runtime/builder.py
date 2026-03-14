@@ -31,7 +31,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from pgcraft.alembic.register import pgcraft_configure_metadata
 from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
 from pgcraft.plugins.api import APIPlugin
-from pgcraft.plugins.pk import UUIDV4PKPlugin, UUIDV7PKPlugin, SerialPKPlugin
+from pgcraft.plugins.pk import SerialPKPlugin, UUIDV4PKPlugin, UUIDV7PKPlugin
 from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 from pgcraft.plugins.statistics import StatisticsViewPlugin
 
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 # Maps config type names to SQLAlchemy column type instances.
 # Using callables for types that require construction (DateTime, UUID).
-_COLUMN_TYPE_MAP: dict[str, TypeEngine[object]] = {
+_COLUMN_TYPE_MAP: dict[str, TypeEngine[object]] = {  # ty: ignore[invalid-assignment]
     "text": Text(),
     "integer": Integer(),
     "bigint": BigInteger(),
@@ -62,7 +62,7 @@ _PK_PLUGIN_MAP = {
 }
 
 
-def _build_column(col: ColumnConfig) -> Column:  # type: ignore[type-arg]
+def _build_column(col: ColumnConfig) -> Column:
     """Translate a :class:`~pgcraft.runtime.config.ColumnConfig` to a Column.
 
     Args:
@@ -76,7 +76,7 @@ def _build_column(col: ColumnConfig) -> Column:  # type: ignore[type-arg]
     kwargs: dict[str, object] = {"nullable": col.nullable}
     if col.default is not None:
         kwargs["server_default"] = text(col.default)
-    return Column(col.name, sa_type, **kwargs)
+    return Column(col.name, sa_type, **kwargs)  # ty: ignore[invalid-argument-type]
 
 
 def build_metadata(config: DimensionConfig, schema: str) -> MetaData:
@@ -111,7 +111,7 @@ def build_metadata(config: DimensionConfig, schema: str) -> MetaData:
         tablename=config.table_name,
         schemaname=schema,
         metadata=metadata,
-        schema_items=columns,
+        schema_items=columns,  # ty: ignore[invalid-argument-type]
         plugins=[
             pk_plugin,
             SimpleTablePlugin(),

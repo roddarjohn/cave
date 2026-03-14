@@ -28,12 +28,10 @@ from alembic.runtime.migration import MigrationContext
 from pgcraft.alembic.dependency import AnyOp, sort_migration_ops
 
 if TYPE_CHECKING:
-    from alembic.operations import ops as alembic_ops
-
     from sqlalchemy import Connection, MetaData
 
 
-def _make_include_name(  # type: ignore[return]
+def _make_include_name(
     schema: str,
 ) -> object:
     """Return an Alembic ``include_name`` callback scoped to *schema*.
@@ -99,5 +97,5 @@ def generate_ops(
     upgrade_ops = script.upgrade_ops
     if upgrade_ops is None:
         return []
-    raw_ops: list[alembic_ops.MigrateOperation] = list(upgrade_ops.ops)
+    raw_ops: list[AnyOp] = list(upgrade_ops.ops)
     return sort_migration_ops(raw_ops)

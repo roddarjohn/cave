@@ -27,6 +27,8 @@ Design principles:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from alembic.operations import ops as alembic_ops
 from sqlalchemy_declarative_extensions.alembic.function import (
     CreateFunctionOp,
@@ -63,6 +65,9 @@ from sqlalchemy_declarative_extensions.role.compare import (
 
 from pgcraft.alembic.extension import CreateExtensionOp
 from pgcraft.errors import DestructiveOperationError
+
+if TYPE_CHECKING:
+    from pgcraft.alembic.dependency import AnyOp
 
 # Operations that are unconditionally safe to apply at runtime.
 # These are all additive or idempotent: they create or replace objects
@@ -119,8 +124,8 @@ def _check_modify_table(op: alembic_ops.ModifyTableOps) -> None:
 
 
 def filter_safe_ops(
-    ops: list[alembic_ops.MigrateOperation],
-) -> list[alembic_ops.MigrateOperation]:
+    ops: list[AnyOp],
+) -> list[AnyOp]:
     """Return *ops* unchanged after verifying every op is safe to apply.
 
     Iterates the op list and raises

@@ -1,14 +1,18 @@
 """Unit tests for build_metadata — no database connection required."""
 
-import pytest
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, Integer, MetaData, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    Integer,
+    MetaData,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-from pgcraft.alembic.extension import CreateExtensionOp
-from pgcraft.plugins.pk import UUIDV4PKPlugin, UUIDV7PKPlugin, SerialPKPlugin
 from pgcraft.runtime.builder import _build_column, build_metadata
 from pgcraft.runtime.config import ColumnConfig, DimensionConfig
-
 
 # ---------------------------------------------------------------------------
 # _build_column

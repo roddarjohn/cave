@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from pgcraft.runtime.config import ColumnConfig, DimensionConfig
 
-
 # ---------------------------------------------------------------------------
 # ColumnConfig — name validation
 # ---------------------------------------------------------------------------

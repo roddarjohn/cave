@@ -59,6 +59,8 @@ from pgcraft.alembic.extension import CreateExtensionOp
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
+    from pgcraft.alembic.dependency import AnyOp
+
 # Alembic built-in ops that are executable via Operations.invoke.
 _NATIVE_OP_TYPES: tuple[type, ...] = (
     alembic_ops.CreateTableOp,
@@ -108,7 +110,7 @@ def _to_executables(  # noqa: PLR0911
     if isinstance(op, CreateSchemaOp):
         stmts = op.to_sql()
         return [
-            text(s) if isinstance(s, str) else s  # ty: ignore[return-type]
+            text(s) if isinstance(s, str) else s
             for s in stmts
         ]
 
@@ -130,7 +132,7 @@ def _to_executables(  # noqa: PLR0911
 
 def apply_ops(
     conn: Connection,
-    ops: list[alembic_ops.MigrateOperation],
+    ops: list[AnyOp],
 ) -> str:
     r"""Execute *ops* against *conn* and return the captured SQL.
 
@@ -153,7 +155,7 @@ def apply_ops(
     """
     captured: list[str] = []
 
-    def _capture(
+    def _capture(  # noqa: PLR0913
         conn: Connection,  # noqa: ARG001
         cursor: object,  # noqa: ARG001
         statement: str,
@@ -170,9 +172,12 @@ def apply_ops(
 
         for op in ops:
             if isinstance(op, _NATIVE_OP_TYPES):
-                operations.invoke(op)
+                operations.invoke(op)  # ty: ignore[no-matching-overload]
             else:
-                for stmt in _to_executables(op, conn):
+                for stmt in _to_executables(
+                    op,  # ty: ignore[invalid-argument-type]
+                    conn,
+                ):
                     conn.execute(stmt)
     finally:
         event.remove(conn, "before_cursor_execute", _capture)
