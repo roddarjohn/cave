@@ -323,7 +323,7 @@ ledger.  Two modes are provided:
 See the :doc:`ledger_actions` page for full documentation.
 
 
-Plugin Reference
+Plugin reference
 ----------------
 
 All ledger plugins are documented in the :doc:`api` reference.  The
