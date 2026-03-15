@@ -100,28 +100,17 @@ Source of truth tables should be very very clear.
 
 # TODOs
 
-- Figure out auth / OPA w/ RLS
-- Figure out approvals?
+- PGCraft extension system
+  - Postgrest behavior can be added via extension
+  - auth / OPA w/ RLS
+  - approvals
 
-- Indices??
-
-- Figure out how to benchmark / do performance analysis on this
-
-- Allow loading a dynamic configuration and dynamic migrations
-
-- Declarative ledgering
-
-- Default plugins can perhaps go in metadata??
-
-- [ip] Different PK types
-- [ip] Add constraints that prevent updating or deleting unless yo uknow what you're doing on tables that are supposed to be updated via trigger.
-- [ip] build naming convention should be namespaced to pgcraft naming conventions
-
-- How to store currency?
-- Other ways to use a ledger
+- Indices don't work right now because we need a column resolution thing.
 
 - FK handling is scuffed because of the root table issue
 
-- Switch to alabaster theme?
+- Allow loading a dynamic configuration and dynamic migrations
 
-- Why are all these dependencies needed?
+- Figure out how to benchmark / do performance analysis on this
+
+- Other ways to use a ledger

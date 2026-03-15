@@ -141,11 +141,12 @@ Use this for fire-and-forget deltas where idempotency is not needed
 Factory integration
 -------------------
 
-Pass a list of events to :class:`~pgcraft.factory.ledger.LedgerResourceFactory`
-via the ``events`` parameter::
+Create the factory, then pass events to
+:class:`~pgcraft.views.actions.LedgerActions`::
 
     from pgcraft import LedgerEvent, ledger_balances
-    from pgcraft.factory.ledger import LedgerResourceFactory
+    from pgcraft.factory import PGCraftLedger
+    from pgcraft.views import APIView, LedgerActions
 
     recognize = LedgerEvent(
         name="recognize",
@@ -166,7 +167,7 @@ via the ``events`` parameter::
         diff_keys=["invoice_id", "account"],
     )
 
-    LedgerResourceFactory(
+    revenue = PGCraftLedger(
         tablename="revenue",
         schemaname="ops",
         metadata=metadata,
@@ -174,32 +175,24 @@ via the ``events`` parameter::
             Column("invoice_id", Integer, nullable=False),
             Column("account",    String, nullable=False),
         ],
-        events=[recognize],
     )
 
-``LedgerActionsPlugin`` is appended to ``extra_plugins`` automatically
-and runs after the table and API view have been created.
+    APIView(
+        source=revenue,
+        grants=["select", "insert"],
+    )
+    LedgerActions(source=revenue, events=[recognize])
 
 
 Declarative style
 ~~~~~~~~~~~~~~~~~
 
-The ``@register`` decorator works with ledger events too.  Pass
-:class:`~pgcraft.plugins.ledger_actions.LedgerActionsPlugin` in the
-plugin list directly::
+The ``@register`` decorator works with ledger events too.  Create
+an ``APIView`` via the ``api=`` kwarg and attach views separately::
 
     from pgcraft import LedgerEvent, ledger_balances
     from pgcraft.declarative import register
-    from pgcraft.plugins.api import APIPlugin
-    from pgcraft.plugins.created_at import CreatedAtPlugin
-    from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
-    from pgcraft.plugins.ledger import (
-        LedgerBalanceViewPlugin,
-        LedgerTablePlugin,
-        LedgerTriggerPlugin,
-    )
-    from pgcraft.plugins.ledger_actions import LedgerActionsPlugin
-    from pgcraft.plugins.pk import SerialPKPlugin
+    from pgcraft.views import BalanceView, LedgerActions
 
     recognize = LedgerEvent(
         name="recognize",
@@ -222,18 +215,7 @@ plugin list directly::
 
     @register(
         metadata=metadata,
-        plugins=[
-            SerialPKPlugin(),
-            UUIDEntryIDPlugin(),
-            CreatedAtPlugin(),
-            LedgerTablePlugin(),
-            APIPlugin(grants=["select", "insert"]),
-            LedgerTriggerPlugin(),
-            LedgerBalanceViewPlugin(
-                dimensions=["invoice_id", "account"]
-            ),
-            LedgerActionsPlugin(events=[recognize]),
-        ],
+        api={"grants": ["select", "insert"]},
     )
     class Revenue:
         __tablename__ = "revenue"

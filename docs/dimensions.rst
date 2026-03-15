@@ -1,4 +1,4 @@
-Built-in Dimensions
+Built-in dimensions
 ===================
 
 pgcraft ships with three dimension types, each backed by a different
@@ -14,7 +14,7 @@ Choose the type that matches your data:
   columns.  Best for highly dynamic or optional fields.
 
 
-Simple Dimension
+Simple dimension
 ----------------
 
 A single backing table with a corresponding API view.  Suitable
@@ -37,7 +37,7 @@ history.
 .. include:: _generated/dim_simple.rst
 
 
-Append-Only Dimension (SCD Type 2)
+Append-only dimension (SCD Type 2)
 ----------------------------------
 
 Tracks full change history using an append-only attributes log.
@@ -63,7 +63,7 @@ triggers manage the internal tables:
 .. include:: _generated/dim_append_only.rst
 
 
-EAV Dimension (Entity-Attribute-Value)
+EAV dimension (Entity-Attribute-Value)
 --------------------------------------
 
 Stores attributes as rows rather than columns, using typed value

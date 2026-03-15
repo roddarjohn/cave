@@ -1,4 +1,4 @@
-Ledger Tables
+Ledger tables
 =============
 
 Ledger tables are append-only tables designed for recording immutable
@@ -19,7 +19,7 @@ Choose the variant that matches your data:
   debits equal credits per ``entry_id``.  Best for financial journals.
 
 
-Basic Ledger
+Basic ledger
 ------------
 
 A single append-only table with an API view.  Insert-only: UPDATE and
@@ -41,20 +41,20 @@ DELETE on the API view raise a PostgreSQL error.
 .. include:: _generated/dim_ledger.rst
 
 
-Latest View
+Latest view
 ~~~~~~~~~~~
 
-Use :class:`~pgcraft.plugins.ledger.LedgerLatestViewPlugin` to create
-a view that shows the most recent row per dimension group.  This is
-useful for status-tracking ledgers where you care about current state
-rather than historical sums:
+Use :class:`~pgcraft.views.latest.LatestView` to create a view that
+shows the most recent row per dimension group.  This is useful for
+status-tracking ledgers where you care about current state rather
+than historical sums:
 
 .. code-block:: python
 
-   from pgcraft.factory.ledger import LedgerResourceFactory
-   from pgcraft.plugins.ledger import LedgerLatestViewPlugin
+   from pgcraft.factory import PGCraftLedger
+   from pgcraft.views import APIView, LatestView
 
-   LedgerResourceFactory(
+   order_events = PGCraftLedger(
        tablename="order_events",
        schemaname="ops",
        metadata=metadata,
@@ -62,9 +62,15 @@ rather than historical sums:
            Column("order_id", String, nullable=False),
            Column("status", String, nullable=False),
        ],
-       extra_plugins=[
-           LedgerLatestViewPlugin(dimensions=["order_id"]),
-       ],
+   )
+
+   APIView(
+       source=order_events,
+       grants=["select", "insert"],
+   )
+   LatestView(
+       source=order_events,
+       dimensions=["order_id"],
    )
 
 This registers an ``order_events_latest`` view using PostgreSQL's
@@ -79,20 +85,20 @@ The view name follows the naming convention and can be customised via
 ``metadata.naming_convention["ledger_latest_view"]``.
 
 
-Balance Views
+Balance views
 ~~~~~~~~~~~~~
 
-Use :class:`~pgcraft.plugins.ledger.LedgerBalanceViewPlugin` to create
-a view that shows current balances (``SUM(value)``) per dimension group.
+Use :class:`~pgcraft.views.balance.BalanceView` to create a view
+that shows current balances (``SUM(value)``) per dimension group.
 Best for ledgers where the running total is meaningful (inventory,
 resource quotas, point systems):
 
 .. code-block:: python
 
-   from pgcraft.factory.ledger import LedgerResourceFactory
-   from pgcraft.plugins.ledger import LedgerBalanceViewPlugin
+   from pgcraft.factory import PGCraftLedger
+   from pgcraft.views import APIView, BalanceView
 
-   LedgerResourceFactory(
+   stock = PGCraftLedger(
        tablename="stock_movements",
        schemaname="inventory",
        metadata=metadata,
@@ -100,9 +106,15 @@ resource quotas, point systems):
            Column("warehouse", String, nullable=False),
            Column("sku", String, nullable=False),
        ],
-       extra_plugins=[
-           LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
-       ],
+   )
+
+   APIView(
+       source=stock,
+       grants=["select", "insert"],
+   )
+   BalanceView(
+       source=stock,
+       dimensions=["warehouse", "sku"],
    )
 
 This registers a ``stock_movements_balances`` view:
@@ -116,22 +128,21 @@ The view name follows the naming convention and can be customised via
 ``metadata.naming_convention["ledger_balance_view"]``.
 
 
-Balance Constraints
+Balance constraints
 ~~~~~~~~~~~~~~~~~~~
 
-Use :class:`~pgcraft.plugins.ledger.LedgerBalanceCheckPlugin` to enforce
-that ``SUM(value)`` for a dimension group never drops below a threshold.
-This is useful for preventing negative inventory, overdrafts, or
-exceeding resource quotas:
+Use :class:`~pgcraft.plugins.ledger.LedgerBalanceCheckPlugin` to
+enforce that ``SUM(value)`` for a dimension group never drops below
+a threshold.  This is useful for preventing negative inventory,
+overdrafts, or exceeding resource quotas:
 
 .. code-block:: python
 
-   from pgcraft.plugins.ledger import (
-       LedgerBalanceCheckPlugin,
-       LedgerBalanceViewPlugin,
-   )
+   from pgcraft.factory import PGCraftLedger
+   from pgcraft.plugins.ledger import LedgerBalanceCheckPlugin
+   from pgcraft.views import APIView, BalanceView
 
-   LedgerResourceFactory(
+   stock = PGCraftLedger(
        tablename="stock_movements",
        schemaname="inventory",
        metadata=metadata,
@@ -140,12 +151,20 @@ exceeding resource quotas:
            Column("sku", String, nullable=False),
        ],
        extra_plugins=[
-           LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
            LedgerBalanceCheckPlugin(
                dimensions=["warehouse", "sku"],
                min_balance=0,   # default; cannot go negative
            ),
        ],
+   )
+
+   APIView(
+       source=stock,
+       grants=["select", "insert"],
+   )
+   BalanceView(
+       source=stock,
+       dimensions=["warehouse", "sku"],
    )
 
 The trigger fires ``AFTER INSERT FOR EACH STATEMENT`` and checks only
@@ -174,7 +193,7 @@ Set ``min_balance`` to a different value for other use cases:
    )
 
 
-Double-Entry Ledger
+Double-entry ledger
 -------------------
 
 A double-entry ledger extends the basic ledger with debit/credit
@@ -233,62 +252,61 @@ rejected.
    the backing table to benefit from statement-level batching.
 
 
-Customising the Value Type
+Customising the value type
 --------------------------
 
-The default value type is ``INTEGER``.  To use ``NUMERIC`` for decimal
-precision, pass ``value_type="numeric"`` to
-:class:`~pgcraft.plugins.ledger.LedgerTablePlugin`:
+The default value type is ``INTEGER``.  To use ``NUMERIC`` for
+decimal precision, pass ``value_type="numeric"`` to
+:class:`~pgcraft.plugins.ledger.LedgerTablePlugin` via the
+internal plugin override mechanism:
 
 .. code-block:: python
 
-   from pgcraft.factory.ledger import LedgerResourceFactory
+   from pgcraft.factory import PGCraftLedger
    from pgcraft.plugins.ledger import LedgerTablePlugin
-   from pgcraft.plugins.api import APIPlugin
-   from pgcraft.plugins.created_at import CreatedAtPlugin
-   from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
-   from pgcraft.plugins.pk import SerialPKPlugin
+   from pgcraft.views import APIView
 
-   LedgerResourceFactory(
+   payments = PGCraftLedger(
        tablename="payments",
        schemaname="finance",
        metadata=metadata,
        schema_items=[
            Column("account_id", Integer, nullable=False),
        ],
-       plugins=[
-           SerialPKPlugin(),
-           UUIDEntryIDPlugin(),
-           CreatedAtPlugin(),
-           LedgerTablePlugin(value_type="numeric"),
-           APIPlugin(grants=["select", "insert"]),
-       ],
+   )
+
+   APIView(
+       source=payments,
+       grants=["select", "insert"],
    )
 
 
-Using a UUID Primary Key
+Using a UUID primary key
 ------------------------
 
 Swap :class:`~pgcraft.plugins.pk.SerialPKPlugin` for
-:class:`~pgcraft.plugins.pk.UUIDV4PKPlugin` to use a UUIDv4 primary
-key with ``gen_random_uuid()`` as the server default:
+:class:`~pgcraft.plugins.pk.UUIDV4PKPlugin` to use a UUIDv4
+primary key with ``gen_random_uuid()`` as the server default:
 
 .. code-block:: python
 
+   from pgcraft.factory import PGCraftLedger
    from pgcraft.plugins.pk import UUIDV4PKPlugin
+   from pgcraft.views import APIView
 
-   LedgerResourceFactory(
+   events = PGCraftLedger(
        tablename="events",
        schemaname="analytics",
        metadata=metadata,
-       schema_items=[Column("event_type", String, nullable=False)],
-       plugins=[
-           UUIDV4PKPlugin(),
-           UUIDEntryIDPlugin(),
-           CreatedAtPlugin(),
-           LedgerTablePlugin(),
-           APIPlugin(grants=["select", "insert"]),
+       schema_items=[
+           Column("event_type", String, nullable=False),
        ],
+       plugins=[UUIDV4PKPlugin()],
+   )
+
+   APIView(
+       source=events,
+       grants=["select", "insert"],
    )
 
 
@@ -305,7 +323,7 @@ ledger.  Two modes are provided:
 See the :doc:`ledger_actions` page for full documentation.
 
 
-Plugin Reference
+Plugin reference
 ----------------
 
 All ledger plugins are documented in the :doc:`api` reference.  The
@@ -328,11 +346,8 @@ key context keys are:
     ``"created_at_column"`` for plugin ordering.  Writes ``"primary"``
     (the table) and ``"__root__"``.
 
-``APIPlugin``
-    Reads ``"primary"``.  Writes ``"api"`` (the view).
-
 ``LedgerTriggerPlugin``
-    Reads ``"primary"``, ``"api"``, ``"entry_id_column"``.
+    Reads ``"primary"``, ``"entry_id_column"``.
 
 ``LedgerLatestViewPlugin``
     Reads ``"primary"`` and ``"created_at_column"``.  Writes

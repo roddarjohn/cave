@@ -2,10 +2,14 @@
 
 from sqlalchemy import Column, Integer, MetaData, String, select
 
-from pgcraft.factory.ledger import LedgerResourceFactory
+from pgcraft.factory import PGCraftLedger
 from pgcraft.ledger.events import LedgerEvent, ledger_balances
-from pgcraft.plugins.ledger import LedgerBalanceViewPlugin
 from pgcraft.utils.naming_convention import build_naming_convention
+from pgcraft.views import (
+    APIView,
+    BalanceView,
+    LedgerActions,
+)
 
 metadata = MetaData(naming_convention=build_naming_convention())
 
@@ -28,7 +32,7 @@ reconcile = LedgerEvent(
     diff_keys=["warehouse", "sku"],
 )
 
-LedgerResourceFactory(
+inventory = PGCraftLedger(
     tablename="inventory",
     schemaname="ops",
     metadata=metadata,
@@ -37,9 +41,12 @@ LedgerResourceFactory(
         Column("sku", String, nullable=False),
         Column("source", String, nullable=True),
     ],
-    extra_plugins=[
-        LedgerBalanceViewPlugin(dimensions=["warehouse", "sku"]),
-    ],
-    events=[reconcile],
 )
+
+APIView(source=inventory, grants=["select", "insert"])
+BalanceView(
+    source=inventory,
+    dimensions=["warehouse", "sku"],
+)
+LedgerActions(source=inventory, events=[reconcile])
 # --- example end ---

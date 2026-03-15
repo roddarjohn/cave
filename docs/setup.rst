@@ -106,19 +106,22 @@ A simple dimension stores each row in one table and exposes it through an
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, String, Text
-   from pgcraft.factory.dimension.simple import SimpleDimensionFactory
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.views import APIView
 
    metadata = MetaData()
 
-   SimpleDimensionFactory(
+   products = PGCraftSimple(
        tablename="products",
        schemaname="dim",
        metadata=metadata,
-       dimensions=[
+       schema_items=[
            Column("name", String, nullable=False),
            Column("description", Text),
        ],
    )
+
+   APIView(source=products)
 
 Append-only dimension (SCD Type 2)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -129,18 +132,21 @@ current state is always the most recent row in the attributes log:
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, Numeric, String
-   from pgcraft.factory.dimension.append_only import AppendOnlyDimensionFactory
+   from pgcraft.factory import PGCraftAppendOnly
+   from pgcraft.views import APIView
 
-   AppendOnlyDimensionFactory(
+   prices = PGCraftAppendOnly(
        tablename="prices",
        schemaname="dim",
        metadata=metadata,
-       dimensions=[
+       schema_items=[
            Column("sku", String, nullable=False),
            Column("amount", Numeric(10, 2), nullable=False),
            Column("currency", String(3), nullable=False),
        ],
    )
+
+   APIView(source=prices)
 
 Ledger (append-only value table)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -152,9 +158,10 @@ is allowed through the API view:
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, String
-   from pgcraft.factory.ledger import LedgerResourceFactory
+   from pgcraft.factory import PGCraftLedger
+   from pgcraft.views import APIView
 
-   LedgerResourceFactory(
+   order_events = PGCraftLedger(
        tablename="order_events",
        schemaname="ops",
        metadata=metadata,
@@ -162,6 +169,11 @@ is allowed through the API view:
            Column("order_id", String, nullable=False),
            Column("status", String, nullable=False),
        ],
+   )
+
+   APIView(
+       source=order_events,
+       grants=["select", "insert"],
    )
 
 See :doc:`ledgers` for balance views, double-entry enforcement, and
@@ -177,18 +189,21 @@ frequently:
 .. code-block:: python
 
    from sqlalchemy import Boolean, Column, Integer, MetaData, String
-   from pgcraft.factory.dimension.eav import EAVDimensionFactory
+   from pgcraft.factory import PGCraftEAV
+   from pgcraft.views import APIView
 
-   EAVDimensionFactory(
+   features = PGCraftEAV(
        tablename="features",
        schemaname="dim",
        metadata=metadata,
-       dimensions=[
+       schema_items=[
            Column("name", String, nullable=False),
            Column("enabled", Boolean),
            Column("max_seats", Integer),
        ],
    )
+
+   APIView(source=features)
 
 Customising factory behaviour
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -200,36 +215,29 @@ Custom PK column name:
 
 .. code-block:: python
 
-   from pgcraft.factory.dimension.simple import SimpleDimensionFactory
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
-   from pgcraft.plugins.api import APIPlugin
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.plugins.pk import UUIDV4PKPlugin
+   from pgcraft.views import APIView
 
-   SimpleDimensionFactory(
-       "products", "dim", metadata, dimensions,
-       plugins=[
-           SerialPKPlugin(column_name="product_id"),
-           SimpleTablePlugin(),
-           APIPlugin(),
-           SimpleTriggerPlugin(),
-       ],
+   products = PGCraftSimple(
+       "products", "dim", metadata, schema_items,
+       plugins=[UUIDV4PKPlugin()],
    )
+
+   APIView(source=products)
 
 Custom API schema:
 
 .. code-block:: python
 
-   SimpleDimensionFactory(
-       "products", "dim", metadata, dimensions,
-       plugins=[
-           SerialPKPlugin(),
-           SimpleTablePlugin(),
-           APIPlugin(schema="reporting"),
-           SimpleTriggerPlugin(),
-       ],
+   products = PGCraftSimple(
+       "products", "dim", metadata, schema_items,
    )
 
-Apply a custom plugin to every factory via :class:`~pgcraft.config.PGCraftConfig`:
+   APIView(source=products, schema="reporting")
+
+Apply a custom plugin to every factory via
+:class:`~pgcraft.config.PGCraftConfig`:
 
 .. code-block:: python
 
@@ -238,9 +246,11 @@ Apply a custom plugin to every factory via :class:`~pgcraft.config.PGCraftConfig
    pgcraft_cfg = PGCraftConfig()
    pgcraft_cfg.register(TimestampPlugin(), TenantPlugin())
 
-   SimpleDimensionFactory(
-       "products", "dim", metadata, dimensions, config=pgcraft_cfg
+   PGCraftSimple(
+       "products", "dim", metadata, schema_items,
+       config=pgcraft_cfg,
    )
-   AppendOnlyDimensionFactory(
-       "orders", "dim", metadata, dimensions, config=pgcraft_cfg
+   PGCraftAppendOnly(
+       "orders", "dim", metadata, schema_items,
+       config=pgcraft_cfg,
    )

@@ -70,6 +70,29 @@ nitpick_ignore = [
     ("py:class", "alembic.autogenerate.rewriter.Rewriter"),
     # private Protocol used only for internal type checking
     ("py:class", "pgcraft.validator._SchemaItemValidator"),
+    # sqlalchemy_declarative_extensions internals
+    (
+        "py:class",
+        "sqlalchemy_declarative_extensions"
+        ".dialects.postgresql.function.FunctionParam",
+    ),
+    (
+        "py:class",
+        "sqlalchemy_declarative_extensions.op.MigrateOp",
+    ),
+    # sqlalchemy classes not in intersphinx inventory
+    ("py:class", "sqlalchemy.Column"),
+    ("py:class", "sqlalchemy.MetaData"),
+    ("py:class", "sqlalchemy.Select"),
+    ("py:class", "sqlalchemy.Table"),
+    # produces/requires are decorators, not attributes
+    ("py:attr", "pgcraft.plugin.Plugin.produces"),
+    ("py:attr", "pgcraft.plugin.Plugin.requires"),
+    # Plugin.extra_columns was removed
+    ("py:meth", "pgcraft.plugin.Plugin.extra_columns"),
+    # check module-level docstring references bare names
+    ("py:class", "TableCheckPlugin"),
+    ("py:class", "TriggerCheckPlugin"),
 ]
 
 intersphinx_mapping = {

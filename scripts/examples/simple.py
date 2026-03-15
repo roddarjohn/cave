@@ -3,12 +3,13 @@
 from sqlalchemy import Column, MetaData, String
 
 from pgcraft import pgcraft_build_naming_conventions
-from pgcraft.factory.dimension import SimpleDimensionResourceFactory
+from pgcraft.factory import PGCraftSimple
+from pgcraft.views import APIView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
 # --- example start ---
-SimpleDimensionResourceFactory(
+users = PGCraftSimple(
     tablename="users",
     schemaname="public",
     metadata=metadata,
@@ -17,6 +18,8 @@ SimpleDimensionResourceFactory(
         Column("email", String),
     ],
 )
+
+APIView(source=users)
 # --- example end ---
 
 SCHEMA_DESCRIPTION = (

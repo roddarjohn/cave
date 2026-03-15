@@ -59,13 +59,13 @@ The three built-in dimension factories are thin wrappers:
 
 .. code-block:: python
 
-   class SimpleDimensionResourceFactory(ResourceFactory):
-       DEFAULT_PLUGINS = [
-           SerialPKPlugin(),
+   class PGCraftSimple(ResourceFactory):
+       DEFAULT_PLUGINS = []
+
+       _INTERNAL_PLUGINS = [
            SimpleTablePlugin(),
-           StatisticsViewPlugin(),
-           APIPlugin(),
-           SimpleTriggerPlugin(),
+           TableCheckPlugin(),
+           RawTableProtectionPlugin("primary"),
        ]
 
 
@@ -202,9 +202,9 @@ in this order:
    pgcraft_cfg = PGCraftConfig()
    pgcraft_cfg.register(AuditPlugin())         # prepended to every factory
 
-   SimpleDimensionResourceFactory(
+   PGCraftSimple(
        "users", "app", metadata, schema_items,
-       config=pgcraft_cfg,                        # global plugins first
+       config=pgcraft_cfg,                   # global plugins first
        extra_plugins=[TenantPlugin()],       # appended after defaults
    )
 
@@ -212,15 +212,14 @@ To replace the default plugin list entirely:
 
 .. code-block:: python
 
-   SimpleDimensionResourceFactory(
+   events = PGCraftSimple(
        "events", "app", metadata, schema_items,
        plugins=[                             # replaces DEFAULT_PLUGINS
-           SerialPKPlugin(column_name="event_id"),
-           SimpleTablePlugin(),
-           APIPlugin(schema="reporting"),
-           SimpleTriggerPlugin(),
+           UUIDV4PKPlugin(),
        ],
    )
+
+   APIView(source=events, schema="reporting")
 
 
 Singleton groups
@@ -259,12 +258,18 @@ so two independent pipelines can coexist in one factory without colliding.
 ``SimpleTablePlugin``
     Writes ``"primary"`` (the backing table).
 
-``APIPlugin``
-    Reads ``"primary"`` (via ``table_key``).  Writes ``"api"`` (via
-    ``view_key``).
-
 ``SimpleTriggerPlugin``
     Reads ``"primary"`` (via ``table_key``) and ``"api"`` (via ``view_key``).
+    Accepts ``columns`` (writable column subset) and
+    ``permitted_operations`` (which DML operations get INSTEAD OF
+    triggers).
+
+``RawTableProtectionPlugin``
+    Reads the table keys passed to its constructor (e.g. ``"primary"``,
+    ``"root_table"``, ``"attributes"``).  Installs BEFORE triggers that
+    block direct DML on raw backing tables — mutations must go through
+    the API view.  Included automatically in each factory's
+    ``_INTERNAL_PLUGINS``.
 
 ``AppendOnlyTablePlugin``
     Writes ``"root_table"`` and ``"attributes"``.
@@ -368,24 +373,25 @@ Register it globally so it applies to every factory in the project:
 .. code-block:: python
 
    from pgcraft.config import PGCraftConfig
-   from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
-   from pgcraft.factory.dimension.append_only import AppendOnlyDimensionResourceFactory
+   from pgcraft.factory import PGCraftAppendOnly, PGCraftSimple
 
    pgcraft_cfg = PGCraftConfig()
    pgcraft_cfg.register(TimestampPlugin())
 
-   SimpleDimensionResourceFactory(
-       "products", "app", metadata, schema_items, config=pgcraft_cfg
+   PGCraftSimple(
+       "products", "app", metadata, schema_items,
+       config=pgcraft_cfg,
    )
-   AppendOnlyDimensionResourceFactory(
-       "orders", "app", metadata, schema_items, config=pgcraft_cfg
+   PGCraftAppendOnly(
+       "orders", "app", metadata, schema_items,
+       config=pgcraft_cfg,
    )
 
 Or apply it to a single factory only:
 
 .. code-block:: python
 
-   SimpleDimensionResourceFactory(
+   PGCraftSimple(
        "products", "app", metadata, schema_items,
        extra_plugins=[TimestampPlugin()],
    )
@@ -438,7 +444,7 @@ and makes it available to a downstream trigger plugin via a ctx key.
 
    # Use them together — order in the list doesn't matter because the
    # dependency declarations ensure ShadowTablePlugin runs first.
-   SimpleDimensionResourceFactory(
+   PGCraftSimple(
        "products", "app", metadata, schema_items,
        extra_plugins=[ShadowTriggerPlugin(), ShadowTablePlugin()],
    )
@@ -475,12 +481,62 @@ defined:
 
    # models.py
    from myapp.pgcraft_setup import pgcraft_cfg
-   from pgcraft.factory.dimension.simple import SimpleDimensionResourceFactory
+   from pgcraft.factory import PGCraftSimple
 
-   SimpleDimensionResourceFactory(
-       "users", "app", metadata, schema_items, config=pgcraft_cfg
+   PGCraftSimple(
+       "users", "app", metadata, schema_items,
+       config=pgcraft_cfg,
    )
 
+
+Factory and view reference
+--------------------------
+
+**Table factories** create the core data model.  Each factory type
+has its own internal plugins and trigger strategy:
+
+:class:`~pgcraft.factory.dimension.simple.PGCraftSimple`
+    Single backing table.  Best for reference data and simple
+    lookups.
+
+:class:`~pgcraft.factory.dimension.append_only.PGCraftAppendOnly`
+    SCD Type 2 dimension with root + attributes tables and a
+    current-state join view.  Best for slowly changing dimensions
+    where audit trails matter.
+
+:class:`~pgcraft.factory.dimension.eav.PGCraftEAV`
+    Entity-Attribute-Value dimension with entity + attribute tables
+    and a pivot view.  Best for sparse or highly dynamic attributes.
+
+:class:`~pgcraft.factory.ledger.PGCraftLedger`
+    Append-only ledger table with value, entry_id, and created_at
+    columns.  Best for event logs, financial journals, and metric
+    observations.
+
+**View factories** create derived views from a table factory:
+
+:class:`~pgcraft.views.api.APIView`
+    PostgREST-facing view with auto-selected INSTEAD OF triggers.
+    Grants drive which triggers are created.  Supports
+    ``columns``, ``exclude_columns``, and ``query=`` for
+    customisation.
+
+:class:`~pgcraft.views.view.PGCraftView`
+    Standalone view from any SQLAlchemy ``select()`` expression.
+    Exposes ``.table`` for use in joins.
+
+:class:`~pgcraft.views.view.PGCraftMaterializedView`
+    Materialized view with an auto-generated refresh function.
+
+:class:`~pgcraft.views.balance.BalanceView`
+    Ledger balance view (``SUM(value) GROUP BY dimensions``).
+
+:class:`~pgcraft.views.latest.LatestView`
+    Ledger latest view (``DISTINCT ON (dimensions) ORDER BY
+    created_at DESC``).
+
+:class:`~pgcraft.views.actions.LedgerActions`
+    Ledger event functions for reconciliation and delta inserts.
 
 Built-in plugins reference
 --------------------------

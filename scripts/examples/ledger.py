@@ -3,13 +3,13 @@
 from sqlalchemy import Column, MetaData, String
 
 from pgcraft import pgcraft_build_naming_conventions
-from pgcraft.factory.ledger import LedgerResourceFactory
-from pgcraft.plugins.ledger import LedgerLatestViewPlugin
+from pgcraft.factory import PGCraftLedger
+from pgcraft.views import APIView, LatestView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
 # --- example start ---
-LedgerResourceFactory(
+order_events = PGCraftLedger(
     tablename="order_events",
     schemaname="ops",
     metadata=metadata,
@@ -17,10 +17,10 @@ LedgerResourceFactory(
         Column("order_id", String, nullable=False),
         Column("status", String, nullable=False),
     ],
-    extra_plugins=[
-        LedgerLatestViewPlugin(dimensions=["order_id"]),
-    ],
 )
+
+APIView(source=order_events, grants=["select", "insert"])
+LatestView(source=order_events, dimensions=["order_id"])
 # --- example end ---
 
 SCHEMA_DESCRIPTION = (
@@ -45,6 +45,17 @@ VIEWS = [
             ("status", "VARCHAR", "NOT NULL"),
         ],
     },
+    {
+        "fullname": "ops.order_events_latest",
+        "columns": [
+            ("id", "INTEGER", "PK"),
+            ("entry_id", "UUID", "NOT NULL"),
+            ("created_at", "DATETIME", ""),
+            ("value", "INTEGER", "NOT NULL"),
+            ("order_id", "VARCHAR", "NOT NULL"),
+            ("status", "VARCHAR", "NOT NULL"),
+        ],
+    },
 ]
 
 EXTRA_EDGES = [
@@ -52,6 +63,15 @@ EXTRA_EDGES = [
         "api.order_events",
         "ops.order_events",
         'style=dashed label="SELECT *"',
+    ),
+    (
+        "ops.order_events_latest",
+        "ops.order_events",
+        (
+            "style=dashed"
+            ' label="DISTINCT ON (order_id)\\n'
+            'ORDER BY created_at DESC"'
+        ),
     ),
 ]
 

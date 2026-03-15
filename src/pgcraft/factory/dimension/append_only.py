@@ -1,49 +1,46 @@
-"""Append-only dimension resource factory convenience class."""
+"""Append-only dimension resource factory."""
 
 from typing import ClassVar
 
 from pgcraft.factory.base import ResourceFactory
 from pgcraft.plugin import Plugin
-from pgcraft.plugins.api import APIPlugin
 from pgcraft.plugins.append_only import (
     AppendOnlyTablePlugin,
     AppendOnlyTriggerPlugin,
     AppendOnlyViewPlugin,
 )
+from pgcraft.plugins.check import TableCheckPlugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
-from pgcraft.plugins.pk import SerialPKPlugin
 from pgcraft.plugins.protect import RawTableProtectionPlugin
-from pgcraft.plugins.statistics import StatisticsViewPlugin
 
 
-class AppendOnlyDimensionResourceFactory(ResourceFactory):
+class PGCraftAppendOnly(ResourceFactory):
     """Create an append-only (SCD Type 2) dimension.
 
-    Default plugins:
+    Internal plugins (always present):
 
-    1. :class:`~pgcraft.plugins.pk.SerialPKPlugin` -- auto-increment PK.
-    2. :class:`~pgcraft.plugins.created_at.CreatedAtPlugin` --
-       ``created_at`` timestamp on root table.
-    3. :class:`~pgcraft.plugins.append_only.AppendOnlyTablePlugin` --
-       root + attributes tables.
-    4. :class:`~pgcraft.plugins.append_only.AppendOnlyViewPlugin` --
-       join view.
-    5. :class:`~pgcraft.plugins.statistics.StatisticsViewPlugin` --
-       statistics views (no-op when no statistics items).
-    6. :class:`~pgcraft.plugins.api.APIPlugin` -- API view + resource.
-    7. :class:`~pgcraft.plugins.append_only.AppendOnlyTriggerPlugin` --
-       INSTEAD OF triggers.
-    8. :class:`~pgcraft.plugins.protect.RawTableProtectionPlugin` --
-       BEFORE triggers blocking direct DML on root and attributes tables.
+    1. :class:`~pgcraft.plugins.created_at.CreatedAtPlugin` --
+       ``created_at`` column name.
+    2. :class:`~pgcraft.plugins.append_only.AppendOnlyTablePlugin`
+       -- root + attributes tables.
+    3. :class:`~pgcraft.plugins.append_only.AppendOnlyViewPlugin`
+       -- join view proxy.
+    4. :class:`~pgcraft.plugins.check.TableCheckPlugin` --
+       materializes :class:`~pgcraft.check.PGCraftCheck` items.
+
+    A :class:`~pgcraft.plugins.pk.SerialPKPlugin` is auto-added
+    when no user plugin produces ``pk_columns``.
+
+    Use :class:`~pgcraft.views.api.APIView` to expose this table
+    through a PostgREST API view with CRUD triggers.
     """
 
-    DEFAULT_PLUGINS: ClassVar[list[Plugin]] = [
-        SerialPKPlugin(),
+    _INTERNAL_PLUGINS: ClassVar[list[Plugin]] = [
         CreatedAtPlugin(),
         AppendOnlyTablePlugin(),
         AppendOnlyViewPlugin(),
-        StatisticsViewPlugin(),
-        APIPlugin(),
-        AppendOnlyTriggerPlugin(),
+        TableCheckPlugin(),
         RawTableProtectionPlugin("root_table", "attributes"),
     ]
+
+    TRIGGER_PLUGIN_CLS = AppendOnlyTriggerPlugin

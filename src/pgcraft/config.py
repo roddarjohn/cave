@@ -21,10 +21,10 @@ class PGCraftConfig:
         config = PGCraftConfig()
         config.register(TimestampPlugin(), TenantPlugin())
 
-        SimpleDimensionResourceFactory(
+        PGCraftSimple(
             "users", "public", metadata, ..., config=config
         )
-        AppendOnlyDimensionResourceFactory(
+        PGCraftAppendOnly(
             "events", "public", metadata, ..., config=config
         )
 

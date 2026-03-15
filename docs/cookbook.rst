@@ -12,11 +12,9 @@ Use pgcraft purely as a migration generator — define your schema with
 pgcraft factories, produce Alembic migrations, and export them as raw
 SQL. No pgcraft code runs at application time.
 
-The default factory plugins include
-:class:`~pgcraft.plugins.api.APIPlugin` (PostgREST views) and
-:class:`~pgcraft.plugins.simple.SimpleTriggerPlugin` (INSTEAD OF
-triggers on those views). Since this recipe does not use PostgREST,
-pass an explicit ``plugins`` list that omits them.
+API views are created separately via
+:class:`~pgcraft.views.api.APIView`.  Since this recipe does not
+use PostgREST, simply omit the ``APIView`` call.
 
 **Project layout**::
 
@@ -34,18 +32,14 @@ pass an explicit ``plugins`` list that omits them.
    # models.py
    from sqlalchemy import Column, MetaData, Numeric, String
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import SimpleTablePlugin
+   from pgcraft.factory import PGCraftSimple
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
    )
 
-   SimpleDimensionResourceFactory(
+   PGCraftSimple(
        tablename="products",
        schemaname="inventory",
        metadata=metadata,
@@ -53,10 +47,6 @@ pass an explicit ``plugins`` list that omits them.
            Column("name", String, nullable=False),
            Column("sku", String(32), nullable=False),
            Column("price", Numeric(10, 2), nullable=False),
-       ],
-       plugins=[
-           SerialPKPlugin(),
-           SimpleTablePlugin(),
        ],
    )
 
@@ -130,9 +120,8 @@ import time — access it via
 ``metadata.tables["<schema>.<tablename>"]`` to get a standard
 :class:`sqlalchemy.schema.Table` object.
 
-Since this recipe does not use PostgREST, the plugin list omits
-:class:`~pgcraft.plugins.api.APIPlugin` and
-:class:`~pgcraft.plugins.simple.SimpleTriggerPlugin`.
+Since this recipe does not use PostgREST, simply omit the
+``APIView`` call.
 
 Shared models module
 ~~~~~~~~~~~~~~~~~~~~
@@ -146,8 +135,6 @@ application import:
    from sqlalchemy import Column, Integer, MetaData, String
 
    from pgcraft.declarative import register
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import SimpleTablePlugin
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
@@ -155,13 +142,7 @@ application import:
    )
 
 
-   @register(
-       metadata=metadata,
-       plugins=[
-           SerialPKPlugin(),
-           SimpleTablePlugin(),
-       ],
-   )
+   @register(metadata=metadata)
    class Users:
        __tablename__ = "users"
        __table_args__ = {"schema": "public"}
@@ -262,45 +243,38 @@ Adding PostgREST API views
 
 pgcraft can generate PostgREST-compatible API views, INSTEAD OF
 triggers for write operations, and the role/grant declarations that
-PostgREST expects. This is the default behaviour — the built-in
-factory plugins include
-:class:`~pgcraft.plugins.api.APIPlugin` and
-:class:`~pgcraft.plugins.simple.SimpleTriggerPlugin` out of the box.
+PostgREST expects.  Create a factory, then call
+:class:`~pgcraft.views.api.APIView` to expose it.
 
 How it works
 ~~~~~~~~~~~~
 
-When :class:`~pgcraft.plugins.api.APIPlugin` runs it:
+When :class:`~pgcraft.views.api.APIView` is called it:
 
 1. Creates a view in the ``api`` schema (configurable) that
    ``SELECT *`` s from the backing table.
 2. Registers an :class:`~pgcraft.resource.APIResource` on the
    metadata so that pgcraft can generate role and grant statements.
-
-:class:`~pgcraft.plugins.simple.SimpleTriggerPlugin` then creates
-INSTEAD OF ``INSERT`` / ``UPDATE`` / ``DELETE`` triggers on that
-view so PostgREST clients can write through it.
+3. Creates INSTEAD OF ``INSERT`` / ``UPDATE`` / ``DELETE`` triggers
+   on the view so PostgREST clients can write through it.
 
 Minimal example
 ~~~~~~~~~~~~~~~
-
-Use the factory defaults — no explicit plugin list needed:
 
 .. code-block:: python
 
    # models.py
    from sqlalchemy import Column, Integer, MetaData, Numeric, String
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.views import APIView
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
    )
 
-   SimpleDimensionResourceFactory(
+   products = PGCraftSimple(
        tablename="products",
        schemaname="inventory",
        metadata=metadata,
@@ -310,6 +284,8 @@ Use the factory defaults — no explicit plugin list needed:
            Column("price", Numeric(10, 2), nullable=False),
        ],
    )
+
+   APIView(source=products)
 
 This creates:
 
@@ -322,31 +298,22 @@ This creates:
 Customising grants
 ~~~~~~~~~~~~~~~~~~
 
-By default the ``anon`` role gets only ``SELECT``. Pass a ``grants``
-list to :class:`~pgcraft.plugins.api.APIPlugin` to allow writes:
+By default the ``anon`` role gets only ``SELECT``. Pass a
+``grants`` list to :class:`~pgcraft.views.api.APIView` to allow
+writes:
 
 .. code-block:: python
 
-   from pgcraft.plugins.api import APIPlugin
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
-
-   SimpleDimensionResourceFactory(
-       tablename="products",
-       schemaname="inventory",
-       metadata=metadata,
-       schema_items=[
-           Column("name", String, nullable=False),
-           Column("sku", String(32), nullable=False),
-           Column("price", Numeric(10, 2), nullable=False),
-       ],
-       plugins=[
-           SerialPKPlugin(),
-           SimpleTablePlugin(),
-           APIPlugin(grants=["select", "insert", "update", "delete"]),
-           SimpleTriggerPlugin(),
-       ],
+   APIView(
+       source=products,
+       grants=["select", "insert", "update", "delete"],
    )
+
+Grants drive triggers: INSTEAD OF triggers are only created for the
+DML operations listed in ``grants``.  A ``["select"]``-only view
+has no triggers and is read-only.  A view with
+``["select", "insert"]`` gets only an INSERT trigger — no UPDATE or
+DELETE.
 
 Changing the API schema
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -356,7 +323,7 @@ parameter:
 
 .. code-block:: python
 
-   APIPlugin(schema="reporting")
+   APIView(source=products, schema="reporting")
 
 PostgREST setup
 ~~~~~~~~~~~~~~~
@@ -397,31 +364,24 @@ the full query syntax and configuration reference.
 Exposing a subset of columns
 -----------------------------
 
-By default :class:`~pgcraft.plugins.api.APIPlugin` creates a
-``SELECT *`` view.  Pass a ``columns`` list to expose only specific
-columns through the API — useful when a table has internal columns
-that should not be visible to API consumers.
+By default :class:`~pgcraft.views.api.APIView` creates a
+``SELECT *`` view.  Pass a ``columns`` list to expose only
+specific columns through the API — useful when a table has
+internal columns that should not be visible to API consumers.
 
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, Numeric, String, Text
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
-   from pgcraft.plugins.api import APIPlugin
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import (
-       SimpleTablePlugin,
-       SimpleTriggerPlugin,
-   )
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.views import APIView
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
    )
 
-   SimpleDimensionResourceFactory(
+   products = PGCraftSimple(
        tablename="products",
        schemaname="inventory",
        metadata=metadata,
@@ -431,12 +391,11 @@ that should not be visible to API consumers.
            Column("price", Numeric(10, 2), nullable=False),
            Column("internal_notes", Text),  # hidden from API
        ],
-       plugins=[
-           SerialPKPlugin(),
-           SimpleTablePlugin(),
-           APIPlugin(columns=["id", "name", "sku", "price"]),
-           SimpleTriggerPlugin(),
-       ],
+   )
+
+   APIView(
+       source=products,
+       columns=["id", "name", "sku", "price"],
    )
 
 The generated view selects only the listed columns:
@@ -457,24 +416,25 @@ tables:
 
 .. code-block:: python
 
-   APIPlugin(exclude_columns=["internal_notes"])
+   APIView(
+       source=products,
+       exclude_columns=["internal_notes"],
+   )
 
 
 .. _cookbook-statistics-views:
 
-Joining statistics views into the API
+Joining aggregate views into the API
 -------------------------------------
 
-Use :class:`~pgcraft.statistics.PGCraftStatisticsView` to expose
-aggregate or derived data as read-only columns in the API view.
+Create standalone aggregate views with
+:class:`~pgcraft.views.view.PGCraftView`, then join them into an
+API view using the ``query=`` parameter on
+:class:`~pgcraft.views.api.APIView`.
 
-:class:`~pgcraft.plugins.statistics.StatisticsViewPlugin` is
-included in every dimension factory's default plugins and is a
-no-op when no statistics items are present.
-
-Statistics queries are defined using SQLAlchemy ``select()``
-expressions — column names are derived automatically from the
-query, so there is nothing to keep in sync.
+Each ``PGCraftView`` exposes a ``.table`` property — a joinable
+SQLAlchemy selectable — so you can compose joins using standard
+SQLAlchemy syntax.
 
 Multiple statistics on one dimension
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -490,15 +450,13 @@ statistics:
        MetaData,
        Numeric,
        String,
-       Table,
        func,
        select,
    )
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
-   from pgcraft.statistics import PGCraftStatisticsView
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.views import APIView
+   from pgcraft.views.view import PGCraftView
    from pgcraft import (
        pgcraft_build_naming_conventions,
    )
@@ -507,203 +465,97 @@ statistics:
        naming_convention=pgcraft_build_naming_conventions(),
    )
 
-   # -- Reference tables (already exist in the database) ------
+   # -- Table factories ----------------------------------------
 
-   orders = Table(
-       "orders",
-       metadata,
-       Column("id", Integer, primary_key=True),
-       Column("customer_id", Integer),
-       Column("total", Numeric(10, 2)),
-       schema="public",
+   Orders = PGCraftSimple(
+       "orders", "public", metadata,
+       schema_items=[
+           Column("customer_id", Integer, nullable=False),
+           Column("total", Numeric(10, 2), nullable=False),
+       ],
    )
 
-   invoices = Table(
-       "invoices",
-       metadata,
-       Column("id", Integer, primary_key=True),
-       Column("customer_id", Integer),
-       Column("amount", Numeric(10, 2)),
-       Column("paid", Integer),
-       schema="public",
-   )
-
-   # -- Statistics queries ------------------------------------
-
-   order_stats = select(
-       orders.c.customer_id,
-       func.count().label("order_count"),
-       func.sum(orders.c.total).label("order_total"),
-   ).group_by(orders.c.customer_id)
-
-   invoice_stats = select(
-       invoices.c.customer_id,
-       func.count().label("invoice_count"),
-       func.sum(invoices.c.amount).label("invoiced_total"),
-       func.sum(invoices.c.paid).label("paid_total"),
-   ).group_by(invoices.c.customer_id)
-
-   # -- Dimension with statistics -----------------------------
-
-   SimpleDimensionResourceFactory(
-       tablename="customer",
-       schemaname="dim",
-       metadata=metadata,
+   customers = PGCraftSimple(
+       "customers", "public", metadata,
        schema_items=[
            Column("name", String, nullable=False),
            Column("email", String),
-           PGCraftStatisticsView(
-               name="orders",
-               query=order_stats,
-               join_key="customer_id",
-           ),
-           PGCraftStatisticsView(
-               name="invoices",
-               query=invoice_stats,
-               join_key="customer_id",
-           ),
        ],
+   )
+
+   # -- Standalone aggregate views ----------------------------
+
+   _orders_t = Orders.table
+   order_stats = PGCraftView(
+       "customer_order_stats", "public", metadata,
+       query=select(
+           _orders_t.c.customer_id,
+           func.count().label("order_count"),
+           func.sum(_orders_t.c.total).label("order_total"),
+       ).group_by(_orders_t.c.customer_id),
+   )
+
+   # -- API view with joined statistics -----------------------
+   # PGCraftView.table is a joinable SQLAlchemy Table.
+   # Triggers still work — they operate on the base table
+   # columns; joined columns are read-only.
+
+   _os = order_stats.table
+
+   APIView(
+       source=customers,
+       grants=["select", "insert", "update", "delete"],
+       query=lambda q, t: (
+           select(
+               t.c.id,
+               t.c.name,
+               t.c.email,
+               _os.c.order_count,
+               _os.c.order_total,
+           )
+           .select_from(t)
+           .outerjoin(
+               _os, t.c.id == _os.c.customer_id
+           )
+       ),
    )
 
 This creates:
 
-* ``dim.customer`` — the backing table (``id``, ``name``,
+* ``public.customers`` — the backing table (``id``, ``name``,
   ``email``).
-* ``dim.customer_orders_statistics`` — a view aggregating orders.
-* ``dim.customer_invoices_statistics`` — a view aggregating
-  invoices.
-* ``api.customer`` — the API view with LEFT JOINs to both
-  statistics views.
+* ``public.customer_order_stats`` — a standalone aggregate view.
+* ``api.customers`` — the API view with a LEFT JOIN to the
+  statistics view.
 
-The generated API view looks like:
-
-.. code-block:: sql
-
-   SELECT p.id, p.name, p.email,
-          s.order_count, s.order_total,
-          s1.invoice_count, s1.invoiced_total, s1.paid_total
-   FROM dim.customer AS p
-   LEFT OUTER JOIN dim.customer_orders_statistics AS s
-     ON p.id = s.customer_id
-   LEFT OUTER JOIN dim.customer_invoices_statistics AS s1
-     ON p.id = s1.customer_id
-
-The join key column (``customer_id``) is automatically excluded
-from the API select list — only the aggregate columns appear.
+The ``query=`` lambda receives the base ``SELECT *`` query and the
+source table. Return any valid SQLAlchemy ``Select`` — add joins,
+filter columns, or transform freely. INSTEAD OF triggers are still
+created for the base table columns; joined columns are read-only.
 
 How it works
 ~~~~~~~~~~~~
 
-1. ``PGCraftStatisticsView`` items are filtered out of
-   ``schema_items`` before table creation — they do not add
-   columns to the backing table.
-2. ``StatisticsViewPlugin`` (a default plugin) compiles each
-   query to SQL and creates a view (or materialized view) named
-   ``{tablename}_{name}_statistics``.
-3. ``APIPlugin`` reads the view info and generates LEFT JOINs
-   into the API view automatically.
-
-Column names are derived from the ``select()`` expression
-automatically.  The ``join_key`` column is included in the view
-(for the JOIN) but excluded from the API select list.
-
-Custom schema for statistics views
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-By default statistics views are created in the same schema as the
-dimension.  Pass a ``schema`` to place them elsewhere:
-
-.. code-block:: python
-
-   PGCraftStatisticsView(
-       name="orders",
-       query=order_stats,
-       join_key="customer_id",
-       schema="analytics",
-   )
-
-Materialized statistics
-~~~~~~~~~~~~~~~~~~~~~~~
-
-For expensive aggregations, set ``materialized=True`` to create a
-materialized view that must be refreshed manually:
-
-.. code-block:: python
-
-   PGCraftStatisticsView(
-       name="lifetime",
-       query=select(
-           orders.c.customer_id,
-           func.sum(orders.c.total).label("lifetime_value"),
-       ).group_by(orders.c.customer_id),
-       join_key="customer_id",
-       materialized=True,
-   )
-
-Refresh it on a schedule:
-
-.. code-block:: sql
-
-   REFRESH MATERIALIZED VIEW dim.customer_lifetime_statistics;
-
-Join key
-~~~~~~~~
-
-The ``join_key`` parameter tells the plugin which column in the
-statistics query corresponds to the primary table's PK.  This is
-required when the foreign key column name differs from the PK
-column name (which is the common case — e.g. ``customer_id`` in
-orders vs. ``id`` in customers).
-
-When ``join_key`` is omitted it defaults to the PK column name,
-which works when the statistics query uses the same name:
-
-.. code-block:: python
-
-   # Works because the query selects "id", matching the PK
-   PGCraftStatisticsView(
-       name="lines",
-       query=select(
-           orders.c.id,
-           func.count().label("line_count"),
-       ).group_by(orders.c.id),
-   )
-
-Combining column selection with statistics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Use ``columns`` on ``APIPlugin`` to control which table columns
-appear, while statistics columns are always appended:
-
-.. code-block:: python
-
-   from pgcraft.plugins.api import APIPlugin
-   from pgcraft.plugins.pk import SerialPKPlugin
-   from pgcraft.plugins.simple import (
-       SimpleTablePlugin,
-       SimpleTriggerPlugin,
-   )
-
-   plugins=[
-       SerialPKPlugin(),
-       SimpleTablePlugin(),
-       APIPlugin(columns=["id", "name"]),
-       SimpleTriggerPlugin(),
-   ]
+1. ``PGCraftView`` creates a standalone view from any SQLAlchemy
+   ``select()`` expression and exposes ``.table`` for use in
+   further joins.
+2. ``APIView`` with ``query=`` uses the lambda to customise the
+   view definition. Grants drive which INSTEAD OF triggers are
+   created.
+3. Writable columns are automatically restricted to the base
+   table's dimension columns — joined columns cannot be written
+   through the API view.
 
 
-.. _cookbook-computed-and-statistics:
+.. _cookbook-computed-columns:
 
-Computed columns with statistics
---------------------------------
+Computed columns
+----------------
 
-Combine PostgreSQL computed columns (``Computed``) with statistics
-views for a dimension that has both derived table columns and
-aggregated read-only data from related tables.
-
-``Computed`` columns live in the backing table — PostgreSQL
-evaluates them automatically from other columns.  Statistics views
-are separate views that get LEFT JOINed into the API.
+PostgreSQL computed columns (``Computed``) are derived from other
+columns in the same row.  PostgreSQL evaluates them automatically
+— they appear in the API view like any other column but cannot be
+written to.
 
 .. code-block:: python
 
@@ -712,75 +564,34 @@ are separate views that get LEFT JOINed into the API.
        Computed,
        Integer,
        MetaData,
-       Numeric,
        String,
-       Table,
-       func,
-       select,
    )
 
-   from pgcraft.factory.dimension.simple import (
-       SimpleDimensionResourceFactory,
-   )
-   from pgcraft.statistics import PGCraftStatisticsView
-   from pgcraft import (
-       pgcraft_build_naming_conventions,
-   )
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.views import APIView
+   from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
    )
 
-   # Reference table
-   orders = Table(
-       "orders",
-       metadata,
-       Column("id", Integer, primary_key=True),
-       Column("customer_id", Integer),
-       Column("total", Numeric(10, 2)),
-       schema="public",
-   )
-
-   order_stats = select(
-       orders.c.customer_id,
-       func.count().label("order_count"),
-       func.sum(orders.c.total).label("order_total"),
-   ).group_by(orders.c.customer_id)
-
-   SimpleDimensionResourceFactory(
-       tablename="products",
-       schemaname="inventory",
-       metadata=metadata,
+   products = PGCraftSimple(
+       "products", "inventory", metadata,
        schema_items=[
            Column("name", String, nullable=False),
            Column("price", Integer, nullable=False),
            Column("qty", Integer, nullable=False),
-           # Computed: Postgres evaluates this automatically
            Column(
-               "total",
-               Integer,
+               "total", Integer,
                Computed("price * qty"),
-           ),
-           # Statistics: aggregated from a related table
-           PGCraftStatisticsView(
-               name="orders",
-               query=order_stats,
-               join_key="customer_id",
            ),
        ],
    )
 
-This creates:
+   APIView(
+       source=products,
+       grants=["select", "insert", "update", "delete"],
+   )
 
-* ``inventory.products`` — backing table with ``id``, ``name``,
-  ``price``, ``qty``, and ``total`` (a generated column).
-* ``inventory.products_orders_statistics`` — order aggregation
-  view.
-* ``api.products`` — API view with the computed ``total`` column
-  from the table and the ``order_count`` / ``order_total``
-  columns LEFT JOINed from the statistics view.
-
-The key distinction: ``Computed`` is a native PostgreSQL feature
-for deriving a column from others in the same row, while
-``PGCraftStatisticsView`` creates a separate view that aggregates
-data from other tables and joins it into the API.
+The ``total`` column is a generated column — it appears in the
+API but is computed by PostgreSQL, not writable through the API.

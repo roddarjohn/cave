@@ -1,4 +1,5 @@
 """Unit tests for pgcraft.declarative.register decorator."""
+
 # ruff: noqa: RUF012
 
 import pytest
@@ -11,9 +12,8 @@ from pgcraft.declarative import register
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.factory.context import FactoryContext
 from pgcraft.plugin import Plugin, requires
-from pgcraft.plugins.api import APIPlugin
 from pgcraft.plugins.pk import SerialPKPlugin
-from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+from pgcraft.plugins.simple import SimpleTablePlugin
 
 
 class Base(DeclarativeBase):
@@ -56,10 +56,7 @@ class TestRegisterDecorator:
     def test_creates_table_on_metadata(self):
         md = MetaData()
 
-        @register(
-            metadata=md,
-            plugins=[SerialPKPlugin(), SimpleTablePlugin()],
-        )
+        @register(metadata=md)
         class User:
             __tablename__ = "users"
             __table_args__ = {"schema": "public"}
@@ -71,10 +68,7 @@ class TestRegisterDecorator:
     def test_sets_dunder_table(self):
         md = MetaData()
 
-        @register(
-            metadata=md,
-            plugins=[SerialPKPlugin(), SimpleTablePlugin()],
-        )
+        @register(metadata=md)
         class User:
             __tablename__ = "users"
             __table_args__ = {"schema": "public"}
@@ -87,10 +81,7 @@ class TestRegisterDecorator:
     def test_table_has_pk_from_plugin(self):
         md = MetaData()
 
-        @register(
-            metadata=md,
-            plugins=[SerialPKPlugin(), SimpleTablePlugin()],
-        )
+        @register(metadata=md)
         class Item:
             __tablename__ = "items"
             __table_args__ = {"schema": "dim"}
@@ -104,10 +95,7 @@ class TestRegisterDecorator:
     def test_table_has_declared_columns(self):
         md = MetaData()
 
-        @register(
-            metadata=md,
-            plugins=[SerialPKPlugin(), SimpleTablePlugin()],
-        )
+        @register(metadata=md)
         class Product:
             __tablename__ = "products"
             __table_args__ = {"schema": "dim"}
@@ -122,10 +110,7 @@ class TestRegisterDecorator:
     def test_column_name_inferred_from_attribute(self):
         md = MetaData()
 
-        @register(
-            metadata=md,
-            plugins=[SerialPKPlugin(), SimpleTablePlugin()],
-        )
+        @register(metadata=md)
         class Widget:
             __tablename__ = "widgets"
             __table_args__ = {"schema": "dim"}
@@ -137,10 +122,7 @@ class TestRegisterDecorator:
     def test_explicit_column_name_preserved(self):
         md = MetaData()
 
-        @register(
-            metadata=md,
-            plugins=[SerialPKPlugin(), SimpleTablePlugin()],
-        )
+        @register(metadata=md)
         class Gadget:
             __tablename__ = "gadgets"
             __table_args__ = {"schema": "dim"}
@@ -149,17 +131,12 @@ class TestRegisterDecorator:
 
         assert "email_address" in {c.name for c in Gadget.__table__.columns}
 
-    def test_runs_api_and_trigger_plugins(self):
+    def test_api_kwarg_creates_view_and_triggers(self):
         md = MetaData()
 
         @register(
             metadata=md,
-            plugins=[
-                SerialPKPlugin(),
-                SimpleTablePlugin(),
-                APIPlugin(),
-                SimpleTriggerPlugin(),
-            ],
+            api={"grants": ["select"]},
         )
         class Order:
             __tablename__ = "orders"
@@ -179,11 +156,7 @@ class TestRegisterDecorator:
 
         @register(
             metadata=md,
-            plugins=[
-                SerialPKPlugin(),
-                SimpleTablePlugin(),
-                _CapturePlugin(),
-            ],
+            extra_plugins=[_CapturePlugin()],
         )
         class Thing:
             __tablename__ = "things"
@@ -202,11 +175,7 @@ class TestRegisterDecorator:
 
         @register(
             metadata=md,
-            plugins=[
-                SerialPKPlugin(),
-                SimpleTablePlugin(),
-                _CapturePlugin(),
-            ],
+            extra_plugins=[_CapturePlugin()],
         )
         class Entity:
             __tablename__ = "entities"
@@ -225,11 +194,7 @@ class TestRegisterDecorator:
 
         @register(
             metadata=md,
-            plugins=[
-                SerialPKPlugin(),
-                SimpleTablePlugin(),
-                _CapturePlugin(),
-            ],
+            extra_plugins=[_CapturePlugin()],
         )
         class Priced:
             __tablename__ = "priced"
@@ -254,10 +219,7 @@ class TestRegisterWithBase:
         Base.metadata.clear()
 
     def test_select_works_after_mapping(self):
-        @register(
-            base=Base,
-            plugins=[SerialPKPlugin(), SimpleTablePlugin()],
-        )
+        @register(base=Base)
         class Customer:
             __tablename__ = "customers"
             __table_args__ = {"schema": "public"}
@@ -269,10 +231,7 @@ class TestRegisterWithBase:
         assert "customers" in sql
 
     def test_mapped_class_has_column_attributes(self):
-        @register(
-            base=Base,
-            plugins=[SerialPKPlugin(), SimpleTablePlugin()],
-        )
+        @register(base=Base)
         class Account:
             __tablename__ = "accounts"
             __table_args__ = {"schema": "public"}
@@ -284,10 +243,7 @@ class TestRegisterWithBase:
         assert hasattr(Account, "email")
 
     def test_uses_base_metadata(self):
-        @register(
-            base=Base,
-            plugins=[SerialPKPlugin(), SimpleTablePlugin()],
-        )
+        @register(base=Base)
         class Tenant:
             __tablename__ = "tenants"
             __table_args__ = {"schema": "public"}
@@ -309,7 +265,7 @@ class TestRegisterValidation:
     def test_declarative_subclass_raises(self):
         with pytest.raises(PGCraftValidationError, match="__table__"):
 
-            @register(plugins=[], metadata=MetaData())
+            @register(metadata=MetaData())
             class Bad(Base):
                 __tablename__ = "bad"
                 __table_args__ = {"schema": "s"}
@@ -319,7 +275,7 @@ class TestRegisterValidation:
     def test_no_metadata_or_base_raises(self):
         with pytest.raises(PGCraftValidationError, match="metadata"):
 
-            @register(plugins=[])
+            @register()
             class Bad:
                 __tablename__ = "x"
                 __table_args__ = {"schema": "s"}
@@ -327,36 +283,22 @@ class TestRegisterValidation:
     def test_no_tablename_raises(self):
         with pytest.raises(PGCraftValidationError, match="__tablename__"):
 
-            @register(metadata=MetaData(), plugins=[])
+            @register(metadata=MetaData())
             class Bad:
                 __table_args__ = {"schema": "s"}
 
     def test_no_schema_raises(self):
         with pytest.raises(PGCraftValidationError, match="schema"):
 
-            @register(metadata=MetaData(), plugins=[])
+            @register(metadata=MetaData())
             class Bad:
                 __tablename__ = "x"
-
-    def test_no_root_raises(self):
-        with pytest.raises(PGCraftValidationError, match="__root__"):
-
-            @register(
-                metadata=MetaData(),
-                plugins=[SerialPKPlugin()],
-            )
-            class Bad:
-                __tablename__ = "x"
-                __table_args__ = {"schema": "s"}
 
     def test_table_args_as_tuple(self):
         """Schema extracted from tuple-form __table_args__."""
         md = MetaData()
 
-        @register(
-            metadata=md,
-            plugins=[SerialPKPlugin(), SimpleTablePlugin()],
-        )
+        @register(metadata=md)
         class TupleArgs:
             __tablename__ = "tuple_test"
             __table_args__ = ({"schema": "dim"},)
