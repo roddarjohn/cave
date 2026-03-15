@@ -5,7 +5,11 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from pgcraft.columns import PrimaryKeyColumns
 from pgcraft.factory.context import FactoryContext
-from pgcraft.plugins.pk import SerialPKPlugin, UUIDV4PKPlugin
+from pgcraft.plugins.pk import (
+    SerialPKPlugin,
+    UUIDV4PKPlugin,
+    UUIDV7PKPlugin,
+)
 
 
 def _bare_ctx() -> FactoryContext:
@@ -118,3 +122,67 @@ class TestUUIDV4PKPlugin:
         ctx = _bare_ctx()
         plugin.run(ctx)
         assert len(ctx["pk_columns"]) == 1
+
+
+class TestUUIDV7PKPlugin:
+    def test_run_stores_primary_key_columns(self):
+        plugin = UUIDV7PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        assert isinstance(ctx["pk_columns"], PrimaryKeyColumns)
+
+    def test_default_column_name_is_id(self):
+        plugin = UUIDV7PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        assert ctx["pk_columns"].first_key == "id"
+
+    def test_custom_column_name(self):
+        plugin = UUIDV7PKPlugin(column_name="entity_id")
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        assert ctx["pk_columns"].first_key == "entity_id"
+
+    def test_column_type_is_uuid(self):
+        plugin = UUIDV7PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        col = ctx["pk_columns"].first
+        assert isinstance(col.type, UUID)
+
+    def test_column_is_primary_key(self):
+        plugin = UUIDV7PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        col = ctx["pk_columns"].first
+        assert col.primary_key is True
+
+    def test_column_has_server_default(self):
+        plugin = UUIDV7PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        col = ctx["pk_columns"].first
+        assert col.server_default is not None
+
+    def test_server_default_uses_uuidv7(self):
+        plugin = UUIDV7PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        col = ctx["pk_columns"].first
+        assert "uuidv7()" in str(col.server_default.arg)
+
+    def test_singleton_group_is_pk(self):
+        assert UUIDV7PKPlugin.singleton_group == "__pk__"
+
+    def test_produces_pk_columns(self):
+        plugin = UUIDV7PKPlugin()
+        assert plugin.resolved_produces() == ["pk_columns"]
+
+    def test_len_is_one(self):
+        plugin = UUIDV7PKPlugin()
+        ctx = _bare_ctx()
+        plugin.run(ctx)
+        assert len(ctx["pk_columns"]) == 1
+
+    def test_min_pg_version(self):
+        assert UUIDV7PKPlugin.MIN_PG_VERSION == 18
