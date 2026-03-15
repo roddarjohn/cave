@@ -197,6 +197,7 @@ def _install_triggers(
     source: ResourceFactory,
     ctx: FactoryContext,
     columns: list[str] | None = None,
+    permitted_operations: list[str] | None = None,
 ) -> None:
     """Auto-install triggers based on factory type.
 
@@ -206,6 +207,9 @@ def _install_triggers(
         columns: Writable column names for the triggers.
             When ``None``, the trigger plugin uses all dim
             columns from ctx.
+        permitted_operations: Which DML operations get
+            INSTEAD OF triggers.  When ``None``, creates
+            all supported triggers.
 
     """
     trigger_cls = getattr(source, "TRIGGER_PLUGIN_CLS", None)
@@ -213,10 +217,15 @@ def _install_triggers(
         import inspect  # noqa: PLC0415
 
         sig = inspect.signature(trigger_cls)
+        kwargs: dict[str, Any] = {}
         if columns is not None and "columns" in sig.parameters:
-            trigger_plugin = trigger_cls(columns=columns)
-        else:
-            trigger_plugin = trigger_cls()
+            kwargs["columns"] = columns
+        if (
+            permitted_operations is not None
+            and "permitted_operations" in sig.parameters
+        ):
+            kwargs["permitted_operations"] = permitted_operations
+        trigger_plugin = trigger_cls(**kwargs)
         trigger_plugin.run(ctx)
 
     # Auto-install EAV check triggers on the API view.
@@ -250,24 +259,24 @@ def _install_protection(
 class APIView:
     """Create a PostgREST-facing view with auto-selected triggers.
 
-    Reads from a table factory's context to create an API view,
-    INSTEAD OF triggers, and raw-table protection triggers.
+    Reads from a table factory's context to create an API view
+    and INSTEAD OF triggers.  The trigger strategy is
+    auto-selected based on the factory type
+    (``source.TRIGGER_PLUGIN_CLS``).
 
-    The trigger strategy is auto-selected based on the factory
-    type (``source.TRIGGER_PLUGIN_CLS``).  Raw-table protection
-    is auto-installed on all tables listed in
-    ``source.PROTECTED_TABLE_KEYS``.
+    Grants drive triggers: only operations listed in *grants*
+    get INSTEAD OF triggers.  ``"select"``-only views have no
+    triggers and are read-only.
 
     Args:
         source: A :class:`~pgcraft.factory.base.ResourceFactory`
             instance whose table/context to expose.
         schema: Schema for the API view (default ``"api"``).
         grants: PostgREST privileges (default ``["select"]``).
+            Determines which INSTEAD OF triggers are created.
         query: Optional callable ``(query, source_table) ->
             Select`` for SQLAlchemy-style view customization
             (joins, column filtering, etc.).
-        protect_raw: Install BEFORE triggers blocking direct DML
-            on raw backing tables (default ``True``).
         columns: Column names to include.  Mutually exclusive
             with ``exclude_columns``.
         exclude_columns: Column names to exclude.  Mutually
@@ -282,11 +291,10 @@ class APIView:
         grants: list[Grant] | None = None,
         query: Callable[[Select, Table], Select] | None = None,
         *,
-        protect_raw: bool = True,
         columns: list[str] | None = None,
         exclude_columns: list[str] | None = None,
     ) -> None:
-        """Create the API view, triggers, and protection."""
+        """Create the API view and triggers."""
         self.source = source
         self.schema = schema
         self.grants: list[Grant] = grants if grants is not None else ["select"]
@@ -315,9 +323,18 @@ class APIView:
         effective = _resolve_included_columns(primary, columns, exclude_columns)
         if effective is not None:
             dim_set = set(ctx.dim_column_names)
-            writable = [c for c in effective if c in dim_set]
+            writable: list[str] | None = [c for c in effective if c in dim_set]
+        elif query is not None:
+            # query= may add non-table columns (joins, etc.)
+            # so restrict triggers to base dim columns.
+            writable = list(ctx.dim_column_names)
         else:
             writable = None
+
+        # Derive DML operations from grants.
+        dml_ops = [
+            g for g in self.grants if g in {"insert", "update", "delete"}
+        ]
 
         register_api_resource(
             ctx.metadata,
@@ -328,11 +345,5 @@ class APIView:
             ),
         )
 
-        # Custom query= changes the view shape, so skip
-        # auto-generated CRUD triggers (the view is read-only
-        # or the caller manages writes externally).
-        if query is None:
-            _install_triggers(source, ctx, writable)
-
-            if protect_raw:
-                _install_protection(source, ctx)
+        if dml_ops:
+            _install_triggers(source, ctx, writable, dml_ops)

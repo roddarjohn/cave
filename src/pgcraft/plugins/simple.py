@@ -72,6 +72,7 @@ class SimpleTriggerPlugin(Plugin):
         table_key: str = "primary",
         view_key: str = "api",
         columns: list[str] | None = None,
+        permitted_operations: list[str] | None = None,
     ) -> None:
         """Store the context keys.
 
@@ -80,11 +81,16 @@ class SimpleTriggerPlugin(Plugin):
             view_key: Key in ``ctx`` for the API view.
             columns: Writable columns for the triggers.
                 When ``None``, uses all dim columns from ctx.
+            permitted_operations: DML operations to create
+                INSTEAD OF triggers for (``"insert"``,
+                ``"update"``, ``"delete"``).  When ``None``,
+                creates all three.
 
         """
         self.table_key = table_key
         self.view_key = view_key
         self.columns = columns
+        self.permitted_operations = permitted_operations
 
     def run(self, ctx: FactoryContext) -> None:
         """Register INSTEAD OF triggers on the target view."""
@@ -112,26 +118,35 @@ class SimpleTriggerPlugin(Plugin):
         }
 
         api_schema = api_view.schema or "api"
+
+        all_ops = [
+            (
+                "insert",
+                load_template(_TEMPLATES / "insert.plpgsql.mako"),
+            ),
+            (
+                "update",
+                load_template(_TEMPLATES / "update.plpgsql.mako"),
+            ),
+            (
+                "delete",
+                load_template(_TEMPLATES / "delete.plpgsql.mako"),
+            ),
+        ]
+        if self.permitted_operations is not None:
+            grant_set = set(self.permitted_operations)
+            all_ops = [(op, tmpl) for op, tmpl in all_ops if op in grant_set]
+
+        if not all_ops:
+            return
+
         register_view_triggers(
             metadata=ctx.metadata,
             view_schema=api_schema,
             view_fullname=f"{api_schema}.{ctx.tablename}",
             tablename=ctx.tablename,
             template_vars=template_vars,
-            ops=[
-                (
-                    "insert",
-                    load_template(_TEMPLATES / "insert.plpgsql.mako"),
-                ),
-                (
-                    "update",
-                    load_template(_TEMPLATES / "update.plpgsql.mako"),
-                ),
-                (
-                    "delete",
-                    load_template(_TEMPLATES / "delete.plpgsql.mako"),
-                ),
-            ],
+            ops=all_ops,
             naming_defaults=_NAMING_DEFAULTS,
             function_key="simple_function",
             trigger_key="simple_trigger",

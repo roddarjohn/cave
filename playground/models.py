@@ -186,11 +186,13 @@ invoice_stats = PGCraftView(
 _os = order_stats.table
 _iv = invoice_stats.table
 
-# query= changes the view shape — no auto-triggers
-# or protection are installed (the view is read-only).
+# query=: full SQLAlchemy control over the API view.
+# PGCraftView.table is a joinable SQLAlchemy Table.
+# Triggers still work — they operate on the base
+# table columns; joined columns are read-only.
 APIView(
     source=customers,
-    grants=["select"],
+    grants=["select", "insert", "update", "delete"],
     query=lambda q, t: (
         select(
             t.c.id,
