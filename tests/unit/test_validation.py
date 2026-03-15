@@ -3,7 +3,44 @@
 import pytest
 
 from pgcraft.errors import PGCraftValidationError
-from pgcraft.validation import validate_column_references
+from pgcraft.validation import (
+    extract_column_names,
+    resolve_markers,
+    validate_column_references,
+)
+
+
+class TestExtractColumnNames:
+    def test_single_marker(self):
+        assert extract_column_names("{price}") == ["price"]
+
+    def test_multiple_markers(self):
+        assert extract_column_names("{a} + {b}") == ["a", "b"]
+
+    def test_deduplicates(self):
+        assert extract_column_names("{x} AND {x}") == ["x"]
+
+    def test_no_markers(self):
+        assert extract_column_names("1 = 1") == []
+
+    def test_embedded_in_function(self):
+        assert extract_column_names("lower({name})") == ["name"]
+
+
+class TestResolveMarkers:
+    def test_identity(self):
+        assert resolve_markers("{price} > 0", lambda c: c) == "price > 0"
+
+    def test_new_prefix(self):
+        result = resolve_markers("{price} > 0", lambda c: f"NEW.{c}")
+        assert result == "NEW.price > 0"
+
+    def test_multi_marker(self):
+        result = resolve_markers("{a} + {b}", lambda c: c.upper())
+        assert result == "A + B"
+
+    def test_no_markers(self):
+        assert resolve_markers("1 = 1", lambda c: c) == "1 = 1"
 
 
 class TestValidateColumnReferences:

@@ -9,14 +9,13 @@ EAV trigger-based enforcement).
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from pgcraft.validation import extract_column_names, resolve_markers
+
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-_MARKER_RE = re.compile(r"\{(\w+)\}")
 
 
 @dataclass(frozen=True)
@@ -41,14 +40,7 @@ class PGCraftCheck:
             in order of first appearance with duplicates removed.
 
         """
-        seen: set[str] = set()
-        result: list[str] = []
-        for m in _MARKER_RE.finditer(self.expression):
-            name = m.group(1)
-            if name not in seen:
-                seen.add(name)
-                result.append(name)
-        return result
+        return extract_column_names(self.expression)
 
     def resolve(self, mapping: Callable[[str], str]) -> str:
         """Replace each ``{col}`` with ``mapping(col)``.
@@ -62,7 +54,7 @@ class PGCraftCheck:
             The resolved SQL expression.
 
         """
-        return _MARKER_RE.sub(lambda m: mapping(m.group(1)), self.expression)
+        return resolve_markers(self.expression, mapping)
 
 
 def collect_checks(schema_items: list) -> list[PGCraftCheck]:

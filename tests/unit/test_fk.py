@@ -8,11 +8,11 @@ from pgcraft.fk import PGCraftFK, collect_fks
 class TestPGCraftFK:
     def test_basic_construction(self):
         fk = PGCraftFK(
-            columns=["org_id"],
+            columns=["{org_id}"],
             references=["public.orgs.id"],
             name="fk_org",
         )
-        assert fk.columns == ["org_id"]
+        assert fk.columns == ["{org_id}"]
         assert fk.references == ["public.orgs.id"]
         assert fk.name == "fk_org"
         assert fk.ondelete is None
@@ -20,7 +20,7 @@ class TestPGCraftFK:
 
     def test_cascade_options(self):
         fk = PGCraftFK(
-            columns=["org_id"],
+            columns=["{org_id}"],
             references=["public.orgs.id"],
             name="fk_org",
             ondelete="CASCADE",
@@ -31,24 +31,48 @@ class TestPGCraftFK:
 
     def test_multi_column(self):
         fk = PGCraftFK(
-            columns=["a", "b"],
+            columns=["{a}", "{b}"],
             references=[
                 "public.other.x",
                 "public.other.y",
             ],
             name="fk_ab",
         )
-        assert fk.columns == ["a", "b"]
+        assert fk.columns == ["{a}", "{b}"]
         assert len(fk.references) == 2
 
     def test_is_frozen(self):
         fk = PGCraftFK(
-            columns=["a"],
+            columns=["{a}"],
             references=["t.a"],
             name="fk_a",
         )
         with pytest.raises(AttributeError):
             fk.name = "changed"  # type: ignore[misc]
+
+    def test_column_names(self):
+        fk = PGCraftFK(
+            columns=["{org_id}"],
+            references=["public.orgs.id"],
+            name="fk_org",
+        )
+        assert fk.column_names() == ["org_id"]
+
+    def test_column_names_multi(self):
+        fk = PGCraftFK(
+            columns=["{a}", "{b}"],
+            references=["t.x", "t.y"],
+            name="fk_ab",
+        )
+        assert fk.column_names() == ["a", "b"]
+
+    def test_resolve_identity(self):
+        fk = PGCraftFK(
+            columns=["{org_id}"],
+            references=["public.orgs.id"],
+            name="fk_org",
+        )
+        assert fk.resolve(lambda c: c) == ["org_id"]
 
 
 class TestCollectFKs:
@@ -58,7 +82,7 @@ class TestCollectFKs:
         items = [
             Column("org_id", Integer),
             PGCraftFK(
-                columns=["org_id"],
+                columns=["{org_id}"],
                 references=["public.orgs.id"],
                 name="fk_org",
             ),

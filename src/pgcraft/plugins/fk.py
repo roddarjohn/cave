@@ -47,11 +47,12 @@ class TableFKPlugin(Plugin):
         for fk in fks:
             validate_column_references(
                 f"PGCraftFK {fk.name!r}",
-                fk.columns,
+                fk.column_names(),
                 col_names,
             )
+            resolved_columns = fk.resolve(lambda c: c)
             constraint = ForeignKeyConstraint(
-                fk.columns,
+                resolved_columns,
                 fk.references,
                 name=fk.name,
                 ondelete=fk.ondelete,

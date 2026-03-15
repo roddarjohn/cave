@@ -7,14 +7,14 @@ from pgcraft.index import PGCraftIndex, collect_indices
 
 class TestPGCraftIndex:
     def test_basic_construction(self):
-        idx = PGCraftIndex(columns=["price"], name="idx_price")
-        assert idx.columns == ["price"]
+        idx = PGCraftIndex(expressions=["{price}"], name="idx_price")
+        assert idx.expressions == ["{price}"]
         assert idx.name == "idx_price"
         assert idx.unique is False
 
     def test_unique_flag(self):
         idx = PGCraftIndex(
-            columns=["code"],
+            expressions=["{code}"],
             name="uq_code",
             unique=True,
         )
@@ -22,15 +22,35 @@ class TestPGCraftIndex:
 
     def test_multi_column(self):
         idx = PGCraftIndex(
-            columns=["a", "b"],
+            expressions=["{a}", "{b}"],
             name="idx_ab",
         )
-        assert idx.columns == ["a", "b"]
+        assert idx.expressions == ["{a}", "{b}"]
 
     def test_is_frozen(self):
-        idx = PGCraftIndex(columns=["a"], name="idx_a")
+        idx = PGCraftIndex(expressions=["{a}"], name="idx_a")
         with pytest.raises(AttributeError):
             idx.name = "changed"  # type: ignore[misc]
+
+    def test_column_names(self):
+        idx = PGCraftIndex(expressions=["{a}", "{b}"], name="idx_ab")
+        assert idx.column_names() == ["a", "b"]
+
+    def test_column_names_deduplicates(self):
+        idx = PGCraftIndex(expressions=["{a}", "{a}"], name="idx_aa")
+        assert idx.column_names() == ["a"]
+
+    def test_column_names_functional(self):
+        idx = PGCraftIndex(expressions=["lower({name})"], name="idx_lower")
+        assert idx.column_names() == ["name"]
+
+    def test_resolve_identity(self):
+        idx = PGCraftIndex(expressions=["{a}", "{b}"], name="idx")
+        assert idx.resolve(lambda c: c) == ["a", "b"]
+
+    def test_resolve_functional(self):
+        idx = PGCraftIndex(expressions=["lower({name})"], name="idx")
+        assert idx.resolve(lambda c: c) == ["lower(name)"]
 
 
 class TestCollectIndices:
@@ -39,7 +59,7 @@ class TestCollectIndices:
 
         items = [
             Column("price", Integer),
-            PGCraftIndex(columns=["price"], name="idx_price"),
+            PGCraftIndex(expressions=["{price}"], name="idx_price"),
             Column("qty", Integer),
         ]
         result = collect_indices(items)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Index
+from sqlalchemy import Index, text
 
 from pgcraft.index import collect_indices
 from pgcraft.plugin import Dynamic, Plugin, requires
@@ -45,12 +45,19 @@ class TableIndexPlugin(Plugin):
         for idx in indices:
             validate_column_references(
                 f"PGCraftIndex {idx.name!r}",
-                idx.columns,
+                idx.column_names(),
                 col_names,
             )
-            cols = [table.c[c] for c in idx.columns]
-            Index(
+            resolved = idx.resolve(lambda c: c)
+            has_expressions = any(expr not in col_names for expr in resolved)
+            cols = [
+                table.c[expr] if expr in col_names else text(expr)
+                for expr in resolved
+            ]
+            sa_index = Index(
                 idx.name,
                 *cols,
                 unique=idx.unique,
             )
+            if has_expressions:
+                table.append_constraint(sa_index)

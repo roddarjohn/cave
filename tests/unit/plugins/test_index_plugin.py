@@ -17,7 +17,7 @@ class TestTableIndexPlugin:
             schema_items=[
                 Column("price", Integer),
                 PGCraftIndex(
-                    columns=["price"],
+                    expressions=["{price}"],
                     name="idx_price",
                 ),
             ]
@@ -35,7 +35,7 @@ class TestTableIndexPlugin:
             schema_items=[
                 Column("code", String),
                 PGCraftIndex(
-                    columns=["code"],
+                    expressions=["{code}"],
                     name="uq_code",
                     unique=True,
                 ),
@@ -55,7 +55,7 @@ class TestTableIndexPlugin:
                 Column("a", Integer),
                 Column("b", Integer),
                 PGCraftIndex(
-                    columns=["a", "b"],
+                    expressions=["{a}", "{b}"],
                     name="idx_ab",
                 ),
             ]
@@ -81,7 +81,7 @@ class TestTableIndexPlugin:
             schema_items=[
                 Column("price", Integer),
                 PGCraftIndex(
-                    columns=["nonexistent"],
+                    expressions=["{nonexistent}"],
                     name="idx_bad",
                 ),
             ]
@@ -100,7 +100,7 @@ class TestTableIndexPlugin:
             schema_items=[
                 Column("price", Integer),
                 PGCraftIndex(
-                    columns=["price"],
+                    expressions=["{price}"],
                     name="idx_price",
                 ),
             ]
@@ -114,3 +114,21 @@ class TestTableIndexPlugin:
     def test_requires_dynamic_table_key(self):
         plugin = TableIndexPlugin()
         assert "primary" in plugin.resolved_requires()
+
+    def test_functional_expression(self):
+        from pgcraft.plugins.simple import SimpleTablePlugin
+
+        ctx = make_ctx(
+            schema_items=[
+                Column("name", String),
+                PGCraftIndex(
+                    expressions=["lower({name})"],
+                    name="idx_lower_name",
+                ),
+            ]
+        )
+        SimpleTablePlugin().run(ctx)
+        TableIndexPlugin().run(ctx)
+        table = ctx["primary"]
+        idx_names = [i.name for i in table.indexes]
+        assert "idx_lower_name" in idx_names
