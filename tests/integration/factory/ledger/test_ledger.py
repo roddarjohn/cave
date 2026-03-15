@@ -5,6 +5,8 @@ insert-only operations through the API view and its INSTEAD OF
 trigger.
 """
 
+from typing import ClassVar
+
 import pytest
 from sqlalchemy import Column, MetaData, String, text
 from sqlalchemy.exc import ProgrammingError
@@ -12,6 +14,7 @@ from sqlalchemy.exc import ProgrammingError
 from pgcraft.config import PGCraftConfig
 from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTView
 from pgcraft.factory.ledger import PGCraftLedger
+from pgcraft.plugin import Plugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
 from pgcraft.plugins.ledger import (
@@ -20,6 +23,16 @@ from pgcraft.plugins.ledger import (
     LedgerTablePlugin,
 )
 from tests.integration.conftest import create_all_from_metadata
+
+
+class _NumericLedger(PGCraftLedger):
+    """Ledger with NUMERIC value column (for testing decimals)."""
+
+    _INTERNAL_PLUGINS: ClassVar[list[Plugin]] = [
+        UUIDEntryIDPlugin(),
+        CreatedAtPlugin(),
+        LedgerTablePlugin(value_type="numeric"),
+    ]
 
 
 def _make_ledger(  # noqa: PLR0913
@@ -67,17 +80,12 @@ def numeric_ledger(db_conn, db_schema):
     config = PGCraftConfig(auto_discover=False)
     config.use(PostgRESTExtension())
     metadata = MetaData()
-    factory = PGCraftLedger(
+    factory = _NumericLedger(
         "payments",
         db_schema,
         metadata,
         schema_items=[],
         config=config,
-        plugins=[
-            UUIDEntryIDPlugin(),
-            CreatedAtPlugin(),
-            LedgerTablePlugin(value_type="numeric"),
-        ],
     )
     PostgRESTView(
         source=factory,
