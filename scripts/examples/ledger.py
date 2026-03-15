@@ -3,8 +3,9 @@
 from sqlalchemy import Column, MetaData, String
 
 from pgcraft import pgcraft_build_naming_conventions
+from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory import PGCraftLedger
-from pgcraft.views import LatestView, PostgRESTView
+from pgcraft.views import LatestView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 

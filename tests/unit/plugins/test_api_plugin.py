@@ -3,7 +3,7 @@
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table
 
-from pgcraft.plugins.api import PostgRESTPlugin
+from pgcraft.extensions.postgrest import PostgRESTPlugin
 from pgcraft.statistics import JoinedView
 from tests.unit.plugins.conftest import make_ctx
 

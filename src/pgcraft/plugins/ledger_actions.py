@@ -119,7 +119,8 @@ class LedgerActionsPlugin(Plugin):
 
     Must run **after** :class:`~pgcraft.plugins.ledger.LedgerTablePlugin`
     (needs ``"__root__"``) and
-    :class:`~pgcraft.plugins.api.PostgRESTPlugin` (needs the API view key).
+    :class:`~pgcraft.extensions.postgrest.PostgRESTPlugin`
+    (needs the API view key).
 
     Args:
         events: List of :class:`~pgcraft.ledger.events.LedgerEvent`

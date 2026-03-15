@@ -4,10 +4,10 @@ import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 
 from pgcraft.errors import PGCraftValidationError
+from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.append_only import (
     PGCraftAppendOnly,
 )
-from pgcraft.views.api import PostgRESTView
 
 
 class TestPGCraftAppendOnlyTables:

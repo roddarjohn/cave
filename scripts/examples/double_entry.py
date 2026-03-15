@@ -3,12 +3,12 @@
 from sqlalchemy import Column, ForeignKey, MetaData, String
 
 from pgcraft import pgcraft_build_naming_conventions
+from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory import PGCraftLedger, PGCraftSimple
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
 )
-from pgcraft.views import PostgRESTView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 

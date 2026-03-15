@@ -7,9 +7,9 @@ from sqlalchemy_declarative_extensions.dialects.postgresql.trigger import (
 )
 
 from pgcraft.errors import PGCraftValidationError
+from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.plugins.pk import SerialPKPlugin
-from pgcraft.views.api import PostgRESTView
 
 _CRUD_OPS = ("insert", "update", "delete")
 _CRUD_GRANTS = ["select", "insert", "update", "delete"]

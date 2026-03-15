@@ -219,11 +219,6 @@ To replace the default plugin list entirely:
        ],
    )
 
-   # Requires PostgRESTExtension on PGCraftConfig
-   # for role/grant generation — see "Global
-   # configuration" below.
-   PostgRESTView(source=events, schema="reporting")
-
 
 Singleton groups
 ----------------
@@ -518,7 +513,7 @@ has its own internal plugins and trigger strategy:
 
 **View factories** create derived views from a table factory:
 
-:class:`~pgcraft.views.api.PostgRESTView`
+:class:`~pgcraft.extensions.postgrest.PostgRESTView`
     PostgREST-facing view with auto-selected INSTEAD OF triggers.
     Grants drive which triggers are created.  Supports
     ``columns``, ``exclude_columns``, and ``query=`` for

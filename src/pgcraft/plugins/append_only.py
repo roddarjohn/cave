@@ -133,7 +133,7 @@ class AppendOnlyViewPlugin(Plugin):
             (default ``"attributes"``).
         primary_key: Key in ``ctx`` to store the view proxy under,
             for downstream plugins such as
-            :class:`~pgcraft.plugins.api.PostgRESTPlugin` (default
+            :class:`~pgcraft.extensions.postgrest.PostgRESTPlugin` (default
             ``"primary"``).
 
     """

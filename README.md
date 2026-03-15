@@ -40,15 +40,7 @@ pip install pgcraft            # or: uv add pgcraft
 
 ```python
 from sqlalchemy import Column, MetaData, String
-from pgcraft.config import PGCraftConfig
-from pgcraft.extensions.postgrest import (
-    PostgRESTExtension,
-)
 from pgcraft.factory import PGCraftSimple
-from pgcraft.views import PostgRESTView
-
-config = PGCraftConfig()
-config.register_extension(PostgRESTExtension())
 
 metadata = MetaData()
 
@@ -56,21 +48,15 @@ users = PGCraftSimple(
     tablename="users",
     schemaname="public",
     metadata=metadata,
-    config=config,
     schema_items=[
         Column("name", String, nullable=False),
         Column("email", String),
     ],
 )
-
-PostgRESTView(source=users)
 ```
 
-This creates:
-
-- A `public.users` table with `id`, `name`, and `email` columns.
-- An `api.users` view exposing the same columns for PostgREST.
-- Alembic migration support out of the box.
+This creates a `public.users` table with `id`, `name`, and `email`
+columns, with Alembic migration support out of the box.
 
 ### Generate migrations
 

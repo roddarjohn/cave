@@ -103,15 +103,22 @@ This creates ``public.users`` with columns ``id``, ``name``,
 
 
 PostgRESTView
--------
+-------------
 
-.. module:: pgcraft.views.api
+.. module:: pgcraft.extensions.postgrest.view
    :no-index:
 
+.. note::
+
+   ``PostgRESTView`` lives in the PostgREST extension package
+   (``pgcraft.extensions.postgrest``).  Install the extension
+   and register it on your
+   :class:`~pgcraft.config.PGCraftConfig` before use.
+
 API views are created separately from the factory using
-:class:`~pgcraft.views.api.PostgRESTView`.  This creates a
-PostgREST-facing view and registers the API resource for
-role/grant generation.
+:class:`~pgcraft.extensions.postgrest.PostgRESTView`.  This
+creates a PostgREST-facing view and registers the API resource
+for role/grant generation.
 
 .. note::
 
@@ -157,9 +164,9 @@ Default behaviour — ``SELECT *``
    from pgcraft.config import PGCraftConfig
    from pgcraft.extensions.postgrest import (
        PostgRESTExtension,
+       PostgRESTView,
    )
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import PostgRESTView
 
    config = PGCraftConfig()
    config.use(PostgRESTExtension())
@@ -430,7 +437,9 @@ To expose via PostgREST:
 
 .. code-block:: python
 
-   from pgcraft.views import PostgRESTView
+   from pgcraft.extensions.postgrest import (
+       PostgRESTView,
+   )
 
    PostgRESTView(source=students)
 
@@ -502,7 +511,9 @@ To expose via PostgREST:
 
 .. code-block:: python
 
-   from pgcraft.views import PostgRESTView
+   from pgcraft.extensions.postgrest import (
+       PostgRESTView,
+   )
 
    PostgRESTView(source=products)
 
@@ -521,7 +532,10 @@ declarations.  A typical simple dimension pipeline runs:
    TableCheckPlugin            (reads __root__)
    RawTableProtectionPlugin    (reads primary)
 
-API views and triggers are created separately via ``PostgRESTView``.
+API views and triggers are created separately via
+``PostgRESTView``, which is part of the optional PostgREST
+extension (``pgcraft.extensions.postgrest``).  It is not
+included in the core plugin pipeline.
 
 All context key names are overridable via constructor arguments,
 so two independent pipelines can coexist in one factory.

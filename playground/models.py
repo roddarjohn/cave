@@ -20,7 +20,10 @@ from pgcraft import (
     pgcraft_build_naming_conventions,
 )
 from pgcraft.config import PGCraftConfig
-from pgcraft.extensions.postgrest import PostgRESTExtension
+from pgcraft.extensions.postgrest import (
+    PostgRESTExtension,
+    PostgRESTView,
+)
 from pgcraft.check import PGCraftCheck
 from pgcraft.declarative import register
 from pgcraft.factory.dimension.append_only import (
@@ -34,7 +37,6 @@ from pgcraft.plugins.ledger import (
     DoubleEntryTriggerPlugin,
 )
 from pgcraft.views.actions import LedgerActions
-from pgcraft.views.api import PostgRESTView
 from pgcraft.views.balance import BalanceView
 from pgcraft.views.view import PGCraftView
 

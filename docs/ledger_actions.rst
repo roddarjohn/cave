@@ -145,15 +145,8 @@ Create the factory, then pass events to
 :class:`~pgcraft.views.actions.LedgerActions`::
 
     from pgcraft import LedgerEvent, ledger_balances
-    from pgcraft.config import PGCraftConfig
-    from pgcraft.extensions.postgrest import (
-        PostgRESTExtension,
-    )
     from pgcraft.factory import PGCraftLedger
-    from pgcraft.views import PostgRESTView, LedgerActions
-
-    config = PGCraftConfig()
-    config.use(PostgRESTExtension())
+    from pgcraft.views import LedgerActions
 
     recognize = LedgerEvent(
         name="recognize",

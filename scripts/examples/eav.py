@@ -10,8 +10,8 @@ from sqlalchemy import (
 )
 
 from pgcraft import pgcraft_build_naming_conventions
+from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory import PGCraftEAV
-from pgcraft.views import PostgRESTView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 

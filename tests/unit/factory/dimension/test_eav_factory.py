@@ -16,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.sql.expression import Label
 
 from pgcraft.errors import PGCraftValidationError
+from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.eav import PGCraftEAV
 from pgcraft.plugins.eav import (
     _EAVMapping,
@@ -23,7 +24,6 @@ from pgcraft.plugins.eav import (
     _pivot_aggregate,
     _resolve_value_column,
 )
-from pgcraft.views.api import PostgRESTView
 
 # -----------------------------------------------------------
 # _resolve_value_column

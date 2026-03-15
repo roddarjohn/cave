@@ -4,10 +4,9 @@ from sqlalchemy import Column, Integer, MetaData, String
 
 from pgcraft.alembic.register import pgcraft_configure_metadata
 from pgcraft.config import PGCraftConfig
-from pgcraft.extensions.postgrest import PostgRESTExtension
+from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTView
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.resource import APIResource, register_api_resource
-from pgcraft.views.api import PostgRESTView
 
 
 class TestPostgRESTExtensionIntegration:

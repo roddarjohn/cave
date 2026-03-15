@@ -97,35 +97,13 @@ Make three pgcraft-specific additions to ``migrations/env.py``:
 Pass your ``MetaData`` instance to a pgcraft dimension factory so that
 generated tables are registered for autogenerate detection.
 
-PostgREST extension setup
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The PostgREST extension must be registered before using
-``PostgRESTView``.  Without it, no roles or grants are
-generated during Alembic autogenerate.  Set it up once and
-pass the config to every factory:
-
-.. code-block:: python
-
-   from pgcraft.config import PGCraftConfig
-   from pgcraft.extensions.postgrest import PostgRESTExtension
-
-   config = PGCraftConfig()
-   config.use(PostgRESTExtension())
-
-All examples below assume this ``config`` is already defined.
-
 Simple dimension (single table)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A simple dimension stores each row in one table and exposes it
-through an ``api`` schema view with INSTEAD OF triggers:
 
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, String, Text
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import PostgRESTView
 
    metadata = MetaData()
 
@@ -133,91 +111,80 @@ through an ``api`` schema view with INSTEAD OF triggers:
        tablename="products",
        schemaname="dim",
        metadata=metadata,
-       config=config,
        schema_items=[
            Column("name", String, nullable=False),
            Column("description", Text),
        ],
    )
 
-   PostgRESTView(source=products)
-
 Append-only dimension (SCD Type 2)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-An append-only dimension keeps a full history of attribute changes.  The
-current state is always the most recent row in the attributes log:
+An append-only dimension keeps a full history of attribute
+changes.  The current state is always the most recent row in
+the attributes log:
 
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, Numeric, String
    from pgcraft.factory import PGCraftAppendOnly
-   from pgcraft.views import PostgRESTView
 
    prices = PGCraftAppendOnly(
        tablename="prices",
        schemaname="dim",
        metadata=metadata,
-       config=config,
        schema_items=[
            Column("sku", String, nullable=False),
-           Column("amount", Numeric(10, 2), nullable=False),
+           Column(
+               "amount", Numeric(10, 2), nullable=False,
+           ),
            Column("currency", String(3), nullable=False),
        ],
    )
 
-   PostgRESTView(source=prices)
-
 Ledger (append-only value table)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A ledger stores immutable entries with a ``value`` column, an ``entry_id``
-UUID for correlating related entries, and dimension columns.  Only INSERT
-is allowed through the API view:
+A ledger stores immutable entries with a ``value`` column, an
+``entry_id`` UUID for correlating related entries, and dimension
+columns:
 
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, String
    from pgcraft.factory import PGCraftLedger
-   from pgcraft.views import PostgRESTView
 
    order_events = PGCraftLedger(
        tablename="order_events",
        schemaname="ops",
        metadata=metadata,
-       config=config,
        schema_items=[
            Column("order_id", String, nullable=False),
            Column("status", String, nullable=False),
        ],
    )
 
-   PostgRESTView(
-       source=order_events,
-       grants=["select", "insert"],
-   )
-
-See :doc:`ledgers` for balance views, double-entry enforcement, and
-numeric value types.
+See :doc:`ledgers` for balance views, double-entry enforcement,
+and numeric value types.
 
 EAV dimension (sparse / dynamic attributes)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-An EAV dimension stores each attribute as a separate row, making it
-efficient when rows have many nullable fields or when attributes are added
-frequently:
+An EAV dimension stores each attribute as a separate row,
+making it efficient when rows have many nullable fields or when
+attributes are added frequently:
 
 .. code-block:: python
 
-   from sqlalchemy import Boolean, Column, Integer, MetaData, String
+   from sqlalchemy import (
+       Boolean, Column, Integer, MetaData, String,
+   )
    from pgcraft.factory import PGCraftEAV
-   from pgcraft.views import PostgRESTView
 
    features = PGCraftEAV(
        tablename="features",
        schemaname="dim",
        metadata=metadata,
-       config=config,
        schema_items=[
            Column("name", String, nullable=False),
            Column("enabled", Boolean),
@@ -225,40 +192,23 @@ frequently:
        ],
    )
 
-   PostgRESTView(source=features)
-
 Customising factory behaviour
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Any factory argument can be changed by passing a custom plugin list.
-See :doc:`plugins` for a full explanation.
+Any factory argument can be changed by passing a custom plugin
+list.  See :doc:`plugins` for a full explanation.
 
-Custom PK column name:
+Custom PK type:
 
 .. code-block:: python
 
    from pgcraft.factory import PGCraftSimple
    from pgcraft.plugins.pk import UUIDV4PKPlugin
-   from pgcraft.views import PostgRESTView
 
    products = PGCraftSimple(
        "products", "dim", metadata, schema_items,
-       config=config,
        plugins=[UUIDV4PKPlugin()],
    )
-
-   PostgRESTView(source=products)
-
-Custom API schema:
-
-.. code-block:: python
-
-   products = PGCraftSimple(
-       "products", "dim", metadata, schema_items,
-       config=config,
-   )
-
-   PostgRESTView(source=products, schema="reporting")
 
 Apply a custom plugin to every factory via
 :class:`~pgcraft.config.PGCraftConfig`:
@@ -266,12 +216,8 @@ Apply a custom plugin to every factory via
 .. code-block:: python
 
    from pgcraft.config import PGCraftConfig
-   from pgcraft.extensions.postgrest import (
-       PostgRESTExtension,
-   )
 
    pgcraft_cfg = PGCraftConfig()
-   pgcraft_cfg.use(PostgRESTExtension())
    pgcraft_cfg.register(
        TimestampPlugin(), TenantPlugin(),
    )
@@ -284,3 +230,5 @@ Apply a custom plugin to every factory via
        "orders", "dim", metadata, schema_items,
        config=pgcraft_cfg,
    )
+
+To add PostgREST API views, see :doc:`extensions`.

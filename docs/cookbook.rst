@@ -13,7 +13,7 @@ pgcraft factories, produce Alembic migrations, and export them as raw
 SQL. No pgcraft code runs at application time.
 
 API views are created separately via
-:class:`~pgcraft.views.api.PostgRESTView`.  Since this recipe does not
+:class:`~pgcraft.extensions.postgrest.PostgRESTView`.  Since this recipe does not
 use PostgREST, simply omit the ``PostgRESTView`` call.
 
 **Project layout**::
@@ -246,12 +246,12 @@ triggers for write operations, and the role/grant declarations that
 PostgREST expects.  Enable the
 :class:`~pgcraft.extensions.postgrest.PostgRESTExtension` on your
 config, create a factory with that config, then call
-:class:`~pgcraft.views.api.PostgRESTView` to expose it.
+:class:`~pgcraft.extensions.postgrest.PostgRESTView` to expose it.
 
 How it works
 ~~~~~~~~~~~~
 
-When :class:`~pgcraft.views.api.PostgRESTView` is called it:
+When :class:`~pgcraft.extensions.postgrest.PostgRESTView` is called it:
 
 1. Creates a view in the ``api`` schema (configurable) that
    ``SELECT *`` s from the backing table.
@@ -275,9 +275,11 @@ Minimal example
    )
 
    from pgcraft.config import PGCraftConfig
-   from pgcraft.extensions.postgrest import PostgRESTExtension
+   from pgcraft.extensions.postgrest import (
+       PostgRESTExtension,
+       PostgRESTView,
+   )
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import PostgRESTView
    from pgcraft import pgcraft_build_naming_conventions
 
    # Enable PostgREST roles and grants
@@ -322,7 +324,7 @@ Customising grants
 ~~~~~~~~~~~~~~~~~~
 
 By default the ``anon`` role gets only ``SELECT``. Pass a
-``grants`` list to :class:`~pgcraft.views.api.PostgRESTView` to allow
+``grants`` list to :class:`~pgcraft.extensions.postgrest.PostgRESTView` to allow
 writes:
 
 .. code-block:: python
@@ -389,7 +391,7 @@ the full query syntax and configuration reference.
 Exposing a subset of columns
 -----------------------------
 
-By default :class:`~pgcraft.views.api.PostgRESTView` creates a
+By default :class:`~pgcraft.extensions.postgrest.PostgRESTView` creates a
 ``SELECT *`` view.  Pass a ``columns`` list to expose only
 specific columns through the API — useful when a table has
 internal columns that should not be visible to API consumers.
@@ -399,9 +401,11 @@ internal columns that should not be visible to API consumers.
    from sqlalchemy import Column, MetaData, Numeric, String, Text
 
    from pgcraft.config import PGCraftConfig
-   from pgcraft.extensions.postgrest import PostgRESTExtension
+   from pgcraft.extensions.postgrest import (
+       PostgRESTExtension,
+       PostgRESTView,
+   )
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import PostgRESTView
    from pgcraft import pgcraft_build_naming_conventions
 
    config = PGCraftConfig()
@@ -465,7 +469,7 @@ Joining aggregate views into the API
 Create standalone aggregate views with
 :class:`~pgcraft.views.view.PGCraftView`, then join them into an
 API view using the ``query=`` parameter on
-:class:`~pgcraft.views.api.PostgRESTView`.
+:class:`~pgcraft.extensions.postgrest.PostgRESTView`.
 
 Each ``PGCraftView`` exposes a ``.table`` property — a joinable
 SQLAlchemy selectable — so you can compose joins using standard
@@ -492,9 +496,9 @@ statistics:
    from pgcraft.config import PGCraftConfig
    from pgcraft.extensions.postgrest import (
        PostgRESTExtension,
+       PostgRESTView,
    )
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import PostgRESTView
    from pgcraft.views.view import PGCraftView
    from pgcraft import (
        pgcraft_build_naming_conventions,
@@ -622,9 +626,9 @@ written to.
    from pgcraft.config import PGCraftConfig
    from pgcraft.extensions.postgrest import (
        PostgRESTExtension,
+       PostgRESTView,
    )
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import PostgRESTView
    from pgcraft import pgcraft_build_naming_conventions
 
    config = PGCraftConfig()

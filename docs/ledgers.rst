@@ -7,8 +7,8 @@ transactions.  Every row has a ``value`` column, an ``entry_id`` UUID
 for correlating related entries, a ``created_at`` timestamp, and
 consumer-provided dimension columns.
 
-Unlike dimensions, ledger entries are never updated or deleted.  The
-API view only allows ``SELECT`` and ``INSERT``.
+Unlike dimensions, ledger entries are never updated or deleted.
+Ledger tables only allow ``SELECT`` and ``INSERT``.
 
 Choose the variant that matches your data:
 
@@ -22,8 +22,8 @@ Choose the variant that matches your data:
 Basic ledger
 ------------
 
-A single append-only table with an API view.  Insert-only: UPDATE and
-DELETE on the API view raise a PostgreSQL error.
+A single append-only table.  Insert-only: UPDATE and DELETE raise a
+PostgreSQL error.
 
 **Example configuration:**
 
@@ -33,7 +33,7 @@ DELETE on the API view raise a PostgreSQL error.
    :end-before: # --- example end ---
    :dedent:
 
-**Usage** -- all operations go through the API view:
+**Usage:**
 
 .. literalinclude:: ../scripts/examples/ledger.sql
    :language: sql
@@ -51,21 +51,13 @@ than historical sums:
 
 .. code-block:: python
 
-   from pgcraft.config import PGCraftConfig
-   from pgcraft.extensions.postgrest import (
-       PostgRESTExtension,
-   )
    from pgcraft.factory import PGCraftLedger
-   from pgcraft.views import PostgRESTView, LatestView
-
-   config = PGCraftConfig()
-   config.use(PostgRESTExtension())
+   from pgcraft.views import LatestView
 
    order_events = PGCraftLedger(
        tablename="order_events",
        schemaname="ops",
        metadata=metadata,
-       config=config,
        schema_items=[
            Column(
                "order_id", String, nullable=False
@@ -76,10 +68,6 @@ than historical sums:
        ],
    )
 
-   PostgRESTView(
-       source=order_events,
-       grants=["select", "insert"],
-   )
    LatestView(
        source=order_events,
        dimensions=["order_id"],
@@ -107,15 +95,13 @@ resource quotas, point systems):
 
 .. code-block:: python
 
-   # Config assumed from above.
    from pgcraft.factory import PGCraftLedger
-   from pgcraft.views import PostgRESTView, BalanceView
+   from pgcraft.views import BalanceView
 
    stock = PGCraftLedger(
        tablename="stock_movements",
        schemaname="inventory",
        metadata=metadata,
-       config=config,
        schema_items=[
            Column(
                "warehouse", String, nullable=False
@@ -126,10 +112,6 @@ resource quotas, point systems):
        ],
    )
 
-   PostgRESTView(
-       source=stock,
-       grants=["select", "insert"],
-   )
    BalanceView(
        source=stock,
        dimensions=["warehouse", "sku"],
@@ -156,18 +138,16 @@ overdrafts, or exceeding resource quotas:
 
 .. code-block:: python
 
-   # Config assumed from above.
    from pgcraft.factory import PGCraftLedger
    from pgcraft.plugins.ledger import (
        LedgerBalanceCheckPlugin,
    )
-   from pgcraft.views import PostgRESTView, BalanceView
+   from pgcraft.views import BalanceView
 
    stock = PGCraftLedger(
        tablename="stock_movements",
        schemaname="inventory",
        metadata=metadata,
-       config=config,
        schema_items=[
            Column(
                "warehouse", String, nullable=False
@@ -184,10 +164,6 @@ overdrafts, or exceeding resource quotas:
        ],
    )
 
-   PostgRESTView(
-       source=stock,
-       grants=["select", "insert"],
-   )
    BalanceView(
        source=stock,
        dimensions=["warehouse", "sku"],
@@ -269,13 +245,13 @@ rejected.
 
 .. note::
 
-   The constraint trigger fires on the **backing table**, not on the
-   API view.  When inserting through the API view, the INSTEAD OF
-   INSERT trigger routes each row to the backing table.  Because
-   INSTEAD OF triggers fire row-by-row, each row is a separate
-   statement from the backing table's perspective.  This means that
-   when inserting through the API view, inserts must go directly to
-   the backing table to benefit from statement-level batching.
+   The constraint trigger fires on the **backing table**.  If you
+   insert through an intermediary view with an INSTEAD OF INSERT
+   trigger, each row is routed individually to the backing table.
+   Because INSTEAD OF triggers fire row-by-row, each row is a
+   separate statement from the backing table's perspective.  To
+   benefit from statement-level batching, insert directly into
+   the backing table.
 
 
 Customising the value type
@@ -288,16 +264,13 @@ internal plugin override mechanism:
 
 .. code-block:: python
 
-   # Config assumed from above.
    from pgcraft.factory import PGCraftLedger
    from pgcraft.plugins.ledger import LedgerTablePlugin
-   from pgcraft.views import PostgRESTView
 
    payments = PGCraftLedger(
        tablename="payments",
        schemaname="finance",
        metadata=metadata,
-       config=config,
        schema_items=[
            Column(
                "account_id",
@@ -305,11 +278,6 @@ internal plugin override mechanism:
                nullable=False,
            ),
        ],
-   )
-
-   PostgRESTView(
-       source=payments,
-       grants=["select", "insert"],
    )
 
 
@@ -322,16 +290,13 @@ primary key with ``gen_random_uuid()`` as the server default:
 
 .. code-block:: python
 
-   # Config assumed from above.
    from pgcraft.factory import PGCraftLedger
    from pgcraft.plugins.pk import UUIDV4PKPlugin
-   from pgcraft.views import PostgRESTView
 
    events = PGCraftLedger(
        tablename="events",
        schemaname="analytics",
        metadata=metadata,
-       config=config,
        schema_items=[
            Column(
                "event_type",
@@ -340,11 +305,6 @@ primary key with ``gen_random_uuid()`` as the server default:
            ),
        ],
        plugins=[UUIDV4PKPlugin()],
-   )
-
-   PostgRESTView(
-       source=events,
-       grants=["select", "insert"],
    )
 
 

@@ -199,7 +199,7 @@ def register[T](  # noqa: PLR0913
             ``UUIDV4PKPlugin``).
         extra_plugins: Appended to the resolved plugin list.
         api: When provided, creates a
-            :class:`~pgcraft.views.api.PostgRESTView` after table
+            :class:`~pgcraft.extensions.postgrest.PostgRESTView` after table
             creation.  Accepts keyword arguments forwarded to
             ``PostgRESTView`` (e.g. ``{"grants": ["select"]}``).
 
