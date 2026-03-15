@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.6.3...pgcraft-v0.7.0) (2026-03-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* extensions ([#50](https://github.com/roddarjohn/pgcraft/issues/50))
+
+### Features
+
+* benchmarks ([#52](https://github.com/roddarjohn/pgcraft/issues/52)) ([cdb4ebc](https://github.com/roddarjohn/pgcraft/commit/cdb4ebceb1d99b3723b32fdcd45b1dc6c6cb46c7))
+* extensions ([#50](https://github.com/roddarjohn/pgcraft/issues/50)) ([807bbfa](https://github.com/roddarjohn/pgcraft/commit/807bbfaa9aa210f83a7fa51714974316e730c391))
+* fk / indices ([#51](https://github.com/roddarjohn/pgcraft/issues/51)) ([d086b96](https://github.com/roddarjohn/pgcraft/commit/d086b9630d7e70a9c4f2f9e20cb51723eda2fb85))
+* uuidv7 ([#53](https://github.com/roddarjohn/pgcraft/issues/53)) ([b62c338](https://github.com/roddarjohn/pgcraft/commit/b62c338b87e57547b4a47c604512fdd699a9ae62))
+
 ## [0.6.3](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.6.2...pgcraft-v0.6.3) (2026-03-15)
 
 
