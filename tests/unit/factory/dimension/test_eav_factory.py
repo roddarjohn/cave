@@ -379,6 +379,9 @@ class TestPGCraftEAVViews:
         assert "product_entity" in pivot_view.definition
 
 
+_CRUD_GRANTS = ["select", "insert", "update", "delete"]
+
+
 class TestPGCraftEAVTriggers:
     def test_functions_registered(self):
         metadata = MetaData()
@@ -388,7 +391,7 @@ class TestPGCraftEAVTriggers:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        APIView(source=f, grants=_CRUD_GRANTS)
         functions = metadata.info.get("functions")
         assert functions is not None
         # 6 INSTEAD OF functions (2 views x 3 ops)
@@ -403,7 +406,7 @@ class TestPGCraftEAVTriggers:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        APIView(source=f, grants=_CRUD_GRANTS)
         triggers = metadata.info.get("triggers")
         assert triggers is not None
         # 6 INSTEAD OF + 6 BEFORE protection (2 tables x 3)

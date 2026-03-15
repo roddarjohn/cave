@@ -202,6 +202,9 @@ class TestPGCraftAppendOnlyViews:
         assert "product_attributes" in join_view.definition
 
 
+_CRUD_GRANTS = ["select", "insert", "update", "delete"]
+
+
 class TestPGCraftAppendOnlyTriggers:
     def test_functions_registered(self):
         metadata = MetaData()
@@ -211,7 +214,7 @@ class TestPGCraftAppendOnlyTriggers:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        APIView(source=f, grants=_CRUD_GRANTS)
         functions = metadata.info.get("functions")
         assert functions is not None
         # 2 views x 3 ops = 6 INSTEAD OF functions
@@ -226,7 +229,7 @@ class TestPGCraftAppendOnlyTriggers:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        APIView(source=f, grants=_CRUD_GRANTS)
         triggers = metadata.info.get("triggers")
         assert triggers is not None
         # 6 INSTEAD OF triggers + 6 BEFORE protection
@@ -241,7 +244,7 @@ class TestPGCraftAppendOnlyTriggers:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        APIView(source=f, grants=_CRUD_GRANTS)
         fn_names = {f.name for f in metadata.info["functions"].functions}
         # Each op appears twice (once per view schema).
         # Protection functions are named without an op
