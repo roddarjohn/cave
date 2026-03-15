@@ -41,7 +41,7 @@ DELETE on the API view raise a PostgreSQL error.
 .. include:: _generated/dim_ledger.rst
 
 
-Latest View
+Latest view
 ~~~~~~~~~~~
 
 Use :class:`~pgcraft.views.latest.LatestView` to create a view that
@@ -85,7 +85,7 @@ The view name follows the naming convention and can be customised via
 ``metadata.naming_convention["ledger_latest_view"]``.
 
 
-Balance Views
+Balance views
 ~~~~~~~~~~~~~
 
 Use :class:`~pgcraft.views.balance.BalanceView` to create a view
@@ -128,7 +128,7 @@ The view name follows the naming convention and can be customised via
 ``metadata.naming_convention["ledger_balance_view"]``.
 
 
-Balance Constraints
+Balance constraints
 ~~~~~~~~~~~~~~~~~~~
 
 Use :class:`~pgcraft.plugins.ledger.LedgerBalanceCheckPlugin` to
