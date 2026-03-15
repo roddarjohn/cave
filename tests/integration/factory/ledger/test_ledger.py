@@ -12,7 +12,13 @@ from sqlalchemy.exc import ProgrammingError
 from pgcraft.config import PGCraftConfig
 from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTView
 from pgcraft.factory.ledger import PGCraftLedger
-from pgcraft.plugins.ledger import DoubleEntryPlugin, DoubleEntryTriggerPlugin
+from pgcraft.plugins.created_at import CreatedAtPlugin
+from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
+from pgcraft.plugins.ledger import (
+    DoubleEntryPlugin,
+    DoubleEntryTriggerPlugin,
+    LedgerTablePlugin,
+)
 from tests.integration.conftest import create_all_from_metadata
 
 
@@ -61,7 +67,22 @@ def numeric_ledger(db_conn, db_schema):
     config = PGCraftConfig(auto_discover=False)
     config.use(PostgRESTExtension())
     metadata = MetaData()
-    _make_ledger(db_schema, metadata, config, tablename="payments")
+    factory = PGCraftLedger(
+        "payments",
+        db_schema,
+        metadata,
+        schema_items=[],
+        config=config,
+        plugins=[
+            UUIDEntryIDPlugin(),
+            CreatedAtPlugin(),
+            LedgerTablePlugin(value_type="numeric"),
+        ],
+    )
+    PostgRESTView(
+        source=factory,
+        grants=["select", "insert"],
+    )
     create_all_from_metadata(db_conn, metadata)
     return db_conn, db_schema
 
@@ -221,21 +242,23 @@ class TestLedgerBalanceView:
 
 @pytest.fixture
 def double_entry_ledger(db_conn, db_schema):
-    """Set up a double-entry ledger in the test schema."""
+    """Set up a double-entry ledger in the test schema.
+
+    Uses the factory for table + constraint trigger creation but
+    inserts directly into the backing table.  The factory's
+    LedgerTriggerPlugin does not yet include injected columns
+    (like ``direction``) in the INSTEAD OF trigger, so
+    PostgRESTView is not used here.
+    """
     config = PGCraftConfig(auto_discover=False)
-    config.use(PostgRESTExtension())
     metadata = MetaData()
-    factory = PGCraftLedger(
+    PGCraftLedger(
         "journal",
         db_schema,
         metadata,
         schema_items=[Column("account", String, nullable=False)],
         config=config,
         extra_plugins=[DoubleEntryPlugin(), DoubleEntryTriggerPlugin()],
-    )
-    PostgRESTView(
-        source=factory,
-        grants=["select", "insert"],
     )
     create_all_from_metadata(db_conn, metadata)
     return db_conn, db_schema
@@ -247,7 +270,7 @@ class TestDoubleEntryLedger:
         eid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
         conn.execute(
             text(
-                "INSERT INTO api.journal"
+                f"INSERT INTO {schema}.journal"
                 " (entry_id, value, direction, account)"
                 f" VALUES ('{eid}', 100, 'debit', 'cash'),"
                 f" ('{eid}', 100, 'credit', 'revenue')"
@@ -259,12 +282,12 @@ class TestDoubleEntryLedger:
         assert count == 2
 
     def test_unbalanced_entry_raises(self, double_entry_ledger):
-        conn, _ = double_entry_ledger
+        conn, schema = double_entry_ledger
         eid = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
         with pytest.raises(ProgrammingError, match="double-entry violation"):
             conn.execute(
                 text(
-                    "INSERT INTO api.journal"
+                    f"INSERT INTO {schema}.journal"
                     " (entry_id, value, direction, account)"
                     f" VALUES ('{eid}', 100, 'debit', 'cash'),"
                     f" ('{eid}', 50, 'credit', 'revenue')"
@@ -272,12 +295,12 @@ class TestDoubleEntryLedger:
             )
 
     def test_single_debit_without_credit_raises(self, double_entry_ledger):
-        conn, _ = double_entry_ledger
+        conn, schema = double_entry_ledger
         eid = "cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa"
         with pytest.raises(ProgrammingError, match="double-entry violation"):
             conn.execute(
                 text(
-                    "INSERT INTO api.journal"
+                    f"INSERT INTO {schema}.journal"
                     " (entry_id, value, direction, account)"
                     f" VALUES ('{eid}', 100, 'debit', 'cash')"
                 )
