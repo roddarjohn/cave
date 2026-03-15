@@ -21,6 +21,7 @@ from pgcraft.errors import PGCraftValidationError
 from pgcraft.plugin import Dynamic, Plugin, requires
 from pgcraft.utils.template import load_template
 from pgcraft.utils.trigger import register_view_triggers
+from pgcraft.validation import validate_column_references
 
 if TYPE_CHECKING:
     from pgcraft.factory.context import FactoryContext
@@ -71,7 +72,11 @@ class _CheckPlugin(Plugin):
             return
         col_names = self._column_names(ctx)
         for cave_check in checks:
-            _validate_columns(cave_check, col_names)
+            validate_column_references(
+                f"PGCraftCheck {cave_check.name!r}",
+                cave_check.column_names(),
+                col_names,
+            )
         self._apply(ctx, checks)
 
 
@@ -179,32 +184,6 @@ class TriggerCheckPlugin(_CheckPlugin):
         )
 
         _validate_trigger_ordering(ctx, view_fullname)
-
-
-def _validate_columns(
-    cave_check: PGCraftCheck,
-    known_columns: set[str],
-) -> None:
-    """Raise if a check references unknown columns.
-
-    Args:
-        cave_check: The check to validate.
-        known_columns: Set of known column names.
-
-    Raises:
-        PGCraftValidationError: If a referenced column is not
-            in *known_columns*.
-
-    """
-    for col in cave_check.column_names():
-        if col not in known_columns:
-            msg = (
-                f"PGCraftCheck {cave_check.name!r} references "
-                f"unknown column {col!r}. "
-                f"Known columns: "
-                f"{sorted(known_columns)}"
-            )
-            raise PGCraftValidationError(msg)
 
 
 def _validate_trigger_ordering(
