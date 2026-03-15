@@ -65,3 +65,8 @@ _docs-setup:
     just --list | uv run python scripts/just_to_rst.py > docs/_generated/just_commands.rst
     just --justfile playground/Justfile --list | uv run python scripts/just_to_rst.py > docs/_generated/playground_just_commands.rst
     uv run python scripts/generate_dimension_docs.py
+    if [ -f docs/_generated/benchmark_results.json ]; then
+        uv run python scripts/generate_benchmark_docs.py
+    elif [ ! -f docs/_generated/benchmark_results.rst ]; then
+        echo "No benchmark results available. Run \`\`just bench-docs\`\` to generate them." > docs/_generated/benchmark_results.rst
+    fi

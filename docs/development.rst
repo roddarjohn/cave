@@ -148,8 +148,12 @@ Each benchmark row in the output table shows:
    * - **Rounds**
      - Number of times the function was called
 
-See :doc:`benchmarks` for the full list of benchmarks and representative
-results.
+To re-run benchmarks and update the documentation tables::
+
+    just bench-docs
+
+This saves the JSON results and regenerates the RST included by
+:doc:`benchmarks`.
 
 Linting and formatting
 -----------------------
