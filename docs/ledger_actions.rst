@@ -146,7 +146,7 @@ Create the factory, then pass events to
 
     from pgcraft import LedgerEvent, ledger_balances
     from pgcraft.factory import PGCraftLedger
-    from pgcraft.views import APIView, LedgerActions
+    from pgcraft.views import LedgerActions
 
     recognize = LedgerEvent(
         name="recognize",
@@ -177,10 +177,6 @@ Create the factory, then pass events to
         ],
     )
 
-    APIView(
-        source=revenue,
-        grants=["select", "insert"],
-    )
     LedgerActions(source=revenue, events=[recognize])
 
 
@@ -188,7 +184,8 @@ Declarative style
 ~~~~~~~~~~~~~~~~~
 
 The ``@register`` decorator works with ledger events too.  Create
-an ``APIView`` via the ``api=`` kwarg and attach views separately::
+a ``PostgRESTView`` via the ``api=`` kwarg and attach
+views separately::
 
     from pgcraft import LedgerEvent, ledger_balances
     from pgcraft.declarative import register

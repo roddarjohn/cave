@@ -36,8 +36,9 @@ class PGCraftLedger(ResourceFactory):
     A :class:`~pgcraft.plugins.pk.SerialPKPlugin` is auto-added
     when no user plugin produces ``pk_columns``.
 
-    Use :class:`~pgcraft.views.api.APIView` to expose this table
-    through a PostgREST API view with INSERT triggers.
+    Use :class:`~pgcraft.extensions.postgrest.PostgRESTView`
+    to expose this table through a PostgREST API view with
+    INSERT triggers.
     Use :class:`~pgcraft.views.balance.BalanceView`,
     :class:`~pgcraft.views.latest.LatestView`, and
     :class:`~pgcraft.views.actions.LedgerActions` for derived

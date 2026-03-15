@@ -28,6 +28,7 @@ pgcraft
 
    plugins
    builtin_plugins
+   extensions
    api
    benchmarks
 

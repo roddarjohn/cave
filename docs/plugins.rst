@@ -253,8 +253,6 @@ To replace the default plugin list entirely:
        ],
    )
 
-   APIView(source=events, schema="reporting")
-
 
 Singleton groups
 ----------------
@@ -550,7 +548,7 @@ has its own internal plugins and trigger strategy:
 
 **View factories** create derived views from a table factory:
 
-:class:`~pgcraft.views.api.APIView`
+:class:`~pgcraft.extensions.postgrest.PostgRESTView`
     PostgREST-facing view with auto-selected INSTEAD OF triggers.
     Grants drive which triggers are created.  Supports
     ``columns``, ``exclude_columns``, and ``query=`` for
@@ -578,3 +576,6 @@ Built-in plugins reference
 
 See :doc:`builtin_plugins` for detailed documentation of every built-in
 plugin, including parameters, context keys, and usage examples.
+
+See :doc:`extensions` for the extension system that sits above plugins,
+bundling plugins with metadata hooks, Alembic hooks, and CLI commands.

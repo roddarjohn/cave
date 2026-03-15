@@ -3,8 +3,8 @@
 from sqlalchemy import Column, MetaData, String
 
 from pgcraft import pgcraft_build_naming_conventions
+from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory import PGCraftAppendOnly
-from pgcraft.views import APIView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
@@ -19,7 +19,7 @@ employees = PGCraftAppendOnly(
     ],
 )
 
-APIView(source=employees)
+PostgRESTView(source=employees)
 # --- example end ---
 
 SCHEMA_DESCRIPTION = (

@@ -16,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.sql.expression import Label
 
 from pgcraft.errors import PGCraftValidationError
+from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.eav import PGCraftEAV
 from pgcraft.plugins.eav import (
     _EAVMapping,
@@ -23,7 +24,6 @@ from pgcraft.plugins.eav import (
     _pivot_aggregate,
     _resolve_value_column,
 )
-from pgcraft.views.api import APIView
 
 # -----------------------------------------------------------
 # _resolve_value_column
@@ -323,7 +323,7 @@ class TestPGCraftEAVViews:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        PostgRESTView(source=f)
         views = metadata.info["views"].views
         api_views = [v for v in views if v.schema == "api"]
         assert len(api_views) == 1
@@ -340,8 +340,8 @@ class TestPGCraftEAVViews:
         )
         assert len(metadata.info["views"].views) == 1
 
-    def test_exactly_two_views_with_apiview(self):
-        """Factory + APIView creates two views total."""
+    def test_exactly_two_views_with_postgrest_view(self):
+        """Factory + PostgRESTView creates two views total."""
         metadata = MetaData()
         f = PGCraftEAV(
             "product",
@@ -349,7 +349,7 @@ class TestPGCraftEAVViews:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        PostgRESTView(source=f)
         assert len(metadata.info["views"].views) == 2
 
     def test_api_view_schema_respects_configuration(self):
@@ -360,7 +360,7 @@ class TestPGCraftEAVViews:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f, schema="custom_api")
+        PostgRESTView(source=f, schema="custom_api")
         views = metadata.info["views"].views
         assert any(v.schema == "custom_api" for v in views)
 
@@ -391,7 +391,7 @@ class TestPGCraftEAVTriggers:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         functions = metadata.info.get("functions")
         assert functions is not None
         # 6 INSTEAD OF functions (2 views x 3 ops)
@@ -406,7 +406,7 @@ class TestPGCraftEAVTriggers:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         triggers = metadata.info.get("triggers")
         assert triggers is not None
         # 6 INSTEAD OF + 6 BEFORE protection (2 tables x 3)

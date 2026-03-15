@@ -36,6 +36,9 @@ Issues = "https://github.com/roddarjohn/pgcraft/issues"
 [project.scripts]
 pgcraft = "pgcraft.cli:app"
 
+[project.entry-points."pgcraft.extensions"]
+postgrest = "pgcraft.extensions.postgrest:PostgRESTExtension"
+
 [project.entry-points.sqlfluff]
 sqlfluff_templater_mako = "pgcraft.sqlfluff"
 
@@ -109,6 +112,7 @@ ignore = [
   "PLC0415", # local imports acceptable in test methods
   "RUF003",  # unicode × in comments is fine
   "RUF059",  # unpacked dummy variables are fine in tests
+  "SLF001",  # testing private methods is fine in tests
 ]
 "**/migrations/versions/*.py" = [
   "INP001",  # migration versions aren't a package

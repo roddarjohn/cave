@@ -93,7 +93,7 @@ class JoinedView:
     """A view to LEFT JOIN into the API view.
 
     Produced by plugins (e.g. ``StatisticsViewPlugin``) and
-    consumed by ``APIPlugin`` when building the API view SQL.
+    consumed by ``PostgRESTPlugin`` when building the API view SQL.
 
     Args:
         view_name: Fully qualified view name

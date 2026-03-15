@@ -48,7 +48,9 @@ def _resolve_plugins(
         Ordered list of plugins to run.
 
     """
-    global_plugins: list[Plugin] = getattr(config, "plugins", [])
+    global_plugins: list[Plugin] = getattr(
+        config, "all_plugins", getattr(config, "plugins", [])
+    )
     factory_plugins = plugins if plugins is not None else list(defaults)
     local = extra_plugins or []
     user_plugins = global_plugins + factory_plugins + local
@@ -199,7 +201,7 @@ class ResourceFactory:
     """The factory context after plugin execution.
 
     Downstream view factories (e.g.
-    :class:`~pgcraft.views.api.APIView`) read this to access
+    :class:`~pgcraft.extensions.postgrest.PostgRESTView`) read this to access
     tables, columns, and other plugin outputs.
     """
 

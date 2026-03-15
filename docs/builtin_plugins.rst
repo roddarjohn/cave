@@ -177,16 +177,30 @@ This creates ``public.users`` with columns ``id``, ``name``,
 ``email``.
 
 
-APIView
--------
+PostgRESTView
+-------------
 
-.. module:: pgcraft.views.api
+.. module:: pgcraft.extensions.postgrest.view
    :no-index:
 
+.. note::
+
+   ``PostgRESTView`` lives in the PostgREST extension package
+   (``pgcraft.extensions.postgrest``).  Install the extension
+   and register it on your
+   :class:`~pgcraft.config.PGCraftConfig` before use.
+
 API views are created separately from the factory using
-:class:`~pgcraft.views.api.APIView`.  This creates a
-PostgREST-facing view and registers the API resource for
-role/grant generation.
+:class:`~pgcraft.extensions.postgrest.PostgRESTView`.  This
+creates a PostgREST-facing view and registers the API resource
+for role/grant generation.
+
+.. note::
+
+   The PostgREST extension must be registered on your
+   :class:`~pgcraft.config.PGCraftConfig` for roles and grants
+   to be generated.  See the setup snippet in the first example
+   below.
 
 Grants drive triggers: INSTEAD OF triggers are only created for
 the DML operations listed in ``grants``.  A ``["select"]``-only
@@ -222,8 +236,15 @@ Default behaviour — ``SELECT *``
 
 .. code-block:: python
 
+   from pgcraft.config import PGCraftConfig
+   from pgcraft.extensions.postgrest import (
+       PostgRESTExtension,
+       PostgRESTView,
+   )
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import APIView
+
+   config = PGCraftConfig()
+   config.use(PostgRESTExtension())
 
    users = PGCraftSimple(
        "users", "public", metadata,
@@ -231,13 +252,14 @@ Default behaviour — ``SELECT *``
            Column("name", String, nullable=False),
            Column("email", String),
        ],
+       config=config,
    )
 
    # Exposes all columns, SELECT only (read-only, no triggers)
-   APIView(source=users)
+   PostgRESTView(source=users)
 
    # Full CRUD — creates INSERT, UPDATE, DELETE triggers
-   APIView(
+   PostgRESTView(
        source=users,
        grants=["select", "insert", "update", "delete"],
    )
@@ -250,7 +272,7 @@ internal columns that should not be visible through the API:
 
 .. code-block:: python
 
-   APIView(source=users, columns=["id", "name"])
+   PostgRESTView(source=users, columns=["id", "name"])
 
 The generated view:
 
@@ -267,7 +289,7 @@ included automatically:
 
 .. code-block:: python
 
-   APIView(
+   PostgRESTView(
        source=users,
        exclude_columns=["internal_notes"],
    )
@@ -295,7 +317,7 @@ transforms, or any valid ``Select``:
 
    _s = stats.table
 
-   APIView(
+   PostgRESTView(
        source=customers,
        grants=["select", "insert", "update"],
        query=lambda q, t: (
@@ -356,7 +378,7 @@ SimpleTriggerPlugin
 
 Registers INSTEAD OF ``INSERT`` / ``UPDATE`` / ``DELETE`` triggers
 on the API view, forwarding writes to the backing table.  This is
-an internal plugin used by ``APIView`` — not typically configured
+an internal plugin used by ``PostgRESTView`` — not typically configured
 directly by users.
 
 **Requires:** ``"primary"`` (via ``table_key``),
@@ -490,9 +512,11 @@ To expose via PostgREST:
 
 .. code-block:: python
 
-   from pgcraft.views import APIView
+   from pgcraft.extensions.postgrest import (
+       PostgRESTView,
+   )
 
-   APIView(source=students)
+   PostgRESTView(source=students)
 
 
 EAVTablePlugin
@@ -562,9 +586,11 @@ To expose via PostgREST:
 
 .. code-block:: python
 
-   from pgcraft.views import APIView
+   from pgcraft.extensions.postgrest import (
+       PostgRESTView,
+   )
 
-   APIView(source=products)
+   PostgRESTView(source=products)
 
 
 Plugin execution order
@@ -581,7 +607,10 @@ declarations.  A typical simple dimension pipeline runs:
    TableCheckPlugin            (reads __root__)
    RawTableProtectionPlugin    (reads primary)
 
-API views and triggers are created separately via ``APIView``.
+API views and triggers are created separately via
+``PostgRESTView``, which is part of the optional PostgREST
+extension (``pgcraft.extensions.postgrest``).  It is not
+included in the core plugin pipeline.
 
 All context key names are overridable via constructor arguments,
 so two independent pipelines can coexist in one factory.

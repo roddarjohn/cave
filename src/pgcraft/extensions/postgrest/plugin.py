@@ -1,4 +1,4 @@
-"""API view plugin: creates the PostgREST-facing view and resource."""
+"""PostgREST view plugin: creates the PostgREST-facing view and resource."""
 
 from __future__ import annotations
 
@@ -82,7 +82,10 @@ def _resolve_included_columns(
 
     """
     if columns is not None and exclude_columns is not None:
-        msg = "Cannot specify both 'columns' and 'exclude_columns' on APIPlugin"
+        msg = (
+            "Cannot specify both 'columns' and"
+            " 'exclude_columns' on PostgRESTPlugin"
+        )
         raise ValueError(msg)
 
     if exclude_columns is not None:
@@ -128,7 +131,7 @@ def _build_join_columns(
 
 @produces(Dynamic("view_key"))
 @requires(Dynamic("table_key"))
-class APIPlugin(Plugin):
+class PostgRESTPlugin(Plugin):
     """Create a PostgREST-facing view and register its grants.
 
     Reads ``ctx[table_key]`` to build a view query, registers

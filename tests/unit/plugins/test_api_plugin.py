@@ -1,9 +1,9 @@
-"""Unit tests for APIPlugin in isolation."""
+"""Unit tests for PostgRESTPlugin in isolation."""
 
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table
 
-from pgcraft.plugins.api import APIPlugin
+from pgcraft.extensions.postgrest import PostgRESTPlugin
 from pgcraft.statistics import JoinedView
 from tests.unit.plugins.conftest import make_ctx
 
@@ -27,9 +27,9 @@ def _ctx_with_primary(
     return ctx
 
 
-class TestAPIPlugin:
+class TestPostgRESTPlugin:
     def test_view_registered_in_metadata(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         views = ctx.metadata.info.get("views")
@@ -37,74 +37,74 @@ class TestAPIPlugin:
         assert len(views.views) == 1
 
     def test_view_name_matches_tablename(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
         assert view.name == "product"
 
     def test_view_schema_defaults_to_api(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
         assert view.schema == "api"
 
     def test_custom_schema(self):
-        plugin = APIPlugin(schema="public_api")
+        plugin = PostgRESTPlugin(schema="public_api")
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
         assert view.schema == "public_api"
 
     def test_view_stored_under_default_view_key(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         assert "api" in ctx
 
     def test_custom_view_key(self):
-        plugin = APIPlugin(view_key="my_api_view")
+        plugin = PostgRESTPlugin(view_key="my_api_view")
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         assert "my_api_view" in ctx
 
     def test_custom_table_key(self):
-        plugin = APIPlugin(table_key="source")
+        plugin = PostgRESTPlugin(table_key="source")
         ctx = _ctx_with_primary(table_key="source")
         plugin.run(ctx)
         assert "api" in ctx
 
     def test_view_definition_references_source_table(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
         assert "product" in view.definition
 
     def test_registers_api_resource(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         resources = ctx.metadata.info.get("api_resources", [])
         assert len(resources) == 1
 
     def test_resource_name_matches_tablename(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         assert ctx.metadata.info["api_resources"][0].name == "product"
 
     def test_resource_schema_matches_plugin_schema(self):
-        plugin = APIPlugin(schema="reporting")
+        plugin = PostgRESTPlugin(schema="reporting")
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         assert ctx.metadata.info["api_resources"][0].schema == "reporting"
 
 
-class TestAPIPluginColumns:
+class TestPostgRESTPluginColumns:
     def test_columns_none_selects_all(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
@@ -112,7 +112,7 @@ class TestAPIPluginColumns:
         assert "name" in view.definition
 
     def test_columns_subset(self):
-        plugin = APIPlugin(columns=["id"])
+        plugin = PostgRESTPlugin(columns=["id"])
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
@@ -120,15 +120,15 @@ class TestAPIPluginColumns:
         assert "p.name" not in view.definition
 
     def test_columns_unknown_raises(self):
-        plugin = APIPlugin(columns=["id", "nonexistent"])
+        plugin = PostgRESTPlugin(columns=["id", "nonexistent"])
         ctx = _ctx_with_primary()
         with pytest.raises(ValueError, match="nonexistent"):
             plugin.run(ctx)
 
 
-class TestAPIPluginExcludeColumns:
+class TestPostgRESTPluginExcludeColumns:
     def test_exclude_hides_column(self):
-        plugin = APIPlugin(exclude_columns=["internal_notes"])
+        plugin = PostgRESTPlugin(exclude_columns=["internal_notes"])
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
@@ -137,13 +137,13 @@ class TestAPIPluginExcludeColumns:
         assert "internal_notes" not in view.definition
 
     def test_exclude_unknown_raises(self):
-        plugin = APIPlugin(exclude_columns=["nonexistent"])
+        plugin = PostgRESTPlugin(exclude_columns=["nonexistent"])
         ctx = _ctx_with_primary()
         with pytest.raises(ValueError, match="nonexistent"):
             plugin.run(ctx)
 
     def test_columns_and_exclude_raises(self):
-        plugin = APIPlugin(
+        plugin = PostgRESTPlugin(
             columns=["id"],
             exclude_columns=["name"],
         )
@@ -152,7 +152,7 @@ class TestAPIPluginExcludeColumns:
             plugin.run(ctx)
 
 
-class TestAPIPluginJoins:
+class TestPostgRESTPluginJoins:
     def _ctx_with_joins(self):
         joins = {
             "statistics": JoinedView(
@@ -166,7 +166,7 @@ class TestAPIPluginJoins:
         )
 
     def test_join_in_definition(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = self._ctx_with_joins()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
@@ -175,7 +175,7 @@ class TestAPIPluginJoins:
         assert "product_statistics" in defn
 
     def test_join_columns_in_select(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = self._ctx_with_joins()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]
@@ -189,7 +189,7 @@ class TestAPIPluginJoins:
                 column_names=["order_count"],
             ),
         }
-        plugin = APIPlugin(columns=["id"])
+        plugin = PostgRESTPlugin(columns=["id"])
         ctx = _ctx_with_primary(
             store={"joins": joins},
         )
@@ -206,7 +206,7 @@ class TestAPIPluginJoins:
                 column_names=["order_count"],
             ),
         }
-        plugin = APIPlugin(exclude_columns=["internal_notes"])
+        plugin = PostgRESTPlugin(exclude_columns=["internal_notes"])
         ctx = _ctx_with_primary(
             store={"joins": joins},
         )
@@ -218,7 +218,7 @@ class TestAPIPluginJoins:
         assert "order_count" in view.definition
 
     def test_empty_joins_no_join(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = _ctx_with_primary(
             store={"joins": {}},
         )
@@ -227,7 +227,7 @@ class TestAPIPluginJoins:
         assert "join" not in view.definition.lower()
 
     def test_missing_joins_key_no_join(self):
-        plugin = APIPlugin()
+        plugin = PostgRESTPlugin()
         ctx = _ctx_with_primary()
         plugin.run(ctx)
         view = ctx.metadata.info["views"].views[0]

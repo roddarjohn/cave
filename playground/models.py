@@ -19,6 +19,11 @@ from pgcraft import (
     ledger_balances,
     pgcraft_build_naming_conventions,
 )
+from pgcraft.config import PGCraftConfig
+from pgcraft.extensions.postgrest import (
+    PostgRESTExtension,
+    PostgRESTView,
+)
 from pgcraft.check import PGCraftCheck
 from pgcraft.declarative import register
 from pgcraft.factory.dimension.append_only import (
@@ -32,13 +37,16 @@ from pgcraft.plugins.ledger import (
     DoubleEntryTriggerPlugin,
 )
 from pgcraft.views.actions import LedgerActions
-from pgcraft.views.api import APIView
 from pgcraft.views.balance import BalanceView
 from pgcraft.views.view import PGCraftView
 
 metadata = MetaData(
     naming_convention=pgcraft_build_naming_conventions(),
 )
+
+pgcraft_config = PGCraftConfig(auto_discover=False)
+pgcraft_config.use(PostgRESTExtension())
+metadata.info["pgcraft_config"] = pgcraft_config
 
 # -- Table factories: create the data model -------------------------
 
@@ -131,22 +139,22 @@ customers = PGCraftSimple(
 
 # -- View factories: create derived output --------------------------
 
-APIView(
+PostgRESTView(
     source=users,
     grants=["select", "insert", "update", "delete"],
 )
 
 # columns=: only expose specific columns
-APIView(
+PostgRESTView(
     source=students,
     columns=["id", "name"],
 )
 
-APIView(source=Invoices)
-APIView(source=InvoiceLines)
+PostgRESTView(source=Invoices)
+PostgRESTView(source=InvoiceLines)
 
 # exclude_columns=: hide internal fields from the API
-APIView(
+PostgRESTView(
     source=Orders,
     exclude_columns=["internal_notes"],
 )
@@ -190,7 +198,7 @@ _iv = invoice_stats.table
 # PGCraftView.table is a joinable SQLAlchemy Table.
 # Triggers still work — they operate on the base
 # table columns; joined columns are read-only.
-APIView(
+PostgRESTView(
     source=customers,
     grants=["select", "insert", "update", "delete"],
     query=lambda q, t: (
@@ -252,7 +260,7 @@ inventory = PGCraftLedger(
     ],
 )
 
-APIView(
+PostgRESTView(
     source=inventory,
     grants=["select", "insert"],
 )
@@ -327,7 +335,7 @@ ledger = PGCraftLedger(
     ],
 )
 
-APIView(
+PostgRESTView(
     source=ledger,
     grants=["select", "insert"],
 )
