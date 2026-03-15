@@ -8,6 +8,7 @@ _pyproject = tomllib.loads(
 
 project = "pgcraft"
 author = "Rodda John"
+copyright = "2026, Rodda John"
 version = _pyproject["project"]["version"]
 release = version
 extensions = [
@@ -30,12 +31,13 @@ html_theme_options = {
     "description": "Configuration-driven PostgreSQL framework",
     "github_user": "roddajohn",
     "github_repo": "pgcraft",
-    "github_button": True,
-    "github_type": "star",
+    "github_button": False,
     "fixed_sidebar": True,
     "show_powered_by": False,
     "sidebar_collapse": True,
-    "extra_nav_links": {},
+    "extra_nav_links": {
+        "GitHub": "https://github.com/roddajohn/pgcraft",
+    },
     "font_family": (
         "'Source Sans Pro', 'Segoe UI', Helvetica, Arial,"
         " sans-serif"
