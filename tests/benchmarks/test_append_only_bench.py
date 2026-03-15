@@ -1,4 +1,4 @@
-"""Benchmarks for append-only dimension via API view triggers."""
+"""Benchmarks for append-only dimension operations."""
 
 import pytest
 from sqlalchemy import text
@@ -13,9 +13,7 @@ from tests.benchmarks.conftest import (
 @pytest.fixture(scope="module")
 def _ao_tables(db_engine, bench_schema):  # noqa: ARG001
     with db_engine.connect() as conn:
-        setup_append_only_dimension(
-            conn, SCHEMA, "bench_ao", "name TEXT NOT NULL"
-        )
+        setup_append_only_dimension(conn, SCHEMA, "bm_ao", "name TEXT NOT NULL")
 
 
 @pytest.fixture(scope="module")
@@ -24,10 +22,10 @@ def _seeded_ao(db_engine, _ao_tables):
         setup_append_only_dimension(
             conn,
             SCHEMA,
-            "bench_ao_seeded",
+            "bm_ao_big",
             "name TEXT NOT NULL",
         )
-        seed_append_only_rows(conn, SCHEMA, "bench_ao_seeded", 10_000)
+        seed_append_only_rows(conn, SCHEMA, "bm_ao_big", 10_000)
 
 
 # -- single-row operations ------------------------------------------------
@@ -43,7 +41,7 @@ class TestAppendOnlySingleRow:
             counter["i"] += 1
             bench_conn.execute(
                 text(
-                    f"INSERT INTO {schema}.api_bench_ao"
+                    f"INSERT INTO {schema}.bm_ao_view"
                     f" (name) VALUES ('item_{counter['i']}')"
                 )
             )
@@ -54,14 +52,12 @@ class TestAppendOnlySingleRow:
     def test_update_single(self, benchmark, bench_conn):
         schema = SCHEMA
         bench_conn.execute(
-            text(
-                f"INSERT INTO {schema}.api_bench_ao (name) VALUES ('to_update')"
-            )
+            text(f"INSERT INTO {schema}.bm_ao_view (name) VALUES ('to_update')")
         )
         bench_conn.commit()
         row_id = bench_conn.execute(
             text(
-                f"SELECT id FROM {schema}.api_bench_ao"
+                f"SELECT id FROM {schema}.bm_ao_view"
                 f" WHERE name = 'to_update' LIMIT 1"
             )
         ).scalar()
@@ -72,7 +68,7 @@ class TestAppendOnlySingleRow:
             counter["i"] += 1
             bench_conn.execute(
                 text(
-                    f"UPDATE {schema}.api_bench_ao"
+                    f"UPDATE {schema}.bm_ao_view"
                     f" SET name = 'upd_{counter['i']}'"
                     f" WHERE id = {row_id}"
                 )
@@ -96,9 +92,7 @@ class TestAppendOnlyBatch:
             base = counter["i"] * 100
             values = ", ".join(f"('b100_{base + j}')" for j in range(100))
             bench_conn.execute(
-                text(
-                    f"INSERT INTO {schema}.api_bench_ao (name) VALUES {values}"
-                )
+                text(f"INSERT INTO {schema}.bm_ao_view (name) VALUES {values}")
             )
             bench_conn.commit()
 
@@ -115,37 +109,34 @@ class TestAppendOnlySelect:
 
         def do_select():
             bench_conn.execute(
-                text(f"SELECT * FROM {schema}.api_bench_ao_seeded")
+                text(f"SELECT * FROM {schema}.bm_ao_big_view")
             ).fetchall()
 
         benchmark.pedantic(do_select, rounds=1_000)
 
     def test_select_after_many_updates(self, db_engine, benchmark, bench_conn):
         schema = SCHEMA
-        # Create a single entity and update it 100 times
         with db_engine.connect() as setup_conn:
             setup_append_only_dimension(
                 setup_conn,
                 SCHEMA,
-                "bench_ao_revisions",
+                "bm_ao_rev",
                 "name TEXT NOT NULL",
             )
             setup_conn.execute(
                 text(
-                    f"INSERT INTO"
-                    f" {schema}.api_bench_ao_revisions"
+                    f"INSERT INTO {schema}.bm_ao_rev_view"
                     f" (name) VALUES ('rev_entity')"
                 )
             )
             setup_conn.commit()
             row_id = setup_conn.execute(
-                text(f"SELECT id FROM {schema}.api_bench_ao_revisions LIMIT 1")
+                text(f"SELECT id FROM {schema}.bm_ao_rev_view LIMIT 1")
             ).scalar()
             for i in range(100):
                 setup_conn.execute(
                     text(
-                        f"UPDATE"
-                        f" {schema}.api_bench_ao_revisions"
+                        f"UPDATE {schema}.bm_ao_rev_view"
                         f" SET name = 'rev_{i}'"
                         f" WHERE id = {row_id}"
                     )
@@ -154,7 +145,7 @@ class TestAppendOnlySelect:
 
         def do_select():
             bench_conn.execute(
-                text(f"SELECT * FROM {schema}.api_bench_ao_revisions")
+                text(f"SELECT * FROM {schema}.bm_ao_rev_view")
             ).fetchall()
 
         benchmark.pedantic(do_select, rounds=1_000)

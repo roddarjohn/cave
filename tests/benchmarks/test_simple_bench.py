@@ -1,4 +1,4 @@
-"""Benchmarks for simple dimension CRUD via API view triggers."""
+"""Benchmarks for simple dimension operations."""
 
 import pytest
 from sqlalchemy import text
@@ -13,9 +13,7 @@ from tests.benchmarks.conftest import (
 @pytest.fixture(scope="module")
 def _simple_tables(db_engine, bench_schema):  # noqa: ARG001
     with db_engine.connect() as conn:
-        setup_simple_dimension(
-            conn, SCHEMA, "bench_simple", "name TEXT NOT NULL"
-        )
+        setup_simple_dimension(conn, SCHEMA, "bm_simple", "name TEXT NOT NULL")
 
 
 @pytest.fixture(scope="module")
@@ -24,10 +22,10 @@ def _seeded_tables(db_engine, _simple_tables):
         setup_simple_dimension(
             conn,
             SCHEMA,
-            "bench_simple_seeded",
+            "bm_simple_big",
             "name TEXT NOT NULL",
         )
-        seed_simple_rows(conn, SCHEMA, "bench_simple_seeded", 10_000)
+        seed_simple_rows(conn, SCHEMA, "bm_simple_big", 10_000)
 
 
 # -- single-row operations ------------------------------------------------
@@ -43,7 +41,7 @@ class TestSimpleSingleRow:
             counter["i"] += 1
             bench_conn.execute(
                 text(
-                    f"INSERT INTO {schema}.api_bench_simple"
+                    f"INSERT INTO {schema}.bm_simple"
                     f" (name) VALUES ('item_{counter['i']}')"
                 )
             )
@@ -54,16 +52,11 @@ class TestSimpleSingleRow:
     def test_update_single(self, benchmark, bench_conn):
         schema = SCHEMA
         bench_conn.execute(
-            text(
-                f"INSERT INTO {schema}.api_bench_simple"
-                f" (name) VALUES ('to_update')"
-            )
+            text(f"INSERT INTO {schema}.bm_simple (name) VALUES ('to_update')")
         )
         bench_conn.commit()
         row_id = bench_conn.execute(
-            text(
-                f"SELECT id FROM {schema}.bench_simple WHERE name = 'to_update'"
-            )
+            text(f"SELECT id FROM {schema}.bm_simple WHERE name = 'to_update'")
         ).scalar()
 
         counter = {"i": 0}
@@ -72,7 +65,7 @@ class TestSimpleSingleRow:
             counter["i"] += 1
             bench_conn.execute(
                 text(
-                    f"UPDATE {schema}.api_bench_simple"
+                    f"UPDATE {schema}.bm_simple"
                     f" SET name = 'upd_{counter['i']}'"
                     f" WHERE id = {row_id}"
                 )
@@ -86,17 +79,11 @@ class TestSimpleSingleRow:
 
         def do_delete():
             bench_conn.execute(
-                text(
-                    f"INSERT INTO {schema}.api_bench_simple"
-                    f" (name) VALUES ('del_me')"
-                )
+                text(f"INSERT INTO {schema}.bm_simple (name) VALUES ('del_me')")
             )
             bench_conn.commit()
             bench_conn.execute(
-                text(
-                    f"DELETE FROM {schema}.api_bench_simple"
-                    f" WHERE name = 'del_me'"
-                )
+                text(f"DELETE FROM {schema}.bm_simple WHERE name = 'del_me'")
             )
             bench_conn.commit()
 
@@ -117,10 +104,7 @@ class TestSimpleBatch:
             base = counter["i"] * 100
             values = ", ".join(f"('b100_{base + j}')" for j in range(100))
             bench_conn.execute(
-                text(
-                    f"INSERT INTO {schema}.api_bench_simple"
-                    f" (name) VALUES {values}"
-                )
+                text(f"INSERT INTO {schema}.bm_simple (name) VALUES {values}")
             )
             bench_conn.commit()
 
@@ -135,10 +119,7 @@ class TestSimpleBatch:
             base = counter["i"] * 1000
             values = ", ".join(f"('b1k_{base + j}')" for j in range(1000))
             bench_conn.execute(
-                text(
-                    f"INSERT INTO {schema}.api_bench_simple"
-                    f" (name) VALUES {values}"
-                )
+                text(f"INSERT INTO {schema}.bm_simple (name) VALUES {values}")
             )
             bench_conn.commit()
 
@@ -155,7 +136,7 @@ class TestSimpleSelect:
 
         def do_select():
             bench_conn.execute(
-                text(f"SELECT * FROM {schema}.api_bench_simple_seeded")
+                text(f"SELECT * FROM {schema}.bm_simple_big_view")
             ).fetchall()
 
         benchmark.pedantic(do_select, rounds=1_000)
@@ -166,8 +147,7 @@ class TestSimpleSelect:
         def do_select():
             bench_conn.execute(
                 text(
-                    f"SELECT * FROM"
-                    f" {schema}.api_bench_simple_seeded"
+                    f"SELECT * FROM {schema}.bm_simple_big_view"
                     f" WHERE name = 'item_500'"
                 )
             ).fetchall()

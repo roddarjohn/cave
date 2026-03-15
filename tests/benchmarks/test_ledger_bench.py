@@ -1,4 +1,4 @@
-"""Benchmarks for ledger dimension via API view triggers."""
+"""Benchmarks for ledger dimension operations."""
 
 import pytest
 from sqlalchemy import text
@@ -16,7 +16,7 @@ def _ledger_tables(db_engine, bench_schema):  # noqa: ARG001
         setup_ledger(
             conn,
             SCHEMA,
-            "bench_ledger",
+            "bm_ledger",
             extra_cols="category TEXT NOT NULL",
         )
 
@@ -27,16 +27,16 @@ def _seeded_ledger(db_engine, _ledger_tables):
         setup_ledger(
             conn,
             SCHEMA,
-            "bench_ledger_seeded",
+            "bm_ledger_big",
             extra_cols="category TEXT NOT NULL",
         )
-        seed_ledger_rows(conn, SCHEMA, "bench_ledger_seeded", 10_000)
+        seed_ledger_rows(conn, SCHEMA, "bm_ledger_big", 10_000)
         conn.execute(
             text(
                 f"CREATE OR REPLACE VIEW"
-                f" {SCHEMA}.bench_ledger_seeded_balances AS"
+                f" {SCHEMA}.bm_ledger_big_balances AS"
                 f" SELECT category, SUM(value) AS balance"
-                f" FROM {SCHEMA}.bench_ledger_seeded"
+                f" FROM {SCHEMA}.bm_ledger_big"
                 f" GROUP BY category"
             )
         )
@@ -56,8 +56,7 @@ class TestLedgerSingleRow:
             counter["i"] += 1
             bench_conn.execute(
                 text(
-                    f"INSERT INTO"
-                    f" {schema}.api_bench_ledger"
+                    f"INSERT INTO {schema}.bm_ledger"
                     f" (value, category)"
                     f" VALUES ({counter['i']}, 'sales')"
                 )
@@ -84,8 +83,7 @@ class TestLedgerBatch:
             )
             bench_conn.execute(
                 text(
-                    f"INSERT INTO"
-                    f" {schema}.api_bench_ledger"
+                    f"INSERT INTO {schema}.bm_ledger"
                     f" (value, category) VALUES {values}"
                 )
             )
@@ -105,8 +103,7 @@ class TestLedgerBatch:
             )
             bench_conn.execute(
                 text(
-                    f"INSERT INTO"
-                    f" {schema}.api_bench_ledger"
+                    f"INSERT INTO {schema}.bm_ledger"
                     f" (value, category) VALUES {values}"
                 )
             )
@@ -125,7 +122,7 @@ class TestLedgerSelect:
 
         def do_select():
             bench_conn.execute(
-                text(f"SELECT * FROM {schema}.bench_ledger_seeded_balances")
+                text(f"SELECT * FROM {schema}.bm_ledger_big_balances")
             ).fetchall()
 
         benchmark.pedantic(do_select, rounds=1_000)

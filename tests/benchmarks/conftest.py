@@ -60,9 +60,9 @@ def bench_conn(db_engine, bench_schema):  # noqa: ARG001
 
 
 def setup_simple_dimension(conn, schema, tablename, col_defs):
-    """Create a simple dimension table, API view, and triggers."""
+    """Create a simple dimension table and a read-only view."""
     base = f"{schema}.{tablename}"
-    api = f"{schema}.api_{tablename}"
+    view = f"{schema}.{tablename}_view"
 
     conn.execute(
         text(
@@ -71,37 +71,8 @@ def setup_simple_dimension(conn, schema, tablename, col_defs):
         )
     )
     conn.execute(
-        text(f"CREATE OR REPLACE VIEW {api} AS SELECT id, name FROM {base}")
+        text(f"CREATE OR REPLACE VIEW {view} AS SELECT id, name FROM {base}")
     )
-
-    tpl_dir = _TEMPLATES / "simple"
-    for op in ("insert", "update", "delete"):
-        tpl = load_template(tpl_dir / f"{op}.plpgsql.mako")
-        body = tpl.render(
-            base_table=base,
-            cols="name",
-            new_cols="NEW.name",
-            set_clause="name = NEW.name",
-            returning_cols="*",
-        )
-        conn.execute(
-            text(
-                f"CREATE OR REPLACE FUNCTION"
-                f" {schema}.{tablename}_{op}()"
-                f" RETURNS trigger LANGUAGE plpgsql"
-                f" AS $$ {body} $$"
-            )
-        )
-        conn.execute(text(f"DROP TRIGGER IF EXISTS {tablename}_{op} ON {api}"))
-        conn.execute(
-            text(
-                f"CREATE TRIGGER {tablename}_{op}"
-                f" INSTEAD OF {op.upper()} ON {api}"
-                f" FOR EACH ROW"
-                f" EXECUTE FUNCTION"
-                f" {schema}.{tablename}_{op}()"
-            )
-        )
     conn.commit()
 
 
@@ -112,7 +83,7 @@ def setup_append_only_dimension(conn, schema, tablename, attr_cols):
     """Create an append-only dimension (root + attributes + view)."""
     root = f"{schema}.{tablename}_root"
     attr = f"{schema}.{tablename}_attributes"
-    view = f"{schema}.api_{tablename}"
+    view = f"{schema}.{tablename}_view"
 
     conn.execute(
         text(
@@ -249,7 +220,7 @@ def setup_eav_dimension(conn, schema, tablename, mappings):
     """
     entity = f"{schema}.{tablename}_entity"
     attr = f"{schema}.{tablename}_attribute"
-    view = f"{schema}.api_{tablename}"
+    view = f"{schema}.{tablename}_view"
 
     conn.execute(
         text(
@@ -352,9 +323,9 @@ def setup_eav_dimension(conn, schema, tablename, mappings):
 
 
 def setup_ledger(conn, schema, tablename, extra_cols=""):
-    """Create a ledger table, API view, and INSERT trigger."""
+    """Create a ledger table and a read-only view."""
     base = f"{schema}.{tablename}"
-    api = f"{schema}.api_{tablename}"
+    view = f"{schema}.{tablename}_view"
 
     extra = f", {extra_cols}" if extra_cols else ""
     conn.execute(
@@ -375,47 +346,9 @@ def setup_ledger(conn, schema, tablename, extra_cols=""):
 
     conn.execute(
         text(
-            f"CREATE OR REPLACE VIEW {api} AS SELECT {cols_select} FROM {base}"
+            f"CREATE OR REPLACE VIEW {view} AS SELECT {cols_select} FROM {base}"
         )
     )
-
-    trigger_cols = ["entry_id", "value"]
-    if extra_cols:
-        trigger_cols.extend(c.strip().split()[0] for c in extra_cols.split(","))
-    cols_str = ", ".join(trigger_cols)
-    new_exprs = []
-    for c in trigger_cols:
-        if c == "entry_id":
-            new_exprs.append(f"COALESCE(NEW.{c}, gen_random_uuid())")
-        else:
-            new_exprs.append(f"NEW.{c}")
-    new_cols_str = ", ".join(new_exprs)
-
-    tpl = load_template(_TEMPLATES / "ledger" / "insert.plpgsql.mako")
-    body = tpl.render(
-        base_table=base,
-        cols=cols_str,
-        new_cols=new_cols_str,
-    )
-    conn.execute(
-        text(
-            f"CREATE OR REPLACE FUNCTION"
-            f" {schema}.{tablename}_insert()"
-            f" RETURNS trigger LANGUAGE plpgsql"
-            f" AS $$ {body} $$"
-        )
-    )
-    conn.execute(text(f"DROP TRIGGER IF EXISTS {tablename}_insert ON {api}"))
-    conn.execute(
-        text(
-            f"CREATE TRIGGER {tablename}_insert"
-            f" INSTEAD OF INSERT ON {api}"
-            f" FOR EACH ROW"
-            f" EXECUTE FUNCTION"
-            f" {schema}.{tablename}_insert()"
-        )
-    )
-
     conn.commit()
 
 
@@ -423,36 +356,36 @@ def setup_ledger(conn, schema, tablename, extra_cols=""):
 
 
 def seed_simple_rows(conn, schema, tablename, n):
-    """Insert *n* rows into a simple dimension's API view."""
-    api = f"{schema}.api_{tablename}"
+    """Insert *n* rows directly into a simple dimension table."""
+    table = f"{schema}.{tablename}"
     values = ", ".join(f"('item_{i}')" for i in range(n))
-    conn.execute(text(f"INSERT INTO {api} (name) VALUES {values}"))
+    conn.execute(text(f"INSERT INTO {table} (name) VALUES {values}"))
     conn.commit()
 
 
 def seed_eav_rows(conn, schema, tablename, mappings, n):
-    """Insert *n* entities into an EAV dimension's API view."""
-    api = f"{schema}.api_{tablename}"
+    """Insert *n* entities into an EAV dimension's view."""
+    view = f"{schema}.{tablename}_view"
     cols = ", ".join(name for name, _ in mappings)
     values = ", ".join(
         "(" + ", ".join(f"'val_{i}_{name}'" for name, _ in mappings) + ")"
         for i in range(n)
     )
-    conn.execute(text(f"INSERT INTO {api} ({cols}) VALUES {values}"))
+    conn.execute(text(f"INSERT INTO {view} ({cols}) VALUES {values}"))
     conn.commit()
 
 
 def seed_ledger_rows(conn, schema, tablename, n):
-    """Insert *n* entries into a ledger's API view."""
-    api = f"{schema}.api_{tablename}"
+    """Insert *n* entries directly into a ledger table."""
+    table = f"{schema}.{tablename}"
     values = ", ".join(f"({i}, 'cat_{i % 5}')" for i in range(1, n + 1))
-    conn.execute(text(f"INSERT INTO {api} (value, category) VALUES {values}"))
+    conn.execute(text(f"INSERT INTO {table} (value, category) VALUES {values}"))
     conn.commit()
 
 
 def seed_append_only_rows(conn, schema, tablename, n):
-    """Insert *n* rows into an append-only dimension's API view."""
-    api = f"{schema}.api_{tablename}"
+    """Insert *n* rows into an append-only dimension's view."""
+    view = f"{schema}.{tablename}_view"
     values = ", ".join(f"('item_{i}')" for i in range(n))
-    conn.execute(text(f"INSERT INTO {api} (name) VALUES {values}"))
+    conn.execute(text(f"INSERT INTO {view} (name) VALUES {values}"))
     conn.commit()
