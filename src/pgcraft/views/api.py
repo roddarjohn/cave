@@ -316,7 +316,7 @@ class APIView:
             writable = None
 
         # Derive DML operations from grants.
-        dml_ops = [
+        dml_ops: list[str] = [
             g for g in self.grants if g in {"insert", "update", "delete"}
         ]
 

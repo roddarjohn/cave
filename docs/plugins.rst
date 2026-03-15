@@ -489,6 +489,55 @@ defined:
    )
 
 
+Factory and view reference
+--------------------------
+
+**Table factories** create the core data model.  Each factory type
+has its own internal plugins and trigger strategy:
+
+:class:`~pgcraft.factory.dimension.simple.PGCraftSimple`
+    Single backing table.  Best for reference data and simple
+    lookups.
+
+:class:`~pgcraft.factory.dimension.append_only.PGCraftAppendOnly`
+    SCD Type 2 dimension with root + attributes tables and a
+    current-state join view.  Best for slowly changing dimensions
+    where audit trails matter.
+
+:class:`~pgcraft.factory.dimension.eav.PGCraftEAV`
+    Entity-Attribute-Value dimension with entity + attribute tables
+    and a pivot view.  Best for sparse or highly dynamic attributes.
+
+:class:`~pgcraft.factory.ledger.PGCraftLedger`
+    Append-only ledger table with value, entry_id, and created_at
+    columns.  Best for event logs, financial journals, and metric
+    observations.
+
+**View factories** create derived views from a table factory:
+
+:class:`~pgcraft.views.api.APIView`
+    PostgREST-facing view with auto-selected INSTEAD OF triggers.
+    Grants drive which triggers are created.  Supports
+    ``columns``, ``exclude_columns``, and ``query=`` for
+    customisation.
+
+:class:`~pgcraft.views.view.PGCraftView`
+    Standalone view from any SQLAlchemy ``select()`` expression.
+    Exposes ``.table`` for use in joins.
+
+:class:`~pgcraft.views.view.PGCraftMaterializedView`
+    Materialized view with an auto-generated refresh function.
+
+:class:`~pgcraft.views.balance.BalanceView`
+    Ledger balance view (``SUM(value) GROUP BY dimensions``).
+
+:class:`~pgcraft.views.latest.LatestView`
+    Ledger latest view (``DISTINCT ON (dimensions) ORDER BY
+    created_at DESC``).
+
+:class:`~pgcraft.views.actions.LedgerActions`
+    Ledger event functions for reconciliation and delta inserts.
+
 Built-in plugins reference
 --------------------------
 
