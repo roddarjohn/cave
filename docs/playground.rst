@@ -124,8 +124,15 @@ Adding models
 Define new models in ``playground/models.py`` using the pgcraft
 factory classes::
 
+    from pgcraft.config import PGCraftConfig
+    from pgcraft.extensions.postgrest import (
+        PostgRESTExtension,
+    )
     from pgcraft.factory import PGCraftSimple
     from pgcraft.views import PostgRESTView
+
+    config = PGCraftConfig()
+    config.use(PostgRESTExtension())
 
     users = PGCraftSimple(
         tablename="users",
@@ -134,6 +141,7 @@ factory classes::
         schema_items=[
             Column("name", String),
         ],
+        config=config,
     )
 
     PostgRESTView(source=users)

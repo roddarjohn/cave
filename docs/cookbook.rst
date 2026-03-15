@@ -243,7 +243,9 @@ Adding PostgREST API views
 
 pgcraft can generate PostgREST-compatible API views, INSTEAD OF
 triggers for write operations, and the role/grant declarations that
-PostgREST expects.  Create a factory, then call
+PostgREST expects.  Enable the
+:class:`~pgcraft.extensions.postgrest.PostgRESTExtension` on your
+config, create a factory with that config, then call
 :class:`~pgcraft.views.api.PostgRESTView` to expose it.
 
 How it works
@@ -264,11 +266,23 @@ Minimal example
 .. code-block:: python
 
    # models.py
-   from sqlalchemy import Column, Integer, MetaData, Numeric, String
+   from sqlalchemy import (
+       Column,
+       Integer,
+       MetaData,
+       Numeric,
+       String,
+   )
 
+   from pgcraft.config import PGCraftConfig
+   from pgcraft.extensions.postgrest import PostgRESTExtension
    from pgcraft.factory import PGCraftSimple
    from pgcraft.views import PostgRESTView
    from pgcraft import pgcraft_build_naming_conventions
+
+   # Enable PostgREST roles and grants
+   config = PGCraftConfig()
+   config.use(PostgRESTExtension())
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
@@ -278,14 +292,23 @@ Minimal example
        tablename="products",
        schemaname="inventory",
        metadata=metadata,
+       config=config,
        schema_items=[
            Column("name", String, nullable=False),
            Column("sku", String(32), nullable=False),
-           Column("price", Numeric(10, 2), nullable=False),
+           Column(
+               "price",
+               Numeric(10, 2),
+               nullable=False,
+           ),
        ],
    )
 
    PostgRESTView(source=products)
+
+Remember to pass ``config`` to
+``pgcraft_configure_metadata(metadata, config)`` in your
+``env.py`` — see :doc:`setup` for the full Alembic wiring.
 
 This creates:
 
@@ -304,6 +327,7 @@ writes:
 
 .. code-block:: python
 
+   # config setup as above
    PostgRESTView(
        source=products,
        grants=["select", "insert", "update", "delete"],
@@ -323,6 +347,7 @@ parameter:
 
 .. code-block:: python
 
+   # config setup as above
    PostgRESTView(source=products, schema="reporting")
 
 PostgREST setup

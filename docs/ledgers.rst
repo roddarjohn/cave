@@ -51,16 +51,28 @@ than historical sums:
 
 .. code-block:: python
 
+   from pgcraft.config import PGCraftConfig
+   from pgcraft.extensions.postgrest import (
+       PostgRESTExtension,
+   )
    from pgcraft.factory import PGCraftLedger
    from pgcraft.views import PostgRESTView, LatestView
+
+   config = PGCraftConfig()
+   config.use(PostgRESTExtension())
 
    order_events = PGCraftLedger(
        tablename="order_events",
        schemaname="ops",
        metadata=metadata,
+       config=config,
        schema_items=[
-           Column("order_id", String, nullable=False),
-           Column("status", String, nullable=False),
+           Column(
+               "order_id", String, nullable=False
+           ),
+           Column(
+               "status", String, nullable=False
+           ),
        ],
    )
 
@@ -95,6 +107,7 @@ resource quotas, point systems):
 
 .. code-block:: python
 
+   # Config assumed from above.
    from pgcraft.factory import PGCraftLedger
    from pgcraft.views import PostgRESTView, BalanceView
 
@@ -102,9 +115,14 @@ resource quotas, point systems):
        tablename="stock_movements",
        schemaname="inventory",
        metadata=metadata,
+       config=config,
        schema_items=[
-           Column("warehouse", String, nullable=False),
-           Column("sku", String, nullable=False),
+           Column(
+               "warehouse", String, nullable=False
+           ),
+           Column(
+               "sku", String, nullable=False
+           ),
        ],
    )
 
@@ -138,22 +156,30 @@ overdrafts, or exceeding resource quotas:
 
 .. code-block:: python
 
+   # Config assumed from above.
    from pgcraft.factory import PGCraftLedger
-   from pgcraft.plugins.ledger import LedgerBalanceCheckPlugin
+   from pgcraft.plugins.ledger import (
+       LedgerBalanceCheckPlugin,
+   )
    from pgcraft.views import PostgRESTView, BalanceView
 
    stock = PGCraftLedger(
        tablename="stock_movements",
        schemaname="inventory",
        metadata=metadata,
+       config=config,
        schema_items=[
-           Column("warehouse", String, nullable=False),
-           Column("sku", String, nullable=False),
+           Column(
+               "warehouse", String, nullable=False
+           ),
+           Column(
+               "sku", String, nullable=False
+           ),
        ],
        extra_plugins=[
            LedgerBalanceCheckPlugin(
                dimensions=["warehouse", "sku"],
-               min_balance=0,   # default; cannot go negative
+               min_balance=0,  # cannot go negative
            ),
        ],
    )
@@ -262,6 +288,7 @@ internal plugin override mechanism:
 
 .. code-block:: python
 
+   # Config assumed from above.
    from pgcraft.factory import PGCraftLedger
    from pgcraft.plugins.ledger import LedgerTablePlugin
    from pgcraft.views import PostgRESTView
@@ -270,8 +297,13 @@ internal plugin override mechanism:
        tablename="payments",
        schemaname="finance",
        metadata=metadata,
+       config=config,
        schema_items=[
-           Column("account_id", Integer, nullable=False),
+           Column(
+               "account_id",
+               Integer,
+               nullable=False,
+           ),
        ],
    )
 
@@ -290,6 +322,7 @@ primary key with ``gen_random_uuid()`` as the server default:
 
 .. code-block:: python
 
+   # Config assumed from above.
    from pgcraft.factory import PGCraftLedger
    from pgcraft.plugins.pk import UUIDV4PKPlugin
    from pgcraft.views import PostgRESTView
@@ -298,8 +331,13 @@ primary key with ``gen_random_uuid()`` as the server default:
        tablename="events",
        schemaname="analytics",
        metadata=metadata,
+       config=config,
        schema_items=[
-           Column("event_type", String, nullable=False),
+           Column(
+               "event_type",
+               String,
+               nullable=False,
+           ),
        ],
        plugins=[UUIDV4PKPlugin()],
    )

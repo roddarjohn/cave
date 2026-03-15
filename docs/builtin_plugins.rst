@@ -113,6 +113,13 @@ API views are created separately from the factory using
 PostgREST-facing view and registers the API resource for
 role/grant generation.
 
+.. note::
+
+   The PostgREST extension must be registered on your
+   :class:`~pgcraft.config.PGCraftConfig` for roles and grants
+   to be generated.  See the setup snippet in the first example
+   below.
+
 Grants drive triggers: INSTEAD OF triggers are only created for
 the DML operations listed in ``grants``.  A ``["select"]``-only
 view has no triggers and is read-only.
@@ -147,8 +154,15 @@ Default behaviour — ``SELECT *``
 
 .. code-block:: python
 
+   from pgcraft.config import PGCraftConfig
+   from pgcraft.extensions.postgrest import (
+       PostgRESTExtension,
+   )
    from pgcraft.factory import PGCraftSimple
    from pgcraft.views import PostgRESTView
+
+   config = PGCraftConfig()
+   config.use(PostgRESTExtension())
 
    users = PGCraftSimple(
        "users", "public", metadata,
@@ -156,6 +170,7 @@ Default behaviour — ``SELECT *``
            Column("name", String, nullable=False),
            Column("email", String),
        ],
+       config=config,
    )
 
    # Exposes all columns, SELECT only (read-only, no triggers)

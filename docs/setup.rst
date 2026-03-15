@@ -158,6 +158,7 @@ current state is always the most recent row in the attributes log:
        tablename="prices",
        schemaname="dim",
        metadata=metadata,
+       config=config,
        schema_items=[
            Column("sku", String, nullable=False),
            Column("amount", Numeric(10, 2), nullable=False),
@@ -184,6 +185,7 @@ is allowed through the API view:
        tablename="order_events",
        schemaname="ops",
        metadata=metadata,
+       config=config,
        schema_items=[
            Column("order_id", String, nullable=False),
            Column("status", String, nullable=False),
@@ -215,6 +217,7 @@ frequently:
        tablename="features",
        schemaname="dim",
        metadata=metadata,
+       config=config,
        schema_items=[
            Column("name", String, nullable=False),
            Column("enabled", Boolean),
@@ -240,6 +243,7 @@ Custom PK column name:
 
    products = PGCraftSimple(
        "products", "dim", metadata, schema_items,
+       config=config,
        plugins=[UUIDV4PKPlugin()],
    )
 
@@ -251,6 +255,7 @@ Custom API schema:
 
    products = PGCraftSimple(
        "products", "dim", metadata, schema_items,
+       config=config,
    )
 
    PostgRESTView(source=products, schema="reporting")
@@ -261,9 +266,15 @@ Apply a custom plugin to every factory via
 .. code-block:: python
 
    from pgcraft.config import PGCraftConfig
+   from pgcraft.extensions.postgrest import (
+       PostgRESTExtension,
+   )
 
    pgcraft_cfg = PGCraftConfig()
-   pgcraft_cfg.register(TimestampPlugin(), TenantPlugin())
+   pgcraft_cfg.use(PostgRESTExtension())
+   pgcraft_cfg.register(
+       TimestampPlugin(), TenantPlugin(),
+   )
 
    PGCraftSimple(
        "products", "dim", metadata, schema_items,
