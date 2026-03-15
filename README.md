@@ -121,8 +121,6 @@ DATABASE_URL=postgresql+psycopg:///pgcraft just dev-test
 
 See [PLAN.md](PLAN.md) for the full design philosophy. The short version:
 
-- **Postgres is king.** Push logic into the database when it is obviously
-  correct and declarative.
 - **Explicit over implicit.** No magic — if behavior is not obvious from
   reading the code, it needs a docstring explaining *why*.
 - **Simple over clever.** Three similar lines are better than a premature
