@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from pgcraft.factory.context import FactoryContext
 
 
+@requires(Dynamic("table_key"))
 class _CheckPlugin(Plugin):
     """Base class for check-constraint enforcement plugins.
 
@@ -37,6 +38,10 @@ class _CheckPlugin(Plugin):
     name set and the application logic.
 
     """
+
+    def __init__(self, table_key: str = "primary") -> None:
+        """Store the context key."""
+        self.table_key = table_key
 
     def _column_names(self, ctx: FactoryContext) -> set[str]:
         """Return the set of column names available for validation.
@@ -88,7 +93,6 @@ _NAMING_DEFAULTS = {
 }
 
 
-@requires(Dynamic("table_key"))
 class TableCheckPlugin(_CheckPlugin):
     """Materialize :class:`~pgcraft.check.PGCraftCheck` as table constraints.
 
@@ -101,10 +105,6 @@ class TableCheckPlugin(_CheckPlugin):
             (default ``"primary"``).
 
     """
-
-    def __init__(self, table_key: str = "primary") -> None:
-        """Store the context key."""
-        self.table_key = table_key
 
     def _column_names(self, ctx: FactoryContext) -> set[str]:
         """Return column names from the physical table."""
@@ -123,7 +123,6 @@ class TableCheckPlugin(_CheckPlugin):
             table.append_constraint(constraint)
 
 
-@requires(Dynamic("view_key"))
 class TriggerCheckPlugin(_CheckPlugin):
     """Enforce checks via INSTEAD OF triggers (EAV dimensions).
 
@@ -134,14 +133,10 @@ class TriggerCheckPlugin(_CheckPlugin):
     triggers in alphabetical order by name).
 
     Args:
-        view_key: Key in ``ctx`` for the trigger target view
+        table_key: Key in ``ctx`` for the trigger target view
             (default ``"primary"``).
 
     """
-
-    def __init__(self, view_key: str = "primary") -> None:
-        """Store the context key."""
-        self.view_key = view_key
 
     def _column_names(self, ctx: FactoryContext) -> set[str]:
         """Return column names from the virtual (schema_items) columns."""
@@ -161,10 +156,10 @@ class TriggerCheckPlugin(_CheckPlugin):
         template = load_template(_TEMPLATES / "validate.plpgsql.mako")
         template_vars = {"checks": resolved_checks}
 
-        if self.view_key not in ctx:
+        if self.table_key not in ctx:
             return
 
-        view = ctx[self.view_key]
+        view = ctx[self.table_key]
         view_schema = view.schema or ctx.schemaname
         view_fullname = f"{view_schema}.{ctx.tablename}"
 
