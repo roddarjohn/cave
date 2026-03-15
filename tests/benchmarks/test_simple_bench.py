@@ -1,31 +1,37 @@
 """Benchmarks for simple dimension operations."""
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import Column, String, text
 
 from tests.benchmarks.conftest import (
     SCHEMA,
-    seed_simple_rows,
-    setup_simple_dimension,
+    BenchSimple,
+    build_metadata,
+    create_all_from_metadata,
 )
 
 
 @pytest.fixture(scope="module")
 def _simple_tables(db_engine, bench_schema):  # noqa: ARG001
+    meta, _ = build_metadata(BenchSimple, "bm_simple", [Column("name", String)])
     with db_engine.connect() as conn:
-        setup_simple_dimension(conn, SCHEMA, "bm_simple", "name TEXT NOT NULL")
+        create_all_from_metadata(conn, meta)
 
 
 @pytest.fixture(scope="module")
-def _seeded_tables(db_engine, _simple_tables):
+def _seeded_tables(db_engine, bench_schema):  # noqa: ARG001
+    meta, _ = build_metadata(
+        BenchSimple,
+        "bm_simple_big",
+        [Column("name", String)],
+    )
     with db_engine.connect() as conn:
-        setup_simple_dimension(
-            conn,
-            SCHEMA,
-            "bm_simple_big",
-            "name TEXT NOT NULL",
+        create_all_from_metadata(conn, meta)
+        values = ", ".join(f"('item_{i}')" for i in range(10_000))
+        conn.execute(
+            text(f"INSERT INTO {SCHEMA}.bm_simple_big (name) VALUES {values}")
         )
-        seed_simple_rows(conn, SCHEMA, "bm_simple_big", 10_000)
+        conn.commit()
 
 
 # -- single-row operations ------------------------------------------------
@@ -136,7 +142,7 @@ class TestSimpleSelect:
 
         def do_select():
             bench_conn.execute(
-                text(f"SELECT * FROM {schema}.bm_simple_big_view")
+                text(f"SELECT * FROM {schema}.bm_simple_big")
             ).fetchall()
 
         benchmark.pedantic(do_select, rounds=1_000)
@@ -147,7 +153,7 @@ class TestSimpleSelect:
         def do_select():
             bench_conn.execute(
                 text(
-                    f"SELECT * FROM {schema}.bm_simple_big_view"
+                    f"SELECT * FROM {schema}.bm_simple_big"
                     f" WHERE name = 'item_500'"
                 )
             ).fetchall()
