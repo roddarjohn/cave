@@ -40,7 +40,7 @@ jobs:
     name: docs
     services:
       postgres:
-        image: postgres:17
+        image: postgres:18
         env:
           POSTGRES_DB: pgcraft
           POSTGRES_HOST_AUTH_METHOD: trust
@@ -65,7 +65,7 @@ jobs:
     name: coverage
     services:
       postgres:
-        image: postgres:17
+        image: postgres:18
         env:
           POSTGRES_DB: pgcraft
           POSTGRES_HOST_AUTH_METHOD: trust
