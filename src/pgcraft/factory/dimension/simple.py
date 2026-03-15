@@ -5,6 +5,7 @@ from typing import ClassVar
 from pgcraft.factory.base import ResourceFactory
 from pgcraft.plugin import Plugin
 from pgcraft.plugins.check import TableCheckPlugin
+from pgcraft.plugins.protect import RawTableProtectionPlugin
 from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 
 
@@ -38,7 +39,7 @@ class PGCraftSimple(ResourceFactory):
     _INTERNAL_PLUGINS: ClassVar[list[Plugin]] = [
         SimpleTablePlugin(),
         TableCheckPlugin(),
+        RawTableProtectionPlugin("primary"),
     ]
 
     TRIGGER_PLUGIN_CLS = SimpleTriggerPlugin
-    PROTECTED_TABLE_KEYS: ClassVar[list[str]] = ["primary"]
