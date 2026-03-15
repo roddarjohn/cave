@@ -49,23 +49,18 @@ def create_all_from_metadata(conn, metadata):
     Mirrors what Alembic does at migration time: tables via
     SQLAlchemy's ``create_all``, then views, functions, and triggers
     from the ``sqlalchemy_declarative_extensions`` registrations.
+
+    Does **not** commit — the caller controls transaction boundaries.
+    Integration tests rely on a transactional rollback for isolation,
+    so committing here would break that pattern.
     """
     metadata.create_all(conn)
 
     funcs_obj = metadata.info.get("functions")
     if funcs_obj:
         for fn in funcs_obj.functions:
-            schema = fn.schema or "public"
-            conn.execute(
-                text(
-                    f"CREATE OR REPLACE FUNCTION"
-                    f" {schema}.{fn.name}()"
-                    f" RETURNS {fn.returns}"
-                    f" LANGUAGE {fn.language}"
-                    f" SECURITY DEFINER"
-                    f" AS $$ {fn.definition} $$"
-                )
-            )
+            for stmt in fn.to_sql_create(replace=True):
+                conn.execute(text(stmt))
 
     views_obj = metadata.info.get("views")
     if views_obj:
@@ -79,5 +74,3 @@ def create_all_from_metadata(conn, metadata):
     if triggers_obj:
         for trg in triggers_obj.triggers:
             conn.execute(text(trg.to_sql_create()))
-
-    conn.commit()
