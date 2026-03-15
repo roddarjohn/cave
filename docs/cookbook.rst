@@ -398,9 +398,14 @@ internal columns that should not be visible to API consumers.
 
    from sqlalchemy import Column, MetaData, Numeric, String, Text
 
+   from pgcraft.config import PGCraftConfig
+   from pgcraft.extensions.postgrest import PostgRESTExtension
    from pgcraft.factory import PGCraftSimple
    from pgcraft.views import PostgRESTView
    from pgcraft import pgcraft_build_naming_conventions
+
+   config = PGCraftConfig()
+   config.use(PostgRESTExtension())
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
@@ -410,11 +415,16 @@ internal columns that should not be visible to API consumers.
        tablename="products",
        schemaname="inventory",
        metadata=metadata,
+       config=config,
        schema_items=[
            Column("name", String, nullable=False),
            Column("sku", String(32), nullable=False),
-           Column("price", Numeric(10, 2), nullable=False),
-           Column("internal_notes", Text),  # hidden from API
+           Column(
+               "price",
+               Numeric(10, 2),
+               nullable=False,
+           ),
+           Column("internal_notes", Text),  # hidden
        ],
    )
 
@@ -479,12 +489,19 @@ statistics:
        select,
    )
 
+   from pgcraft.config import PGCraftConfig
+   from pgcraft.extensions.postgrest import (
+       PostgRESTExtension,
+   )
    from pgcraft.factory import PGCraftSimple
    from pgcraft.views import PostgRESTView
    from pgcraft.views.view import PGCraftView
    from pgcraft import (
        pgcraft_build_naming_conventions,
    )
+
+   config = PGCraftConfig()
+   config.use(PostgRESTExtension())
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
@@ -494,14 +511,24 @@ statistics:
 
    Orders = PGCraftSimple(
        "orders", "public", metadata,
+       config=config,
        schema_items=[
-           Column("customer_id", Integer, nullable=False),
-           Column("total", Numeric(10, 2), nullable=False),
+           Column(
+               "customer_id",
+               Integer,
+               nullable=False,
+           ),
+           Column(
+               "total",
+               Numeric(10, 2),
+               nullable=False,
+           ),
        ],
    )
 
    customers = PGCraftSimple(
        "customers", "public", metadata,
+       config=config,
        schema_items=[
            Column("name", String, nullable=False),
            Column("email", String),
@@ -592,9 +619,16 @@ written to.
        String,
    )
 
+   from pgcraft.config import PGCraftConfig
+   from pgcraft.extensions.postgrest import (
+       PostgRESTExtension,
+   )
    from pgcraft.factory import PGCraftSimple
    from pgcraft.views import PostgRESTView
    from pgcraft import pgcraft_build_naming_conventions
+
+   config = PGCraftConfig()
+   config.use(PostgRESTExtension())
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
@@ -602,6 +636,7 @@ written to.
 
    products = PGCraftSimple(
        "products", "inventory", metadata,
+       config=config,
        schema_items=[
            Column("name", String, nullable=False),
            Column("price", Integer, nullable=False),

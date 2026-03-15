@@ -219,6 +219,9 @@ To replace the default plugin list entirely:
        ],
    )
 
+   # Requires PostgRESTExtension on PGCraftConfig
+   # for role/grant generation — see "Global
+   # configuration" below.
    PostgRESTView(source=events, schema="reporting")
 
 
