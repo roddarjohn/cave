@@ -128,4 +128,5 @@ See [PLAN.md](PLAN.md) for the full design philosophy. The short version:
 
 ## License
 
+Adding something here
 See [LICENSE](LICENSE) for details.
