@@ -8,7 +8,6 @@ from sqlalchemy import literal_column, select
 from sqlalchemy.dialects import postgresql
 from sqlalchemy_declarative_extensions import View, register_view
 
-from pgcraft.plugins.protect import _register_table_protection
 from pgcraft.resource import (
     APIResource,
     Grant,
@@ -239,21 +238,6 @@ def _install_triggers(
     if isinstance(source, PGCraftEAV):
         check_plugin = TriggerCheckPlugin(view_key="api")
         check_plugin.run(ctx)
-
-
-def _install_protection(
-    source: ResourceFactory,
-    ctx: FactoryContext,
-) -> None:
-    """Auto-install raw table protection triggers."""
-    protected_keys: list[str] = getattr(source, "PROTECTED_TABLE_KEYS", [])
-    for key in protected_keys:
-        if key in ctx:
-            _register_table_protection(
-                ctx.metadata,
-                ctx[key],
-                ctx.schemaname,
-            )
 
 
 class APIView:

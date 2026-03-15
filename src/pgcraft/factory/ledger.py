@@ -56,7 +56,6 @@ class PGCraftLedger(ResourceFactory):
     ]
 
     TRIGGER_PLUGIN_CLS = LedgerTriggerPlugin
-    PROTECTED_TABLE_KEYS: ClassVar[list[str]] = []
 
     def __init__(  # noqa: PLR0913
         self,

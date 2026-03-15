@@ -11,6 +11,7 @@ from pgcraft.plugins.eav import (
     EAVTriggerPlugin,
     EAVViewPlugin,
 )
+from pgcraft.plugins.protect import RawTableProtectionPlugin
 
 
 class PGCraftEAV(ResourceFactory):
@@ -39,10 +40,7 @@ class PGCraftEAV(ResourceFactory):
         EAVTablePlugin(),
         EAVViewPlugin(),
         TriggerCheckPlugin(),
+        RawTableProtectionPlugin("entity", "attribute"),
     ]
 
     TRIGGER_PLUGIN_CLS = EAVTriggerPlugin
-    PROTECTED_TABLE_KEYS: ClassVar[list[str]] = [
-        "entity",
-        "attribute",
-    ]

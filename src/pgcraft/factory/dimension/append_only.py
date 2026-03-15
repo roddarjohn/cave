@@ -11,6 +11,7 @@ from pgcraft.plugins.append_only import (
 )
 from pgcraft.plugins.check import TableCheckPlugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
+from pgcraft.plugins.protect import RawTableProtectionPlugin
 
 
 class PGCraftAppendOnly(ResourceFactory):
@@ -39,10 +40,7 @@ class PGCraftAppendOnly(ResourceFactory):
         AppendOnlyTablePlugin(),
         AppendOnlyViewPlugin(),
         TableCheckPlugin(),
+        RawTableProtectionPlugin("root_table", "attributes"),
     ]
 
     TRIGGER_PLUGIN_CLS = AppendOnlyTriggerPlugin
-    PROTECTED_TABLE_KEYS: ClassVar[list[str]] = [
-        "root_table",
-        "attributes",
-    ]
