@@ -45,6 +45,17 @@ VIEWS = [
             ("status", "VARCHAR", "NOT NULL"),
         ],
     },
+    {
+        "fullname": "ops.order_events_latest",
+        "columns": [
+            ("id", "INTEGER", "PK"),
+            ("entry_id", "UUID", "NOT NULL"),
+            ("created_at", "DATETIME", ""),
+            ("value", "INTEGER", "NOT NULL"),
+            ("order_id", "VARCHAR", "NOT NULL"),
+            ("status", "VARCHAR", "NOT NULL"),
+        ],
+    },
 ]
 
 EXTRA_EDGES = [
@@ -52,6 +63,15 @@ EXTRA_EDGES = [
         "api.order_events",
         "ops.order_events",
         'style=dashed label="SELECT *"',
+    ),
+    (
+        "ops.order_events_latest",
+        "ops.order_events",
+        (
+            "style=dashed"
+            ' label="DISTINCT ON (order_id)\\n'
+            'ORDER BY created_at DESC"'
+        ),
     ),
 ]
 
