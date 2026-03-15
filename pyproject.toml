@@ -49,6 +49,7 @@ dev = [
   "psycopg[binary]>=3.3.3",
   "pytest>=8",
   "pytest-alembic>=0.12.1",
+  "pytest-benchmark>=5.1",
   "python-dotenv>=1.2.2",
   "slipcover>=1.0.17",
   "tox>=4.49.1",
@@ -124,6 +125,10 @@ extra-paths = ["tests/db"]
 [tool.ty.analysis]
 # pglast has no type stubs.
 allowed-unresolved-imports = ["pglast.**", "sqlfluff.**"]
+
+[tool.pytest.ini_options]
+# Exclude benchmarks from normal test runs; use `just bench` instead
+addopts = "--ignore=tests/benchmarks"
 
 [tool.tox]
 requires = ["tox-uv>=1"]
