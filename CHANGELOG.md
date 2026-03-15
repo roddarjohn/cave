@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.2](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.6.1...pgcraft-v0.6.2) (2026-03-15)
+
+
+### Features
+
+* and the revert ([235c839](https://github.com/roddarjohn/pgcraft/commit/235c8399b6f6412aaabe686732439a4b4c52e830))
+* quick licence fix ([65298a0](https://github.com/roddarjohn/pgcraft/commit/65298a0e244657679fb1b43ab389fa21d4cab87c))
+
 ## [0.6.1](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.6.0...pgcraft-v0.6.1) (2026-03-15)
 
 
