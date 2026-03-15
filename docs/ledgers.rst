@@ -193,7 +193,7 @@ Set ``min_balance`` to a different value for other use cases:
    )
 
 
-Double-Entry Ledger
+Double-entry ledger
 -------------------
 
 A double-entry ledger extends the basic ledger with debit/credit
@@ -252,7 +252,7 @@ rejected.
    the backing table to benefit from statement-level batching.
 
 
-Customising the Value Type
+Customising the value type
 --------------------------
 
 The default value type is ``INTEGER``.  To use ``NUMERIC`` for
@@ -281,7 +281,7 @@ internal plugin override mechanism:
    )
 
 
-Using a UUID Primary Key
+Using a UUID primary key
 ------------------------
 
 Swap :class:`~pgcraft.plugins.pk.SerialPKPlugin` for
