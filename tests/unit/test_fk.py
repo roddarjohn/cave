@@ -16,30 +16,26 @@ from pgcraft.fk import (
 class TestPGCraftFK:
     def test_basic_raw_references(self):
         fk = PGCraftFK(
-            columns=["{org_id}"],
-            raw_references=["public.orgs.id"],
+            raw_references={"{org_id}": "public.orgs.id"},
             name="fk_org",
         )
-        assert fk.columns == ["{org_id}"]
-        assert fk.raw_references == ["public.orgs.id"]
-        assert fk.references == []
+        assert fk.raw_references == {"{org_id}": "public.orgs.id"}
+        assert fk.references == {}
         assert fk.name == "fk_org"
         assert fk.ondelete is None
         assert fk.onupdate is None
 
     def test_basic_references(self):
         fk = PGCraftFK(
-            columns=["{org_id}"],
-            references=["org.id"],
+            references={"{org_id}": "org.id"},
             name="fk_org",
         )
-        assert fk.references == ["org.id"]
-        assert fk.raw_references == []
+        assert fk.references == {"{org_id}": "org.id"}
+        assert fk.raw_references == {}
 
     def test_cascade_options(self):
         fk = PGCraftFK(
-            columns=["{org_id}"],
-            raw_references=["public.orgs.id"],
+            raw_references={"{org_id}": "public.orgs.id"},
             name="fk_org",
             ondelete="CASCADE",
             onupdate="SET NULL",
@@ -49,22 +45,19 @@ class TestPGCraftFK:
 
     def test_multi_column_raw(self):
         fk = PGCraftFK(
-            columns=["{a}", "{b}"],
-            raw_references=[
-                "public.other.x",
-                "public.other.y",
-            ],
+            raw_references={
+                "{a}": "public.other.x",
+                "{b}": "public.other.y",
+            },
             name="fk_ab",
         )
-        assert fk.columns == ["{a}", "{b}"]
         assert len(fk.raw_references) == 2
 
     def test_both_references_raises(self):
         with pytest.raises(PGCraftValidationError, match="not both"):
             PGCraftFK(
-                columns=["{a}"],
-                references=["org.id"],
-                raw_references=["public.orgs.id"],
+                references={"{a}": "org.id"},
+                raw_references={"{a}": "public.orgs.id"},
                 name="fk_bad",
             )
 
@@ -73,15 +66,11 @@ class TestPGCraftFK:
             PGCraftValidationError,
             match="provide either",
         ):
-            PGCraftFK(
-                columns=["{a}"],
-                name="fk_bad",
-            )
+            PGCraftFK(name="fk_bad")
 
     def test_is_frozen(self):
         fk = PGCraftFK(
-            columns=["{a}"],
-            references=["t.a"],
+            references={"{a}": "t.a"},
             name="fk_a",
         )
         with pytest.raises(AttributeError):
@@ -89,24 +78,24 @@ class TestPGCraftFK:
 
     def test_column_names(self):
         fk = PGCraftFK(
-            columns=["{org_id}"],
-            references=["customer.id"],
+            references={"{org_id}": "customer.id"},
             name="fk_org",
         )
         assert fk.column_names() == ["org_id"]
 
     def test_column_names_multi(self):
         fk = PGCraftFK(
-            columns=["{a}", "{b}"],
-            raw_references=["s.t.x", "s.t.y"],
+            raw_references={
+                "{a}": "s.t.x",
+                "{b}": "s.t.y",
+            },
             name="fk_ab",
         )
         assert fk.column_names() == ["a", "b"]
 
     def test_resolve_identity(self):
         fk = PGCraftFK(
-            columns=["{org_id}"],
-            references=["customer.id"],
+            references={"{org_id}": "customer.id"},
             name="fk_org",
         )
         assert fk.resolve(lambda c: c) == ["org_id"]
@@ -114,8 +103,7 @@ class TestPGCraftFK:
     def test_resolve_references_raw_passthrough(self):
         metadata = MetaData()
         fk = PGCraftFK(
-            columns=["{org_id}"],
-            raw_references=["public.orgs.id"],
+            raw_references={"{org_id}": "public.orgs.id"},
             name="fk_org",
         )
         resolved = fk.resolve_references(metadata)
@@ -175,8 +163,7 @@ class TestDimensionRegistry:
             DimensionRef(schema="dim", table="org"),
         )
         fk = PGCraftFK(
-            columns=["{org_id}"],
-            references=["org.id"],
+            references={"{org_id}": "org.id"},
             name="fk_org",
         )
         resolved = fk.resolve_references(metadata)
@@ -190,8 +177,7 @@ class TestCollectFKs:
         items = [
             Column("org_id", Integer),
             PGCraftFK(
-                columns=["{org_id}"],
-                references=["org.id"],
+                references={"{org_id}": "org.id"},
                 name="fk_org",
             ),
         ]

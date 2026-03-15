@@ -17,7 +17,8 @@ All dimension types support declarative
 :class:`~pgcraft.check.PGCraftCheck`,
 :class:`~pgcraft.index.PGCraftIndex`, and
 :class:`~pgcraft.fk.PGCraftFK` items in ``schema_items``.
-See :ref:`cookbook-indices-and-fks` for usage examples.
+See :doc:`constraints_and_indices` for a full walkthrough with
+generated SQL.
 
 
 Simple dimension

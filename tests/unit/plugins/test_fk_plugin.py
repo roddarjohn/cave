@@ -1,7 +1,13 @@
 """Unit tests for TableFKPlugin."""
 
 import pytest
-from sqlalchemy import Column, ForeignKeyConstraint, Integer, String, Table
+from sqlalchemy import (
+    Column,
+    ForeignKeyConstraint,
+    Integer,
+    String,
+    Table,
+)
 
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.fk import PGCraftFK
@@ -17,8 +23,7 @@ class TestTableFKPlugin:
             schema_items=[
                 Column("org_id", Integer),
                 PGCraftFK(
-                    columns=["{org_id}"],
-                    raw_references=["public.orgs.id"],
+                    raw_references={"{org_id}": "public.orgs.id"},
                     name="fk_org",
                 ),
             ]
@@ -40,8 +45,7 @@ class TestTableFKPlugin:
             schema_items=[
                 Column("org_id", Integer),
                 PGCraftFK(
-                    columns=["{org_id}"],
-                    raw_references=["public.orgs.id"],
+                    raw_references={"{org_id}": "public.orgs.id"},
                     name="fk_org",
                     ondelete="CASCADE",
                     onupdate="SET NULL",
@@ -72,8 +76,7 @@ class TestTableFKPlugin:
             schema_items=[
                 Column("org_id", Integer),
                 PGCraftFK(
-                    columns=["{nonexistent}"],
-                    raw_references=["public.orgs.id"],
+                    raw_references={"{nonexistent}": "public.orgs.id"},
                     name="fk_bad",
                 ),
             ]
@@ -92,8 +95,7 @@ class TestTableFKPlugin:
             schema_items=[
                 Column("org_id", Integer),
                 PGCraftFK(
-                    columns=["{org_id}"],
-                    raw_references=["public.orgs.id"],
+                    raw_references={"{org_id}": "public.orgs.id"},
                     name="fk_org",
                 ),
             ]

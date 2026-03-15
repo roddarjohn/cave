@@ -456,8 +456,9 @@ dimensions).
            Column("customer_id", Integer, nullable=False),
            Column("total", Integer, nullable=False),
            PGCraftFK(
-               columns=["{customer_id}"],
-               references=["customers.id"],
+               references={
+                   "{customer_id}": "customers.id"
+               },
                name="fk_orders_customer",
                ondelete="CASCADE",
            ),
@@ -473,16 +474,17 @@ resolves to the root table automatically.
 .. code-block:: python
 
    PGCraftFK(
-       columns=["{org_id}"],
-       raw_references=["public.organizations.id"],
+       raw_references={
+           "{org_id}": "public.organizations.id"
+       },
        name="fk_orders_org",
    )
 
 Use ``raw_references`` for tables outside pgcraft or when you
 want full control over the FK target.
 
-See :doc:`indices_and_fks` for a walkthrough of the generated
-SQL.
+See :doc:`constraints_and_indices` for a walkthrough of the
+generated SQL.
 
 
 AppendOnlyTablePlugin

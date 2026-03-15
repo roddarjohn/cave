@@ -1,15 +1,18 @@
 """Foreign key support for pgcraft dimensions.
 
 Provides :class:`PGCraftFK`, a declarative foreign key constraint
-definition that uses ``{column_name}`` markers for local columns.
+definition that pairs ``{column_name}`` markers with their target
+references in a single dict.
 
 Two reference modes are supported:
 
-- ``references`` — two-part ``"dimension.column"`` strings resolved
-  at factory time via the dimension registry in
+- ``references`` — a dict mapping ``{local_col}`` markers to
+  ``"dimension.column"`` strings, resolved at factory time via
+  the dimension registry in
   ``metadata.info["pgcraft_dimensions"]``.
-- ``raw_references`` — three-part ``"schema.table.column"`` strings
-  passed through to SQLAlchemy directly, bypassing resolution.
+- ``raw_references`` — a dict mapping ``{local_col}`` markers to
+  ``"schema.table.column"`` strings, passed through to SQLAlchemy
+  directly.
 
 Exactly one of the two must be provided.
 """
@@ -68,10 +71,10 @@ def resolve_fk_reference(
     metadata: MetaData,
     reference: str,
 ) -> str:
-    """Resolve a ``"dimension.column"`` reference to a full FK string.
+    """Resolve a ``"dimension.column"`` reference.
 
-    Looks up the dimension name in the registry and expands it to
-    ``"schema.table.column"``.
+    Looks up the dimension name in the registry and expands it
+    to ``"schema.table.column"``.
 
     Args:
         metadata: SQLAlchemy MetaData for registry lookup.
@@ -117,23 +120,34 @@ def resolve_fk_reference(
 
 @dataclass(frozen=True)
 class PGCraftFK:
-    """A declarative foreign key constraint with ``{col}`` markers.
+    """A declarative foreign key constraint.
 
-    Local columns use ``{column_name}`` markers that get resolved
-    against the target table.
+    Each entry in the dict maps a local ``{column}`` marker to
+    its target reference.  Exactly one of ``references`` or
+    ``raw_references`` must be provided:
 
-    Exactly one of ``references`` or ``raw_references`` must be
-    provided:
+    - ``references`` — targets use ``"dimension.column"`` format,
+      resolved via the dimension registry::
 
-    - ``references`` — ``"dimension.column"`` strings resolved via
-      the dimension registry (e.g. ``["customers.id"]``).
-    - ``raw_references`` — ``"schema.table.column"`` strings passed
-      through directly (e.g. ``["public.orgs.id"]``).
+          PGCraftFK(
+              references={"{customer_id}": "customers.id"},
+              name="fk_orders_customer",
+          )
+
+    - ``raw_references`` — targets use
+      ``"schema.table.column"`` format, passed through
+      directly::
+
+          PGCraftFK(
+              raw_references={"{org_id}": "public.orgs.id"},
+              name="fk_orders_org",
+          )
 
     Args:
-        columns: Local column markers, e.g. ``["{org_id}"]``.
-        references: Dimension references resolved via the registry.
-        raw_references: Literal ``"schema.table.column"`` refs.
+        references: Mapping of ``{col}`` markers to dimension
+            references (resolved via registry).
+        raw_references: Mapping of ``{col}`` markers to literal
+            ``schema.table.column`` references.
         name: Required constraint name — no auto-naming.
         ondelete: ON DELETE action (e.g. ``"CASCADE"``).
         onupdate: ON UPDATE action (e.g. ``"CASCADE"``).
@@ -144,9 +158,8 @@ class PGCraftFK:
 
     """
 
-    columns: list[str] = field(default_factory=list)
-    references: list[str] = field(default_factory=list)
-    raw_references: list[str] = field(default_factory=list)
+    references: dict[str, str] = field(default_factory=dict)
+    raw_references: dict[str, str] = field(default_factory=dict)
     name: str = ""
     ondelete: str | None = None
     onupdate: str | None = None
@@ -168,17 +181,22 @@ class PGCraftFK:
             )
             raise PGCraftValidationError(msg)
 
+    @property
+    def _mapping(self) -> dict[str, str]:
+        """Return whichever reference dict was provided."""
+        return self.references or self.raw_references
+
     def column_names(self) -> list[str]:
-        """Extract ``{name}`` markers from local columns.
+        """Extract ``{name}`` markers from local column keys.
 
         Returns:
             Column names in order of first appearance,
-            deduplicated across all column entries.
+            deduplicated.
 
         """
         seen: set[str] = set()
         result: list[str] = []
-        for col in self.columns:
+        for col in self._mapping:
             for name in extract_column_names(col):
                 if name not in seen:
                     seen.add(name)
@@ -186,7 +204,7 @@ class PGCraftFK:
         return result
 
     def resolve(self, mapping: Callable[[str], str]) -> list[str]:
-        """Replace ``{col}`` markers in local columns.
+        """Replace ``{col}`` markers in local column keys.
 
         Args:
             mapping: A callable that maps column names to their
@@ -196,15 +214,15 @@ class PGCraftFK:
             List of resolved column name strings.
 
         """
-        return [resolve_markers(col, mapping) for col in self.columns]
+        return [resolve_markers(col, mapping) for col in self._mapping]
 
     def resolve_references(
         self,
         metadata: Any,  # noqa: ANN401
     ) -> list[str]:
-        """Resolve references to fully qualified FK strings.
+        """Resolve target references to full FK strings.
 
-        If ``raw_references`` was used, returns them as-is.
+        If ``raw_references`` was used, returns values as-is.
         If ``references`` was used, resolves each via the
         dimension registry.
 
@@ -216,8 +234,11 @@ class PGCraftFK:
 
         """
         if self.raw_references:
-            return list(self.raw_references)
-        return [resolve_fk_reference(metadata, ref) for ref in self.references]
+            return list(self.raw_references.values())
+        return [
+            resolve_fk_reference(metadata, ref)
+            for ref in self.references.values()
+        ]
 
 
 def collect_fks(
