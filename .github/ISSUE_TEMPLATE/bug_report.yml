@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a bug in pgcraft
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the behavior.
+      placeholder: |
+        1. Define a dimension config with ...
+        2. Run `pgcraft ...`
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        Please provide:
+        - pgcraft version (`pgcraft --version`)
+        - PostgreSQL version (e.g. `SELECT version()`)
+        - Python version (e.g. `python --version`)
+      placeholder: |
+        - pgcraft: 0.6.2
+        - PostgreSQL: 16.4
+        - Python: 3.12.7
+    validations:
+      required: true
