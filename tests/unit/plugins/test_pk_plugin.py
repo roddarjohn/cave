@@ -1,10 +1,13 @@
 """Unit tests for PK plugins in isolation."""
 
+import pytest
 from sqlalchemy import Integer, MetaData
 from sqlalchemy.dialects.postgresql import UUID
 
 from pgcraft.columns import PrimaryKeyColumns
+from pgcraft.errors import PGCraftValidationError
 from pgcraft.factory.context import FactoryContext
+from pgcraft.plugin import check_pg_version
 from pgcraft.plugins.pk import (
     SerialPKPlugin,
     UUIDV4PKPlugin,
@@ -185,4 +188,29 @@ class TestUUIDV7PKPlugin:
         assert len(ctx["pk_columns"]) == 1
 
     def test_min_pg_version(self):
-        assert UUIDV7PKPlugin.MIN_PG_VERSION == 18
+        assert UUIDV7PKPlugin.min_pg_version == 18
+
+    def test_requires_does_not_include_pg_in_ctx_keys(self):
+        plugin = UUIDV7PKPlugin()
+        assert plugin.resolved_requires() == []
+
+
+class TestCheckPGVersion:
+    def test_passes_when_version_sufficient(self):
+        check_pg_version(18, [UUIDV7PKPlugin()])
+
+    def test_raises_when_version_too_low(self):
+        with pytest.raises(
+            PGCraftValidationError,
+            match=r"UUIDV7PKPlugin requires PostgreSQL >= 18.*version 17",
+        ):
+            check_pg_version(17, [UUIDV7PKPlugin()])
+
+    def test_ignores_plugins_without_version(self):
+        check_pg_version(13, [SerialPKPlugin()])
+
+    def test_mixed_plugins(self):
+        plugins = [SerialPKPlugin(), UUIDV7PKPlugin()]
+        check_pg_version(18, plugins)
+        with pytest.raises(PGCraftValidationError):
+            check_pg_version(17, plugins)

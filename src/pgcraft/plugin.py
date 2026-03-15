@@ -39,13 +39,13 @@ class Dynamic:
 
 
 @dataclass(frozen=True)
-class PG:
+class MinPGVersion:
     """Minimum PostgreSQL version requirement for a plugin.
 
     Use inside :func:`requires` to declare that a plugin needs a
     specific PostgreSQL major version::
 
-        @requires(PG(18))
+        @requires(MinPGVersion(18))
         @produces("pk_columns")
         class UUIDV7PKPlugin(Plugin):
             ...
@@ -60,7 +60,7 @@ class PG:
 
 def _validate_dynamic_keys(
     cls: type,
-    keys: tuple[str | Dynamic | PG, ...],
+    keys: tuple[str | Dynamic | MinPGVersion, ...],
     decorator_name: str,
 ) -> None:
     """Raise TypeError if any Dynamic attr is not an __init__ parameter.
@@ -125,25 +125,25 @@ def produces[T: type[Plugin]](
 
 
 def requires[T: type[Plugin]](
-    *keys: str | Dynamic | PG,
+    *keys: str | Dynamic | MinPGVersion,
 ) -> Callable[[T], T]:
     """Declare the ctx keys this plugin's ``run`` method reads.
 
     Applied as a class decorator, alongside :func:`produces` and
-    :func:`singleton`.  Accepts :class:`PG` sentinels to declare
+    :func:`singleton`.  Accepts :class:`MinPGVersion` sentinels to declare
     a minimum PostgreSQL version requirement::
 
-        @requires(PG(18), "pk_columns")
+        @requires(MinPGVersion(18), "pk_columns")
         class MyPlugin(Plugin):
             ...
 
     Args:
         *keys: Ctx key strings, :class:`Dynamic` references, or
-            :class:`PG` version requirements.
+            :class:`MinPGVersion` version requirements.
 
     Returns:
         A class decorator that attaches ``_requires`` to the class
-        and sets ``min_pg_version`` if any :class:`PG` sentinel
+        and sets ``min_pg_version`` if any :class:`MinPGVersion` sentinel
         is present.
 
     Raises:
@@ -156,7 +156,7 @@ def requires[T: type[Plugin]](
         _validate_dynamic_keys(cls, keys, "requires")
         ctx_keys: list[str | Dynamic] = []
         for key in keys:
-            if isinstance(key, PG):
+            if isinstance(key, MinPGVersion):
                 cls.min_pg_version = key.version
             else:
                 ctx_keys.append(key)

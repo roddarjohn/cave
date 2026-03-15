@@ -11,7 +11,13 @@ if TYPE_CHECKING:
     from pgcraft.factory.context import FactoryContext
 
 from pgcraft.columns import PrimaryKeyColumns
-from pgcraft.plugin import Plugin, produces, singleton
+from pgcraft.plugin import (
+    MinPGVersion,
+    Plugin,
+    produces,
+    requires,
+    singleton,
+)
 
 
 @produces("pk_columns")
@@ -66,6 +72,7 @@ class UUIDV4PKPlugin(Plugin):
         )
 
 
+@requires(MinPGVersion(18))
 @produces("pk_columns")
 @singleton("__pk__")
 class UUIDV7PKPlugin(Plugin):
@@ -76,16 +83,15 @@ class UUIDV7PKPlugin(Plugin):
     making them friendlier to B-tree indexes than random UUIDv4
     values.
 
-    Requires PostgreSQL 18 or later.  On older versions the
-    ``uuidv7()`` function does not exist and PostgreSQL will
-    raise an error at INSERT time.
+    Requires PostgreSQL 18 or later (declared via
+    ``@requires(MinPGVersion(18))``).  Use
+    :func:`~pgcraft.plugin.check_pg_version` to validate the
+    server version before applying DDL.
 
     Args:
         column_name: Name of the PK column (default ``"id"``).
 
     """
-
-    MIN_PG_VERSION = 18
 
     def __init__(self, column_name: str = "id") -> None:
         """Store the PK column name."""
