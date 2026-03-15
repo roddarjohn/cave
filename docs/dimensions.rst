@@ -1,4 +1,4 @@
-Built-in Dimensions
+Built-in dimensions
 ===================
 
 pgcraft ships with three dimension types, each backed by a different
@@ -14,7 +14,7 @@ Choose the type that matches your data:
   columns.  Best for highly dynamic or optional fields.
 
 
-Simple Dimension
+Simple dimension
 ----------------
 
 A single backing table with a corresponding API view.  Suitable
