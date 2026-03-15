@@ -48,7 +48,9 @@ def _resolve_plugins(
         Ordered list of plugins to run.
 
     """
-    global_plugins: list[Plugin] = getattr(config, "plugins", [])
+    global_plugins: list[Plugin] = getattr(
+        config, "all_plugins", getattr(config, "plugins", [])
+    )
     factory_plugins = plugins if plugins is not None else list(defaults)
     local = extra_plugins or []
     user_plugins = global_plugins + factory_plugins + local

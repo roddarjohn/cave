@@ -543,3 +543,6 @@ Built-in plugins reference
 
 See :doc:`builtin_plugins` for detailed documentation of every built-in
 plugin, including parameters, context keys, and usage examples.
+
+See :doc:`extensions` for the extension system that sits above plugins,
+bundling plugins with metadata hooks, Alembic hooks, and CLI commands.

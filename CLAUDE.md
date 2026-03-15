@@ -131,6 +131,36 @@ How plugins compose:
 
 See `docs/plugins.rst` for the full plugin authoring guide.
 
+### Extension system
+
+Extensions sit above plugins. An extension bundles plugins, metadata
+hooks, Alembic hooks, and CLI commands into a single installable unit.
+
+Key files:
+- `src/pgcraft/extension.py` -- `Extension` base class and
+  `discover_extensions()` entry point discovery.
+- `src/pgcraft/extensions/` -- Built-in extensions.
+- `src/pgcraft/extensions/postgrest.py` -- `PostgRESTExtension`
+  (registers PostgREST roles and grants).
+
+How extensions work:
+- `PGCraftConfig.use(ext)` registers an extension instance.
+- `config._resolved_extensions()` merges manual + discovered
+  extensions, deduped by name. Manual takes precedence.
+- `config.all_plugins` returns extension plugins + direct plugins.
+- `pgcraft_configure_metadata()` calls `ext.configure_metadata()`
+  on each resolved extension.
+- `pgcraft_alembic_hook()` calls `ext.configure_alembic()`.
+- `depends_on: ClassVar[list[str]]` declares inter-extension deps.
+- Third-party packages use the `pgcraft.extensions` entry point
+  group for auto-discovery.
+
+PostgREST is now opt-in: `pgcraft_configure_metadata()` no longer
+auto-registers roles. Users must register `PostgRESTExtension` on
+their config.
+
+See `docs/extensions.rst` for the full extension authoring guide.
+
 ## Hooks
 
 A post-tool-use hook runs `just lint && just type-check` after every file

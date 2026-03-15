@@ -19,6 +19,8 @@ from pgcraft import (
     ledger_balances,
     pgcraft_build_naming_conventions,
 )
+from pgcraft.config import PGCraftConfig
+from pgcraft.extensions.postgrest import PostgRESTExtension
 from pgcraft.check import PGCraftCheck
 from pgcraft.declarative import register
 from pgcraft.factory.dimension.append_only import (
@@ -39,6 +41,10 @@ from pgcraft.views.view import PGCraftView
 metadata = MetaData(
     naming_convention=pgcraft_build_naming_conventions(),
 )
+
+pgcraft_config = PGCraftConfig(auto_discover=False)
+pgcraft_config.use(PostgRESTExtension())
+metadata.info["pgcraft_config"] = pgcraft_config
 
 # -- Table factories: create the data model -------------------------
 
