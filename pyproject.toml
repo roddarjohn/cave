@@ -1,6 +1,6 @@
 [project]
 name = "pgcraft"
-version = "0.7.0"
+version = "0.7.1"
 description = "Configuration-driven PostgreSQL framework"
 readme = "README.md"
 license = { file = "LICENSE" }

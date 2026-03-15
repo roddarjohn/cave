@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.7.0...pgcraft-v0.7.1) (2026-03-15)
+
+
+### Features
+
+* `scripts/` cleanup ([#55](https://github.com/roddarjohn/pgcraft/issues/55)) ([a8dc247](https://github.com/roddarjohn/pgcraft/commit/a8dc247d47aee4052cb064d3171f640f499cf8c3))
+
 ## [0.7.0](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.6.3...pgcraft-v0.7.0) (2026-03-15)
 
 
