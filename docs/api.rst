@@ -28,6 +28,9 @@ Plugin system
 .. automodule:: pgcraft.validator
    :members:
 
+.. automodule:: pgcraft.declarative
+   :members:
+
 Dimension resource factories
 ----------------------------
 
@@ -46,6 +49,25 @@ Ledger resource factory
 .. automodule:: pgcraft.factory.ledger
    :members:
 
+View factories
+--------------
+
+.. automodule:: pgcraft.views.api
+   :members:
+   :no-index:
+
+.. automodule:: pgcraft.views.view
+   :members:
+
+.. automodule:: pgcraft.views.balance
+   :members:
+
+.. automodule:: pgcraft.views.latest
+   :members:
+
+.. automodule:: pgcraft.views.actions
+   :members:
+
 Ledger events
 -------------
 
@@ -60,32 +82,42 @@ Built-in plugins
 
 .. automodule:: pgcraft.plugins.pk
    :members:
+   :no-index:
 
 .. automodule:: pgcraft.plugins.created_at
    :members:
+   :no-index:
 
 .. automodule:: pgcraft.plugins.entry_id
    :members:
 
 .. automodule:: pgcraft.plugins.simple
    :members:
+   :no-index:
 
 .. automodule:: pgcraft.plugins.api
    :members:
 
 .. automodule:: pgcraft.plugins.append_only
    :members:
+   :no-index:
 
 .. automodule:: pgcraft.plugins.check
    :members:
+   :no-index:
 
 .. automodule:: pgcraft.plugins.eav
    :members:
+   :no-index:
 
 .. automodule:: pgcraft.plugins.ledger
    :members:
 
 .. automodule:: pgcraft.plugins.statistics
+   :members:
+   :no-index:
+
+.. automodule:: pgcraft.plugins.protect
    :members:
 
 Alembic integration
