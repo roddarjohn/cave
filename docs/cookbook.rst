@@ -424,19 +424,17 @@ tables:
 
 .. _cookbook-statistics-views:
 
-Joining statistics views into the API
+Joining aggregate views into the API
 -------------------------------------
 
-Use :class:`~pgcraft.statistics.PGCraftStatisticsView` to expose
-aggregate or derived data as read-only columns in the API view.
+Create standalone aggregate views with
+:class:`~pgcraft.views.view.PGCraftView`, then join them into an
+API view using the ``query=`` parameter on
+:class:`~pgcraft.views.api.APIView`.
 
-:class:`~pgcraft.plugins.statistics.StatisticsViewPlugin` is
-included in every dimension factory's default plugins and is a
-no-op when no statistics items are present.
-
-Statistics queries are defined using SQLAlchemy ``select()``
-expressions — column names are derived automatically from the
-query, so there is nothing to keep in sync.
+Each ``PGCraftView`` exposes a ``.table`` property — a joinable
+SQLAlchemy selectable — so you can compose joins using standard
+SQLAlchemy syntax.
 
 Multiple statistics on one dimension
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -452,14 +450,13 @@ statistics:
        MetaData,
        Numeric,
        String,
-       Table,
        func,
        select,
    )
 
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.statistics import PGCraftStatisticsView
    from pgcraft.views import APIView
+   from pgcraft.views.view import PGCraftView
    from pgcraft import (
        pgcraft_build_naming_conventions,
    )
@@ -468,195 +465,97 @@ statistics:
        naming_convention=pgcraft_build_naming_conventions(),
    )
 
-   # -- Reference tables (already exist in the database) ------
+   # -- Table factories ----------------------------------------
 
-   orders = Table(
-       "orders",
-       metadata,
-       Column("id", Integer, primary_key=True),
-       Column("customer_id", Integer),
-       Column("total", Numeric(10, 2)),
-       schema="public",
-   )
-
-   invoices = Table(
-       "invoices",
-       metadata,
-       Column("id", Integer, primary_key=True),
-       Column("customer_id", Integer),
-       Column("amount", Numeric(10, 2)),
-       Column("paid", Integer),
-       schema="public",
-   )
-
-   # -- Statistics queries ------------------------------------
-
-   order_stats = select(
-       orders.c.customer_id,
-       func.count().label("order_count"),
-       func.sum(orders.c.total).label("order_total"),
-   ).group_by(orders.c.customer_id)
-
-   invoice_stats = select(
-       invoices.c.customer_id,
-       func.count().label("invoice_count"),
-       func.sum(invoices.c.amount).label("invoiced_total"),
-       func.sum(invoices.c.paid).label("paid_total"),
-   ).group_by(invoices.c.customer_id)
-
-   # -- Dimension with statistics -----------------------------
-
-   customer = PGCraftSimple(
-       tablename="customer",
-       schemaname="dim",
-       metadata=metadata,
+   Orders = PGCraftSimple(
+       "orders", "public", metadata,
        schema_items=[
-           Column("name", String, nullable=False),
-           Column("email", String),
-           PGCraftStatisticsView(
-               name="orders",
-               query=order_stats,
-               join_key="customer_id",
-           ),
-           PGCraftStatisticsView(
-               name="invoices",
-               query=invoice_stats,
-               join_key="customer_id",
-           ),
+           Column("customer_id", Integer, nullable=False),
+           Column("total", Numeric(10, 2), nullable=False),
        ],
    )
 
-   APIView(source=customer)
+   customers = PGCraftSimple(
+       "customers", "public", metadata,
+       schema_items=[
+           Column("name", String, nullable=False),
+           Column("email", String),
+       ],
+   )
+
+   # -- Standalone aggregate views ----------------------------
+
+   _orders_t = Orders.table
+   order_stats = PGCraftView(
+       "customer_order_stats", "public", metadata,
+       query=select(
+           _orders_t.c.customer_id,
+           func.count().label("order_count"),
+           func.sum(_orders_t.c.total).label("order_total"),
+       ).group_by(_orders_t.c.customer_id),
+   )
+
+   # -- API view with joined statistics -----------------------
+   # PGCraftView.table is a joinable SQLAlchemy Table.
+   # Triggers still work — they operate on the base table
+   # columns; joined columns are read-only.
+
+   _os = order_stats.table
+
+   APIView(
+       source=customers,
+       grants=["select", "insert", "update", "delete"],
+       query=lambda q, t: (
+           select(
+               t.c.id,
+               t.c.name,
+               t.c.email,
+               _os.c.order_count,
+               _os.c.order_total,
+           )
+           .select_from(t)
+           .outerjoin(
+               _os, t.c.id == _os.c.customer_id
+           )
+       ),
+   )
 
 This creates:
 
-* ``dim.customer`` — the backing table (``id``, ``name``,
+* ``public.customers`` — the backing table (``id``, ``name``,
   ``email``).
-* ``dim.customer_orders_statistics`` — a view aggregating orders.
-* ``dim.customer_invoices_statistics`` — a view aggregating
-  invoices.
-* ``api.customer`` — the API view with LEFT JOINs to both
-  statistics views.
+* ``public.customer_order_stats`` — a standalone aggregate view.
+* ``api.customers`` — the API view with a LEFT JOIN to the
+  statistics view.
 
-The generated API view looks like:
-
-.. code-block:: sql
-
-   SELECT p.id, p.name, p.email,
-          s.order_count, s.order_total,
-          s1.invoice_count, s1.invoiced_total, s1.paid_total
-   FROM dim.customer AS p
-   LEFT OUTER JOIN dim.customer_orders_statistics AS s
-     ON p.id = s.customer_id
-   LEFT OUTER JOIN dim.customer_invoices_statistics AS s1
-     ON p.id = s1.customer_id
-
-The join key column (``customer_id``) is automatically excluded
-from the API select list — only the aggregate columns appear.
+The ``query=`` lambda receives the base ``SELECT *`` query and the
+source table. Return any valid SQLAlchemy ``Select`` — add joins,
+filter columns, or transform freely. INSTEAD OF triggers are still
+created for the base table columns; joined columns are read-only.
 
 How it works
 ~~~~~~~~~~~~
 
-1. ``PGCraftStatisticsView`` items are filtered out of
-   ``schema_items`` before table creation — they do not add
-   columns to the backing table.
-2. ``StatisticsViewPlugin`` (an internal plugin) compiles each
-   query to SQL and creates a view (or materialized view) named
-   ``{tablename}_{name}_statistics``.
-3. ``APIView`` reads the view info and generates LEFT JOINs
-   into the API view automatically.
-
-Column names are derived from the ``select()`` expression
-automatically.  The ``join_key`` column is included in the view
-(for the JOIN) but excluded from the API select list.
-
-Custom schema for statistics views
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-By default statistics views are created in the same schema as the
-dimension.  Pass a ``schema`` to place them elsewhere:
-
-.. code-block:: python
-
-   PGCraftStatisticsView(
-       name="orders",
-       query=order_stats,
-       join_key="customer_id",
-       schema="analytics",
-   )
-
-Materialized statistics
-~~~~~~~~~~~~~~~~~~~~~~~
-
-For expensive aggregations, set ``materialized=True`` to create a
-materialized view that must be refreshed manually:
-
-.. code-block:: python
-
-   PGCraftStatisticsView(
-       name="lifetime",
-       query=select(
-           orders.c.customer_id,
-           func.sum(orders.c.total).label("lifetime_value"),
-       ).group_by(orders.c.customer_id),
-       join_key="customer_id",
-       materialized=True,
-   )
-
-Refresh it on a schedule:
-
-.. code-block:: sql
-
-   REFRESH MATERIALIZED VIEW dim.customer_lifetime_statistics;
-
-Join key
-~~~~~~~~
-
-The ``join_key`` parameter tells the plugin which column in the
-statistics query corresponds to the primary table's PK.  This is
-required when the foreign key column name differs from the PK
-column name (which is the common case — e.g. ``customer_id`` in
-orders vs. ``id`` in customers).
-
-When ``join_key`` is omitted it defaults to the PK column name,
-which works when the statistics query uses the same name:
-
-.. code-block:: python
-
-   # Works because the query selects "id", matching the PK
-   PGCraftStatisticsView(
-       name="lines",
-       query=select(
-           orders.c.id,
-           func.count().label("line_count"),
-       ).group_by(orders.c.id),
-   )
-
-Combining column selection with statistics
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Use ``columns`` on ``APIView`` to control which table columns
-appear, while statistics columns are always appended:
-
-.. code-block:: python
-
-   from pgcraft.views import APIView
-
-   APIView(source=customer, columns=["id", "name"])
+1. ``PGCraftView`` creates a standalone view from any SQLAlchemy
+   ``select()`` expression and exposes ``.table`` for use in
+   further joins.
+2. ``APIView`` with ``query=`` uses the lambda to customise the
+   view definition. Grants drive which INSTEAD OF triggers are
+   created.
+3. Writable columns are automatically restricted to the base
+   table's dimension columns — joined columns cannot be written
+   through the API view.
 
 
-.. _cookbook-computed-and-statistics:
+.. _cookbook-computed-columns:
 
-Computed columns with statistics
---------------------------------
+Computed columns
+----------------
 
-Combine PostgreSQL computed columns (``Computed``) with statistics
-views for a dimension that has both derived table columns and
-aggregated read-only data from related tables.
-
-``Computed`` columns live in the backing table — PostgreSQL
-evaluates them automatically from other columns.  Statistics views
-are separate views that get LEFT JOINed into the API.
+PostgreSQL computed columns (``Computed``) are derived from other
+columns in the same row.  PostgreSQL evaluates them automatically
+— they appear in the API view like any other column but cannot be
+written to.
 
 .. code-block:: python
 
@@ -665,76 +564,34 @@ are separate views that get LEFT JOINed into the API.
        Computed,
        Integer,
        MetaData,
-       Numeric,
        String,
-       Table,
-       func,
-       select,
    )
 
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.statistics import PGCraftStatisticsView
    from pgcraft.views import APIView
-   from pgcraft import (
-       pgcraft_build_naming_conventions,
-   )
+   from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
        naming_convention=pgcraft_build_naming_conventions(),
    )
 
-   # Reference table
-   orders = Table(
-       "orders",
-       metadata,
-       Column("id", Integer, primary_key=True),
-       Column("customer_id", Integer),
-       Column("total", Numeric(10, 2)),
-       schema="public",
-   )
-
-   order_stats = select(
-       orders.c.customer_id,
-       func.count().label("order_count"),
-       func.sum(orders.c.total).label("order_total"),
-   ).group_by(orders.c.customer_id)
-
    products = PGCraftSimple(
-       tablename="products",
-       schemaname="inventory",
-       metadata=metadata,
+       "products", "inventory", metadata,
        schema_items=[
            Column("name", String, nullable=False),
            Column("price", Integer, nullable=False),
            Column("qty", Integer, nullable=False),
-           # Computed: Postgres evaluates this automatically
            Column(
-               "total",
-               Integer,
+               "total", Integer,
                Computed("price * qty"),
-           ),
-           # Statistics: aggregated from a related table
-           PGCraftStatisticsView(
-               name="orders",
-               query=order_stats,
-               join_key="customer_id",
            ),
        ],
    )
 
-   APIView(source=products)
+   APIView(
+       source=products,
+       grants=["select", "insert", "update", "delete"],
+   )
 
-This creates:
-
-* ``inventory.products`` — backing table with ``id``, ``name``,
-  ``price``, ``qty``, and ``total`` (a generated column).
-* ``inventory.products_orders_statistics`` — order aggregation
-  view.
-* ``api.products`` — API view with the computed ``total`` column
-  from the table and the ``order_count`` / ``order_total``
-  columns LEFT JOINed from the statistics view.
-
-The key distinction: ``Computed`` is a native PostgreSQL feature
-for deriving a column from others in the same row, while
-``PGCraftStatisticsView`` creates a separate view that aggregates
-data from other tables and joins it into the API.
+The ``total`` column is a generated column — it appears in the
+API but is computed by PostgreSQL, not writable through the API.
