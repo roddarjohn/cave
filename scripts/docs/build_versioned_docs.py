@@ -20,7 +20,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 OUTPUT = ROOT / "docs" / "_build" / "html"
 SPHINX_BUILD = [
     "uv",

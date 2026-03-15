@@ -1,7 +1,7 @@
 """Integration tests for EAV nullable attribute enforcement.
 
-These tests render the EAV trigger templates into real PL/pgSQL,
-install them against a live PostgreSQL instance, and verify that:
+Uses pgcraft's EAV factory to create real database objects and
+verifies that:
 
 - Non-nullable attributes raise an exception on INSERT/UPDATE when
   the value is omitted (NULL).
@@ -10,174 +10,67 @@ install them against a live PostgreSQL instance, and verify that:
 - Updates that do not change a value write no new attribute row.
 """
 
-from pathlib import Path
-
 import pytest
-from sqlalchemy import String, text
+from sqlalchemy import Column, MetaData, String, text
 
-from pgcraft.plugins.eav import _EAVMapping
-from pgcraft.utils.template import load_template
-
-_EAV_TEMPLATES = (
-    Path(__file__).resolve().parents[4]
-    / "src"
-    / "pgcraft"
-    / "plugins"
-    / "templates"
-    / "eav"
-)
-
-
-def _render_insert(mappings: list[_EAVMapping], schema: str) -> str:
-    tpl = load_template(_EAV_TEMPLATES / "insert.plpgsql.mako")
-    return tpl.render(
-        entity_table=f"{schema}.things_entity",
-        attr_table=f"{schema}.things_attribute",
-        mappings=[
-            (m.attribute_name, m.value_column, m.nullable) for m in mappings
-        ],
-    )
-
-
-def _render_update(mappings: list[_EAVMapping], schema: str) -> str:
-    tpl = load_template(_EAV_TEMPLATES / "update.plpgsql.mako")
-    return tpl.render(
-        attr_table=f"{schema}.things_attribute",
-        mappings=[
-            (m.attribute_name, m.value_column, m.nullable) for m in mappings
-        ],
-    )
-
-
-def _setup_eav(conn, schema: str, mappings: list[_EAVMapping]) -> None:
-    """Create entity/attribute tables, pivot view, and INSTEAD OF triggers."""
-    value_cols = dict.fromkeys(m.value_column for m in mappings)
-    value_col_defs = "\n".join(f"    {vc} TEXT," for vc in value_cols)
-
-    conn.execute(
-        text(f"""
-        CREATE TABLE {schema}.things_entity (
-            id SERIAL PRIMARY KEY,
-            created_at TIMESTAMPTZ DEFAULT now()
-        )
-    """)
-    )
-    conn.execute(
-        text(f"""
-        CREATE TABLE {schema}.things_attribute (
-            id SERIAL PRIMARY KEY,
-            entity_id INTEGER NOT NULL
-                REFERENCES {schema}.things_entity(id) ON DELETE CASCADE,
-            attribute_name TEXT NOT NULL,
-            {value_col_defs}
-            created_at TIMESTAMPTZ DEFAULT now()
-        )
-    """)
-    )
-
-    pivot_cols = ",\n".join(
-        f"    MAX(a.{m.value_column}) FILTER "
-        f"(WHERE a.attribute_name = '{m.attribute_name}') "
-        f"AS {m.attribute_name}"
-        for m in mappings
-    )
-    conn.execute(
-        text(f"""
-        CREATE VIEW {schema}.things AS
-        SELECT e.id, e.created_at,
-        {pivot_cols}
-        FROM {schema}.things_entity e
-        LEFT JOIN (
-            SELECT DISTINCT ON (entity_id, attribute_name) *
-            FROM {schema}.things_attribute
-            ORDER BY entity_id, attribute_name, created_at DESC, id DESC
-        ) a ON a.entity_id = e.id
-        GROUP BY e.id, e.created_at
-    """)
-    )
-
-    insert_body = _render_insert(mappings, schema)
-    conn.execute(
-        text(f"""
-        CREATE FUNCTION {schema}.things_insert() RETURNS trigger
-        LANGUAGE plpgsql AS $$ {insert_body} $$
-    """)
-    )
-    conn.execute(
-        text(f"""
-        CREATE TRIGGER things_insert
-        INSTEAD OF INSERT ON {schema}.things
-        FOR EACH ROW EXECUTE FUNCTION {schema}.things_insert()
-    """)
-    )
-
-    update_body = _render_update(mappings, schema)
-    conn.execute(
-        text(f"""
-        CREATE FUNCTION {schema}.things_update() RETURNS trigger
-        LANGUAGE plpgsql AS $$ {update_body} $$
-    """)
-    )
-    conn.execute(
-        text(f"""
-        CREATE TRIGGER things_update
-        INSTEAD OF UPDATE ON {schema}.things
-        FOR EACH ROW EXECUTE FUNCTION {schema}.things_update()
-    """)
-    )
+from pgcraft.config import PGCraftConfig
+from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTView
+from pgcraft.factory.dimension.eav import PGCraftEAV
+from tests.integration.conftest import create_all_from_metadata
 
 
 @pytest.fixture
 def eav_nullable(db_conn, db_schema):
     """EAV setup with one required (sku) and one optional (color) attribute."""
-    mappings = [
-        _EAVMapping("sku", "text_value", String(), nullable=False),
-        _EAVMapping("color", "text_value", String(), nullable=True),
-    ]
-    _setup_eav(db_conn, db_schema, mappings)
+    config = PGCraftConfig(auto_discover=False)
+    config.use(PostgRESTExtension())
+
+    metadata = MetaData()
+    factory = PGCraftEAV(
+        "things",
+        db_schema,
+        metadata,
+        schema_items=[
+            Column("sku", String, nullable=False),
+            Column("color", String, nullable=True),
+        ],
+        config=config,
+    )
+    PostgRESTView(
+        source=factory,
+        grants=["select", "insert", "update"],
+    )
+    create_all_from_metadata(db_conn, metadata)
     return db_conn, db_schema
 
 
 class TestInsertEnforcement:
     def test_insert_with_required_attribute_succeeds(self, eav_nullable):
-        conn, schema = eav_nullable
-        conn.execute(
-            text(f"INSERT INTO {schema}.things (sku) VALUES ('ABC-1')")
-        )
-        row = conn.execute(text(f"SELECT sku FROM {schema}.things")).fetchone()
+        conn, _ = eav_nullable
+        conn.execute(text("INSERT INTO api.things (sku) VALUES ('ABC-1')"))
+        row = conn.execute(text("SELECT sku FROM api.things")).fetchone()
         assert row is not None
         assert row[0] == "ABC-1"
 
     def test_insert_missing_required_attribute_raises(self, eav_nullable):
-        conn, schema = eav_nullable
+        conn, _ = eav_nullable
         with pytest.raises(Exception, match="sku"):
-            conn.execute(
-                text(f"INSERT INTO {schema}.things (color) VALUES ('red')")
-            )
+            conn.execute(text("INSERT INTO api.things (color) VALUES ('red')"))
 
     def test_insert_with_null_optional_attribute_succeeds(self, eav_nullable):
-        conn, schema = eav_nullable
+        conn, _ = eav_nullable
         conn.execute(
-            text(
-                f"INSERT INTO {schema}.things (sku, color)"
-                f" VALUES ('ABC-2', NULL)"
-            )
+            text("INSERT INTO api.things (sku, color) VALUES ('ABC-2', NULL)")
         )
-        row = conn.execute(
-            text(f"SELECT sku, color FROM {schema}.things")
-        ).fetchone()
+        row = conn.execute(text("SELECT sku, color FROM api.things")).fetchone()
         assert row is not None
         assert row[0] == "ABC-2"
         assert row[1] is None
 
     def test_insert_omitting_optional_attribute_succeeds(self, eav_nullable):
-        conn, schema = eav_nullable
-        conn.execute(
-            text(f"INSERT INTO {schema}.things (sku) VALUES ('ABC-3')")
-        )
-        row = conn.execute(
-            text(f"SELECT color FROM {schema}.things")
-        ).fetchone()
+        conn, _ = eav_nullable
+        conn.execute(text("INSERT INTO api.things (sku) VALUES ('ABC-3')"))
+        row = conn.execute(text("SELECT color FROM api.things")).fetchone()
         assert row is not None
         assert row[0] is None
 
@@ -187,10 +80,7 @@ class TestUpdateEnforcement:
     def _seed(self, eav_nullable):
         conn, schema = eav_nullable
         conn.execute(
-            text(
-                f"INSERT INTO {schema}.things (sku, color)"
-                f" VALUES ('ABC-10', 'red')"
-            )
+            text("INSERT INTO api.things (sku, color) VALUES ('ABC-10', 'red')")
         )
         self.conn = conn
         self.schema = schema
@@ -198,10 +88,7 @@ class TestUpdateEnforcement:
     def test_update_required_attribute_to_null_raises(self):
         with pytest.raises(Exception, match="sku"):
             self.conn.execute(
-                text(
-                    f"UPDATE {self.schema}.things SET sku = NULL"
-                    f" WHERE sku = 'ABC-10'"
-                )
+                text("UPDATE api.things SET sku = NULL WHERE sku = 'ABC-10'")
             )
 
     def test_update_with_same_value_writes_no_new_row(self):
@@ -212,10 +99,7 @@ class TestUpdateEnforcement:
             )
         ).scalar()
         self.conn.execute(
-            text(
-                f"UPDATE {self.schema}.things SET color = 'red'"
-                f" WHERE sku = 'ABC-10'"
-            )
+            text("UPDATE api.things SET color = 'red' WHERE sku = 'ABC-10'")
         )
         after = self.conn.execute(
             text(
@@ -233,10 +117,7 @@ class TestUpdateEnforcement:
             )
         ).scalar()
         self.conn.execute(
-            text(
-                f"UPDATE {self.schema}.things SET color = 'blue'"
-                f" WHERE sku = 'ABC-10'"
-            )
+            text("UPDATE api.things SET color = 'blue' WHERE sku = 'ABC-10'")
         )
         after = self.conn.execute(
             text(

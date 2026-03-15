@@ -68,7 +68,7 @@ Tests require a running PostgreSQL instance with `DATABASE_URL` set
 - All changes MUST be tested. If a behavior changed, a test should cover it.
 - Use `pytest-alembic` for migration testing.
 - Run `just dev-test` for fast feedback, `just test` before submitting.
-- Run `just coverage` to get per-file coverage figures via slipcover.
+- Run `just coverage` to get per-file coverage figures via coverage.py.
 
 **Using coverage to avoid regressions:** Before starting a change, run
 `just coverage` and note the coverage for the files you are about to

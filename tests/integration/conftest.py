@@ -39,4 +39,45 @@ def db_schema(db_conn):
     ``db_conn`` undoes the ``CREATE SCHEMA`` automatically.
     """
     db_conn.execute(text("CREATE SCHEMA IF NOT EXISTS cave_test"))
+    db_conn.execute(text("CREATE SCHEMA IF NOT EXISTS api"))
     return "cave_test"
+
+
+def create_all_from_metadata(conn, metadata):
+    """Create tables, views, functions, and triggers from *metadata*.
+
+    Mirrors what Alembic does at migration time: tables via
+    SQLAlchemy's ``create_all``, then views, functions, and triggers
+    from the ``sqlalchemy_declarative_extensions`` registrations.
+    """
+    metadata.create_all(conn)
+
+    funcs_obj = metadata.info.get("functions")
+    if funcs_obj:
+        for fn in funcs_obj.functions:
+            schema = fn.schema or "public"
+            conn.execute(
+                text(
+                    f"CREATE OR REPLACE FUNCTION"
+                    f" {schema}.{fn.name}()"
+                    f" RETURNS {fn.returns}"
+                    f" LANGUAGE {fn.language}"
+                    f" SECURITY DEFINER"
+                    f" AS $$ {fn.definition} $$"
+                )
+            )
+
+    views_obj = metadata.info.get("views")
+    if views_obj:
+        for view in views_obj:
+            schema = view.schema or "public"
+            defn = view.compile_definition()
+            fqn = f"{schema}.{view.name}"
+            conn.execute(text(f"CREATE OR REPLACE VIEW {fqn} AS {defn}"))
+
+    triggers_obj = metadata.info.get("triggers")
+    if triggers_obj:
+        for trg in triggers_obj.triggers:
+            conn.execute(text(trg.to_sql_create()))
+
+    conn.commit()
