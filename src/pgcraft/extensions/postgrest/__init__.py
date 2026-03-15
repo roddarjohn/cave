@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from pgcraft.extension import PGCraftExtension
-from pgcraft.plugins.api import PostgRESTPlugin
-from pgcraft.views.api import PostgRESTView
+from pgcraft.extensions.postgrest.plugin import PostgRESTPlugin
+from pgcraft.extensions.postgrest.view import PostgRESTView
 
 if TYPE_CHECKING:
     from sqlalchemy import MetaData
@@ -30,11 +30,6 @@ class PostgRESTExtension(PGCraftExtension):
     per-resource grants are emitted by Alembic autogenerate.
 
     Without this extension, no roles or grants are registered.
-
-    This module also re-exports
-    :class:`~pgcraft.views.api.PostgRESTView` and
-    :class:`~pgcraft.plugins.api.PostgRESTPlugin` for
-    convenience.
 
     Example::
 

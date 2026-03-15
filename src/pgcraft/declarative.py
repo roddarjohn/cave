@@ -132,10 +132,12 @@ def _create_register_api_view(
 
     Uses deferred imports to avoid circular dependencies.
     """
+    from pgcraft.extensions.postgrest import (  # noqa: PLC0415
+        PostgRESTView,
+    )
     from pgcraft.plugins.simple import (  # noqa: PLC0415
         SimpleTriggerPlugin,
     )
-    from pgcraft.views.api import PostgRESTView  # noqa: PLC0415
 
     class _RegisterSource:
         TRIGGER_PLUGIN_CLS = SimpleTriggerPlugin
