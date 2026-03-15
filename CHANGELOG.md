@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.6.0...pgcraft-v0.6.1) (2026-03-15)
+
+
+### Features
+
+* fixing readme ([74993c7](https://github.com/roddarjohn/pgcraft/commit/74993c78b960299f868e3f1c11bcb865169d09e4))
+
 ## [0.6.0](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.5.1...pgcraft-v0.6.0) (2026-03-15)
 
 
