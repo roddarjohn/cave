@@ -58,7 +58,7 @@ class PGCraftLedger(ResourceFactory):
         LedgerTablePlugin(),
     ]
 
-    TRIGGER_PLUGIN_CLS = LedgerTriggerPlugin
+    TRIGGER_PLUGIN_CLS = staticmethod(LedgerTriggerPlugin)
 
     def __init__(  # noqa: PLR0913
         self,

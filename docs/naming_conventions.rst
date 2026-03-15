@@ -113,7 +113,7 @@ need a different format.
 Simple dimension
 ~~~~~~~~~~~~~~~~
 
-Used by :class:`~pgcraft.plugins.simple.SimpleTriggerPlugin` when creating
+Used by :class:`~pgcraft.extensions.postgrest.trigger.SimpleTriggerPlugin` when creating
 ``INSTEAD OF`` triggers on the API view.
 
 Available substitutions: ``%(table_name)s``, ``%(schema)s``, ``%(op)s``

@@ -55,7 +55,10 @@ def pgcraft_alembic_hook(
             called.
 
     """
+    # This is from sqlalchemy-declarative-extensions
     register_alembic_events()
+
+    # These are pgcraft specific
     register_renderers()
     apply_all()
 
@@ -69,10 +72,6 @@ def pgcraft_configure_metadata(
     config: PGCraftConfig | None = None,
 ) -> None:
     """Register schemas and extension hooks on *metadata*.
-
-    Roles and grants are no longer registered automatically.
-    Register :class:`~pgcraft.extensions.postgrest.PostgRESTExtension`
-    on your config to enable PostgREST roles.
 
     Args:
         metadata: The SQLAlchemy ``MetaData`` to configure.

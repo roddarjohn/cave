@@ -22,7 +22,6 @@ from pgcraft.factory.base import (
     _sort_plugins,
 )
 from pgcraft.factory.context import FactoryContext
-from pgcraft.plugins.check import TableCheckPlugin
 from pgcraft.plugins.protect import RawTableProtectionPlugin
 from pgcraft.plugins.simple import SimpleTablePlugin
 
@@ -213,7 +212,6 @@ def register[T](  # noqa: PLR0913
     """
     internal: list[Plugin] = [
         SimpleTablePlugin(),
-        TableCheckPlugin(),
         RawTableProtectionPlugin("primary"),
     ]
 

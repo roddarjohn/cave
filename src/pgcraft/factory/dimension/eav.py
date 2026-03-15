@@ -44,4 +44,4 @@ class PGCraftEAV(ResourceFactory):
         RawTableProtectionPlugin("entity", "attribute"),
     ]
 
-    TRIGGER_PLUGIN_CLS = EAVTriggerPlugin
+    TRIGGER_PLUGIN_CLS = staticmethod(EAVTriggerPlugin)

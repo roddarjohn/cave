@@ -36,7 +36,7 @@ html_theme_options = {
     "show_powered_by": False,
     "sidebar_collapse": True,
     "extra_nav_links": {
-        "GitHub": "https://github.com/roddajohn/pgcraft",
+        "GitHub": "https://github.com/roddarjohn/pgcraft",
     },
     "font_family": (
         "'Source Sans Pro', 'Segoe UI', Helvetica, Arial,"

@@ -17,7 +17,6 @@ from sqlalchemy_declarative_extensions.dialects.postgresql import (
 from pgcraft.utils.naming import resolve_name
 
 if TYPE_CHECKING:
-    from mako.template import Template
     from sqlalchemy import MetaData
 
     from pgcraft.factory.context import FactoryContext
@@ -58,27 +57,27 @@ def register_view_triggers(  # noqa: PLR0913
     view_schema: str,
     view_fullname: str,
     tablename: str,
-    template_vars: dict,
-    ops: list[tuple[str, Template]],
+    ops: list[tuple[str, str]],
     naming_defaults: dict[str, str],
     function_key: str,
     trigger_key: str,
 ) -> None:
     """Register INSTEAD OF triggers for a single view.
 
-    :param metadata: SQLAlchemy ``MetaData`` to register on.
-    :param view_schema: Schema the view lives in.
-    :param view_fullname: Fully qualified view name.
-    :param tablename: Base dimension table name.
-    :param template_vars: Variables passed to Mako templates.
-    :param ops: List of ``(operation, template)`` tuples.
-    :param naming_defaults: Default naming templates.
-    :param function_key: Key for function name resolution.
-    :param trigger_key: Key for trigger name resolution.
+    Args:
+        metadata: SQLAlchemy ``MetaData`` to register on.
+        view_schema: Schema the view lives in.
+        view_fullname: Fully qualified view name.
+        tablename: Base dimension table name.
+        ops: List of ``(operation, plpgsql_body)`` tuples.
+        naming_defaults: Default naming templates.
+        function_key: Key for function name resolution.
+        trigger_key: Key for trigger name resolution.
+
     """
     subs = {"table_name": tablename, "schema": view_schema}
 
-    for op, template in ops:
+    for op, body in ops:
         fn_name = resolve_name(
             metadata,
             function_key,
@@ -96,7 +95,7 @@ def register_view_triggers(  # noqa: PLR0913
             metadata,
             Function(
                 fn_name,
-                template.render(**template_vars),
+                body,
                 returns="trigger",
                 language="plpgsql",
                 schema=view_schema,

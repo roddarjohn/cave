@@ -10,6 +10,7 @@ pgcraft
    :caption: Getting started
 
    setup
+   config
    playground
 
 .. toctree::

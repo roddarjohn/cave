@@ -9,7 +9,6 @@ from pgcraft.plugins.append_only import (
     AppendOnlyTriggerPlugin,
     AppendOnlyViewPlugin,
 )
-from pgcraft.plugins.check import TableCheckPlugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.fk import TableFKPlugin
 from pgcraft.plugins.index import TableIndexPlugin
@@ -27,12 +26,13 @@ class PGCraftAppendOnly(ResourceFactory):
        -- root + attributes tables.
     3. :class:`~pgcraft.plugins.append_only.AppendOnlyViewPlugin`
        -- join view proxy.
-    4. :class:`~pgcraft.plugins.check.TableCheckPlugin` --
-       materializes :class:`~pgcraft.check.PGCraftCheck` items.
-    5. :class:`~pgcraft.plugins.index.TableIndexPlugin` --
-       materializes :class:`~pgcraft.index.PGCraftIndex` items.
-    6. :class:`~pgcraft.plugins.fk.TableFKPlugin` --
-       materializes :class:`~pgcraft.fk.PGCraftFK` items.
+    4. :class:`~pgcraft.plugins.index.TableIndexPlugin` --
+       indices on the attributes table.
+    5. :class:`~pgcraft.plugins.fk.TableFKPlugin` --
+       foreign keys on the attributes table.
+
+    :class:`~pgcraft.plugins.check.TableCheckPlugin` is
+    auto-added by the base factory when not already present.
 
     A :class:`~pgcraft.plugins.pk.SerialPKPlugin` is auto-added
     when no user plugin produces ``pk_columns``.
@@ -48,10 +48,9 @@ class PGCraftAppendOnly(ResourceFactory):
         CreatedAtPlugin(),
         AppendOnlyTablePlugin(),
         AppendOnlyViewPlugin(),
-        TableCheckPlugin(),
         TableIndexPlugin(table_key="attributes"),
         TableFKPlugin(table_key="attributes"),
         RawTableProtectionPlugin("root_table", "attributes"),
     ]
 
-    TRIGGER_PLUGIN_CLS = AppendOnlyTriggerPlugin
+    TRIGGER_PLUGIN_CLS = staticmethod(AppendOnlyTriggerPlugin)

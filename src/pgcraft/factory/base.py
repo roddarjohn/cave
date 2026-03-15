@@ -29,6 +29,39 @@ def _has_pk_producer(plugins: list[Plugin]) -> bool:
     return any("pk_columns" in p.resolved_produces() for p in plugins)
 
 
+def _has_instance(plugins: list[Plugin], cls: type) -> bool:
+    """Return True if any plugin is an instance of *cls*."""
+    return any(isinstance(p, cls) for p in plugins)
+
+
+def _auto_add_defaults(plugins: list[Plugin]) -> list[Plugin]:
+    """Auto-add TableCheckPlugin, TableIndexPlugin, TableFKPlugin.
+
+    These plugins are added with default settings when no
+    instance of their class (or, for checks, any ``_CheckPlugin``
+    subclass) is already present.  Each plugin is a no-op when
+    the corresponding schema items are absent, so adding them
+    unconditionally is safe.
+    """
+    from pgcraft.plugins.check import (  # noqa: PLC0415
+        TableCheckPlugin,
+        _CheckPlugin,
+    )
+    from pgcraft.plugins.fk import TableFKPlugin  # noqa: PLC0415
+    from pgcraft.plugins.index import (  # noqa: PLC0415
+        TableIndexPlugin,
+    )
+
+    added: list[Plugin] = []
+    if not _has_instance(plugins, _CheckPlugin):
+        added.append(TableCheckPlugin())
+    if not _has_instance(plugins, TableIndexPlugin):
+        added.append(TableIndexPlugin())
+    if not _has_instance(plugins, TableFKPlugin):
+        added.append(TableFKPlugin())
+    return plugins + added
+
+
 def _resolve_plugins(
     config: object | None,  # PGCraftConfig, avoiding circular import
     plugins: list[Plugin] | None,
@@ -66,7 +99,12 @@ def _resolve_plugins(
 
         user_plugins = [SerialPKPlugin(), *user_plugins]
 
-    return user_plugins + internal_plugins
+    all_plugins = user_plugins + internal_plugins
+    # Only auto-add check/index/fk plugins when internal plugins
+    # are present (i.e. there is a table-creating plugin).
+    if internal_plugins:
+        all_plugins = _auto_add_defaults(all_plugins)
+    return all_plugins
 
 
 def _run_plugin_validators(
