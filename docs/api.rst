@@ -19,6 +19,15 @@ Plugin system
 .. automodule:: pgcraft.check
    :members:
 
+.. automodule:: pgcraft.index
+   :members:
+
+.. automodule:: pgcraft.fk
+   :members:
+
+.. automodule:: pgcraft.validation
+   :members:
+
 .. automodule:: pgcraft.statistics
    :members:
 
@@ -95,6 +104,12 @@ Built-in plugins
    :members:
 
 .. automodule:: pgcraft.plugins.check
+   :members:
+
+.. automodule:: pgcraft.plugins.index
+   :members:
+
+.. automodule:: pgcraft.plugins.fk
    :members:
 
 .. automodule:: pgcraft.plugins.eav

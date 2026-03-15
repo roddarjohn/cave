@@ -10,14 +10,18 @@ if TYPE_CHECKING:
     from sqlalchemy.schema import SchemaItem
 
     from pgcraft.check import PGCraftCheck
+    from pgcraft.fk import PGCraftFK
+    from pgcraft.index import PGCraftIndex
+
+    _SchemaItemType = SchemaItem | PGCraftCheck | PGCraftFK | PGCraftIndex
 
 
 class _SchemaItemValidator(Protocol):
-    def __call__(self, item: SchemaItem | PGCraftCheck) -> bool: ...
+    def __call__(self, item: _SchemaItemType) -> bool: ...
 
 
 def is_schema_item_not_primary_key(
-    item: SchemaItem | PGCraftCheck,
+    item: _SchemaItemType,
 ) -> bool:
     """Return True if the item is not a primary key column.
 

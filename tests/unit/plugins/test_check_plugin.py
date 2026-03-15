@@ -129,7 +129,7 @@ class TestTriggerCheckPlugin:
 
     def test_registers_functions(self):
         ctx = self._ctx_with_eav()
-        TriggerCheckPlugin(view_key="primary").run(ctx)
+        TriggerCheckPlugin(table_key="primary").run(ctx)
         functions = ctx.metadata.info.get("functions")
         assert functions is not None
         # 2 ops (insert, update) on the primary view
@@ -137,35 +137,35 @@ class TestTriggerCheckPlugin:
 
     def test_registers_triggers(self):
         ctx = self._ctx_with_eav()
-        TriggerCheckPlugin(view_key="primary").run(ctx)
+        TriggerCheckPlugin(table_key="primary").run(ctx)
         triggers = ctx.metadata.info.get("triggers")
         assert triggers is not None
         assert len(triggers.triggers) == 2
 
     def test_trigger_names_have_check_prefix(self):
         ctx = self._ctx_with_eav()
-        TriggerCheckPlugin(view_key="primary").run(ctx)
+        TriggerCheckPlugin(table_key="primary").run(ctx)
         triggers = ctx.metadata.info["triggers"].triggers
         for t in triggers:
             assert t.name.startswith("_check_")
 
     def test_function_body_contains_new_prefix(self):
         ctx = self._ctx_with_eav()
-        TriggerCheckPlugin(view_key="primary").run(ctx)
+        TriggerCheckPlugin(table_key="primary").run(ctx)
         fns = ctx.metadata.info["functions"].functions
         insert_fn = next(f for f in fns if "insert" in f.name)
         assert "NEW.price" in insert_fn.definition
 
     def test_function_body_contains_check_name(self):
         ctx = self._ctx_with_eav()
-        TriggerCheckPlugin(view_key="primary").run(ctx)
+        TriggerCheckPlugin(table_key="primary").run(ctx)
         fns = ctx.metadata.info["functions"].functions
         insert_fn = next(f for f in fns if "insert" in f.name)
         assert "pos_price" in insert_fn.definition
 
     def test_no_checks_is_noop(self):
         ctx = self._ctx_with_eav(schema_items=[Column("price", Integer)])
-        TriggerCheckPlugin(view_key="primary").run(ctx)
+        TriggerCheckPlugin(table_key="primary").run(ctx)
         assert ctx.metadata.info.get("functions") is None
 
     def test_unknown_column_raises(self):
@@ -176,12 +176,12 @@ class TestTriggerCheckPlugin:
             ]
         )
         with pytest.raises(PGCraftValidationError, match="bogus"):
-            TriggerCheckPlugin(view_key="primary").run(ctx)
+            TriggerCheckPlugin(table_key="primary").run(ctx)
 
-    def test_skips_absent_view_key(self):
+    def test_skips_absent_table_key(self):
         ctx = self._ctx_with_eav()
-        TriggerCheckPlugin(view_key="nonexistent").run(ctx)
-        # No triggers registered since view_key not in ctx.
+        TriggerCheckPlugin(table_key="nonexistent").run(ctx)
+        # No triggers registered since table_key not in ctx.
         assert ctx.metadata.info.get("triggers") is None
 
     def test_multi_column_check(self):
@@ -195,7 +195,7 @@ class TestTriggerCheckPlugin:
                 ),
             ]
         )
-        TriggerCheckPlugin(view_key="primary").run(ctx)
+        TriggerCheckPlugin(table_key="primary").run(ctx)
         fns = ctx.metadata.info["functions"].functions
         insert_fn = next(f for f in fns if "insert" in f.name)
         assert "NEW.price" in insert_fn.definition
@@ -204,7 +204,7 @@ class TestTriggerCheckPlugin:
     def test_only_insert_and_update_ops(self):
         """No DELETE trigger — there's no NEW row to check."""
         ctx = self._ctx_with_eav()
-        TriggerCheckPlugin(view_key="primary").run(ctx)
+        TriggerCheckPlugin(table_key="primary").run(ctx)
         triggers = ctx.metadata.info["triggers"].triggers
         ops = {t.name.split("_")[-1] for t in triggers}
         assert "insert" in ops
@@ -217,7 +217,7 @@ class TestTriggerCheckPlugin:
 
         ctx = self._ctx_with_eav()
         # Register check triggers first (_check_...)
-        TriggerCheckPlugin(view_key="primary").run(ctx)
+        TriggerCheckPlugin(table_key="primary").run(ctx)
         # Then register EAV triggers (dim_product_...)
         EAVTriggerPlugin(view_key="nonexistent").run(ctx)
         # No error — _check_ sorts before dim_
@@ -244,4 +244,4 @@ class TestTriggerCheckPlugin:
         # Now the check plugin registers _check_dim_product_insert
         # which sorts AFTER _aaa_, so validation should raise.
         with pytest.raises(PGCraftValidationError, match="alphabetical"):
-            TriggerCheckPlugin(view_key="primary").run(ctx)
+            TriggerCheckPlugin(table_key="primary").run(ctx)

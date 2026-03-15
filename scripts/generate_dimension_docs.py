@@ -217,14 +217,29 @@ def _psql_url(sqlalchemy_url: str) -> str:
     return re.sub(r"\+\w+", "", sqlalchemy_url)
 
 
-def _psql(url: str, command: str) -> str:
-    """Run a psql command and return its stdout."""
+def _psql(
+    url: str,
+    command: str,
+    *,
+    expect_error: bool = False,
+) -> str:
+    """Run a psql command and return its output.
+
+    Args:
+        url: libpq connection URL.
+        command: SQL or psql meta-command to run.
+        expect_error: If True, return stderr on failure
+            instead of raising.
+
+    """
     result = subprocess.run(
         ["psql", url, "-c", command],
         capture_output=True,
         text=True,
-        check=True,
+        check=not expect_error,
     )
+    if expect_error and result.returncode != 0:
+        return result.stderr.rstrip()
     return result.stdout.rstrip()
 
 
@@ -253,7 +268,7 @@ def _query_lines(
         if q.get("description"):
             parts.append(q["description"])
             parts.append("")
-        output = _psql(url, sql)
+        output = _psql(url, sql, expect_error=q.get("expect_error", False))
         block = f"=# {sql}\n{output}"
         parts.append(_directive("code-block", block, argument="text"))
         parts.append("")
@@ -324,6 +339,12 @@ _EXAMPLES_LIST = [
     ("eav", "eav.py"),
     ("ledger", "ledger.py"),
     ("double_entry", "double_entry.py"),
+    ("constraints_simple", "constraints_simple.py"),
+    (
+        "constraints_append_only",
+        "constraints_append_only.py",
+    ),
+    ("constraints_eav", "constraints_eav.py"),
 ]
 
 

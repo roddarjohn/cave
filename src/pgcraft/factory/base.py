@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.factory.context import FactoryContext
+from pgcraft.fk import DimensionRef, register_dimension
 from pgcraft.validator import validate_schema_items
 
 if TYPE_CHECKING:
@@ -17,6 +18,8 @@ if TYPE_CHECKING:
     from sqlalchemy.sql.expression import FromClause
 
     from pgcraft.check import PGCraftCheck
+    from pgcraft.fk import PGCraftFK
+    from pgcraft.index import PGCraftIndex
     from pgcraft.plugin import Plugin
     from pgcraft.statistics import PGCraftStatisticsView
 
@@ -188,6 +191,7 @@ class ResourceFactory:
 
     DEFAULT_PLUGINS: ClassVar[list[Plugin]] = []
     _INTERNAL_PLUGINS: ClassVar[list[Plugin]] = []
+    _FK_TARGET_KEY: ClassVar[str] = "primary"
 
     table: FromClause
     """The root selectable created by the factory.
@@ -210,7 +214,13 @@ class ResourceFactory:
         tablename: str,
         schemaname: str,
         metadata: MetaData,
-        schema_items: list[SchemaItem | PGCraftCheck | PGCraftStatisticsView],
+        schema_items: list[
+            SchemaItem
+            | PGCraftCheck
+            | PGCraftFK
+            | PGCraftIndex
+            | PGCraftStatisticsView
+        ],
         *,
         config: object | None = None,
         plugins: list[Plugin] | None = None,
@@ -245,3 +255,14 @@ class ResourceFactory:
         self.ctx = ctx
         if "__root__" in ctx:
             self.table = ctx["__root__"]
+
+        if self._FK_TARGET_KEY in ctx:
+            fk_table = ctx[self._FK_TARGET_KEY]
+            register_dimension(
+                metadata,
+                tablename,
+                DimensionRef(
+                    schema=schemaname,
+                    table=fk_table.name,
+                ),
+            )

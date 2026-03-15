@@ -13,6 +13,13 @@ Choose the type that matches your data:
 - **EAV** -- sparse attributes stored as rows and pivoted back to
   columns.  Best for highly dynamic or optional fields.
 
+All dimension types support declarative
+:class:`~pgcraft.check.PGCraftCheck`,
+:class:`~pgcraft.index.PGCraftIndex`, and
+:class:`~pgcraft.fk.PGCraftFK` items in ``schema_items``.
+See :doc:`constraints_and_indices` for a full walkthrough with
+generated SQL.
+
 
 Simple dimension
 ----------------

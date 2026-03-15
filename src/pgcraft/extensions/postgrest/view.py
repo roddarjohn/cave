@@ -239,7 +239,7 @@ def _install_triggers(
     )
 
     if isinstance(source, PGCraftEAV):
-        check_plugin = TriggerCheckPlugin(view_key="api")
+        check_plugin = TriggerCheckPlugin(table_key="api")
         check_plugin.run(ctx)
 
 

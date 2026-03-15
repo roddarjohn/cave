@@ -21,11 +21,13 @@ from pgcraft.errors import PGCraftValidationError
 from pgcraft.plugin import Dynamic, Plugin, requires
 from pgcraft.utils.template import load_template
 from pgcraft.utils.trigger import register_view_triggers
+from pgcraft.validation import validate_column_references
 
 if TYPE_CHECKING:
     from pgcraft.factory.context import FactoryContext
 
 
+@requires(Dynamic("table_key"))
 class _CheckPlugin(Plugin):
     """Base class for check-constraint enforcement plugins.
 
@@ -36,6 +38,10 @@ class _CheckPlugin(Plugin):
     name set and the application logic.
 
     """
+
+    def __init__(self, table_key: str = "primary") -> None:
+        """Store the context key."""
+        self.table_key = table_key
 
     def _column_names(self, ctx: FactoryContext) -> set[str]:
         """Return the set of column names available for validation.
@@ -71,7 +77,11 @@ class _CheckPlugin(Plugin):
             return
         col_names = self._column_names(ctx)
         for cave_check in checks:
-            _validate_columns(cave_check, col_names)
+            validate_column_references(
+                f"PGCraftCheck {cave_check.name!r}",
+                cave_check.column_names(),
+                col_names,
+            )
         self._apply(ctx, checks)
 
 
@@ -83,7 +93,6 @@ _NAMING_DEFAULTS = {
 }
 
 
-@requires(Dynamic("table_key"))
 class TableCheckPlugin(_CheckPlugin):
     """Materialize :class:`~pgcraft.check.PGCraftCheck` as table constraints.
 
@@ -96,10 +105,6 @@ class TableCheckPlugin(_CheckPlugin):
             (default ``"primary"``).
 
     """
-
-    def __init__(self, table_key: str = "primary") -> None:
-        """Store the context key."""
-        self.table_key = table_key
 
     def _column_names(self, ctx: FactoryContext) -> set[str]:
         """Return column names from the physical table."""
@@ -118,7 +123,6 @@ class TableCheckPlugin(_CheckPlugin):
             table.append_constraint(constraint)
 
 
-@requires(Dynamic("view_key"))
 class TriggerCheckPlugin(_CheckPlugin):
     """Enforce checks via INSTEAD OF triggers (EAV dimensions).
 
@@ -129,14 +133,10 @@ class TriggerCheckPlugin(_CheckPlugin):
     triggers in alphabetical order by name).
 
     Args:
-        view_key: Key in ``ctx`` for the trigger target view
+        table_key: Key in ``ctx`` for the trigger target view
             (default ``"primary"``).
 
     """
-
-    def __init__(self, view_key: str = "primary") -> None:
-        """Store the context key."""
-        self.view_key = view_key
 
     def _column_names(self, ctx: FactoryContext) -> set[str]:
         """Return column names from the virtual (schema_items) columns."""
@@ -156,10 +156,10 @@ class TriggerCheckPlugin(_CheckPlugin):
         template = load_template(_TEMPLATES / "validate.plpgsql.mako")
         template_vars = {"checks": resolved_checks}
 
-        if self.view_key not in ctx:
+        if self.table_key not in ctx:
             return
 
-        view = ctx[self.view_key]
+        view = ctx[self.table_key]
         view_schema = view.schema or ctx.schemaname
         view_fullname = f"{view_schema}.{ctx.tablename}"
 
@@ -179,32 +179,6 @@ class TriggerCheckPlugin(_CheckPlugin):
         )
 
         _validate_trigger_ordering(ctx, view_fullname)
-
-
-def _validate_columns(
-    cave_check: PGCraftCheck,
-    known_columns: set[str],
-) -> None:
-    """Raise if a check references unknown columns.
-
-    Args:
-        cave_check: The check to validate.
-        known_columns: Set of known column names.
-
-    Raises:
-        PGCraftValidationError: If a referenced column is not
-            in *known_columns*.
-
-    """
-    for col in cave_check.column_names():
-        if col not in known_columns:
-            msg = (
-                f"PGCraftCheck {cave_check.name!r} references "
-                f"unknown column {col!r}. "
-                f"Known columns: "
-                f"{sorted(known_columns)}"
-            )
-            raise PGCraftValidationError(msg)
 
 
 def _validate_trigger_ordering(

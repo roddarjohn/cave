@@ -445,9 +445,143 @@ the pivot view.
 
 **Parameters:**
 
-``view_key``
+``table_key``
     Which view's triggers to add checks to (default varies by
     dimension type).
+
+
+TableIndexPlugin
+----------------
+
+.. module:: pgcraft.plugins.index
+   :no-index:
+
+Resolves :class:`~pgcraft.index.PGCraftIndex` items into real
+``sqlalchemy.Index`` objects on the backing table.  Both simple
+column references (``"{col}"``) and functional expressions
+(``"lower({col})"``) are supported.  Extra keyword arguments on
+the ``PGCraftIndex`` are passed through to the underlying
+``sqlalchemy.Index`` (e.g. ``postgresql_using``,
+``postgresql_where``).
+
+**Requires:** ``"primary"`` (via ``table_key``)
+
+**Parameters:**
+
+``table_key``
+    Context key for the target table (default ``"primary"``).
+    Append-only dimensions use ``"attributes"``.
+
+**Example:**
+
+.. code-block:: python
+
+   from sqlalchemy import Column, Integer, String
+
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.index import PGCraftIndex
+
+   products = PGCraftSimple(
+       "products", "public", metadata,
+       schema_items=[
+           Column("name", String, nullable=False),
+           Column("price", Integer, nullable=False),
+           PGCraftIndex("idx_products_name", "{name}"),
+           PGCraftIndex(
+               "idx_products_price",
+               "{price}",
+               unique=True,
+           ),
+           PGCraftIndex(
+               "idx_products_lower_name",
+               "lower({name})",
+               postgresql_using="btree",
+           ),
+       ],
+   )
+
+
+TableFKPlugin
+-------------
+
+.. module:: pgcraft.plugins.fk
+   :no-index:
+
+Resolves :class:`~pgcraft.fk.PGCraftFK` items into
+``ForeignKeyConstraint`` objects on the backing table.
+
+Local columns use ``{column_name}`` markers.  Exactly one of
+``references`` or ``raw_references`` must be provided:
+
+- ``references`` — ``"dimension.column"`` strings resolved via
+  the dimension registry.
+- ``raw_references`` — ``"schema.table.column"`` strings passed
+  through directly to SQLAlchemy.
+
+The dimension registry is populated automatically when factories
+run — each factory registers its FK-targetable table (the root
+table for append-only dimensions, the primary table for simple
+dimensions).
+
+**Requires:** ``"primary"`` (via ``table_key``)
+
+**Parameters:**
+
+``table_key``
+    Context key for the target table (default ``"primary"``).
+    Append-only dimensions use ``"attributes"``.
+
+**Example (resolved references):**
+
+.. code-block:: python
+
+   from sqlalchemy import Column, Integer, String
+
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.fk import PGCraftFK
+
+   customers = PGCraftSimple(
+       "customers", "public", metadata,
+       schema_items=[
+           Column("name", String, nullable=False),
+       ],
+   )
+
+   orders = PGCraftSimple(
+       "orders", "public", metadata,
+       schema_items=[
+           Column("customer_id", Integer, nullable=False),
+           Column("total", Integer, nullable=False),
+           PGCraftFK(
+               references={
+                   "{customer_id}": "customers.id"
+               },
+               name="fk_orders_customer",
+               ondelete="CASCADE",
+           ),
+       ],
+   )
+
+``"customers.id"`` is resolved to the physical table via the
+dimension registry.  If ``customers`` is append-only, this
+resolves to the root table automatically.
+
+**Example (raw references):**
+
+.. code-block:: python
+
+   PGCraftFK(
+       raw_references={
+           "{org_id}": "public.organizations.id"
+       },
+       name="fk_orders_org",
+   )
+
+Use ``raw_references`` for tables outside pgcraft or when you
+want full control over the FK target.
+
+See :doc:`constraints_and_indices` for a walkthrough of the
+generated SQL.
 
 
 AppendOnlyTablePlugin
@@ -605,6 +739,8 @@ declarations.  A typical simple dimension pipeline runs:
    SerialPKPlugin              -> pk_columns
    SimpleTablePlugin           -> primary, __root__
    TableCheckPlugin            (reads __root__)
+   TableIndexPlugin            (reads primary)
+   TableFKPlugin               (reads primary)
    RawTableProtectionPlugin    (reads primary)
 
 API views and triggers are created separately via

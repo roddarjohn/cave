@@ -1,5 +1,5 @@
 Cookbook
-=======
+========
 
 Practical recipes for common pgcraft use cases.
 
@@ -235,3 +235,129 @@ Flask example
 
 For PostgREST API views, computed columns, column filtering,
 and aggregate view joins, see :ref:`ext-postgrest`.
+
+
+.. _cookbook-indices-and-fks:
+
+Indices and foreign keys
+------------------------
+
+pgcraft supports declarative index and foreign key definitions
+using ``{column_name}`` markers — the same syntax used by
+:class:`~pgcraft.check.PGCraftCheck`.
+
+Adding indices
+~~~~~~~~~~~~~~
+
+Use :class:`~pgcraft.index.PGCraftIndex` in ``schema_items``.
+The constructor mirrors ``sqlalchemy.Index``: name first, then
+expressions, then keyword arguments passed through to the
+underlying index.
+
+.. code-block:: python
+
+   from sqlalchemy import Column, Integer, MetaData, String
+
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.index import PGCraftIndex
+   from pgcraft import pgcraft_build_naming_conventions
+
+   metadata = MetaData(
+       naming_convention=pgcraft_build_naming_conventions(),
+   )
+
+   products = PGCraftSimple(
+       "products", "inventory", metadata,
+       schema_items=[
+           Column("name", String, nullable=False),
+           Column("sku", String(32), nullable=False),
+           Column("price", Integer, nullable=False),
+           # Simple index
+           PGCraftIndex("idx_products_sku", "{sku}"),
+           # Unique index
+           PGCraftIndex(
+               "uq_products_name", "{name}", unique=True
+           ),
+           # Functional index with dialect kwargs
+           PGCraftIndex(
+               "idx_products_lower_name",
+               "lower({name})",
+               postgresql_using="btree",
+           ),
+           # Multi-column index
+           PGCraftIndex(
+               "idx_products_name_price",
+               "{name}", "{price}",
+           ),
+       ],
+   )
+
+Adding foreign keys
+~~~~~~~~~~~~~~~~~~~
+
+Use :class:`~pgcraft.fk.PGCraftFK` in ``schema_items``.
+Exactly one of ``references`` or ``raw_references`` must be
+provided:
+
+- ``references`` — ``"dimension.column"`` strings resolved via the
+  dimension registry.  pgcraft finds the correct physical table
+  regardless of dimension type (simple vs append-only).
+- ``raw_references`` — ``"schema.table.column"`` strings passed
+  through to SQLAlchemy directly, bypassing resolution.
+
+**Resolved references** (dimension registry):
+
+.. code-block:: python
+
+   from sqlalchemy import Column, Integer, MetaData, String
+
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.fk import PGCraftFK
+   from pgcraft import pgcraft_build_naming_conventions
+
+   metadata = MetaData(
+       naming_convention=pgcraft_build_naming_conventions(),
+   )
+
+   customers = PGCraftSimple(
+       "customers", "public", metadata,
+       schema_items=[
+           Column("name", String, nullable=False),
+       ],
+   )
+
+   orders = PGCraftSimple(
+       "orders", "public", metadata,
+       schema_items=[
+           Column("customer_id", Integer, nullable=False),
+           Column("total", Integer, nullable=False),
+           PGCraftFK(
+               references={
+                   "{customer_id}": "customers.id"
+               },
+               name="fk_orders_customer",
+               ondelete="CASCADE",
+           ),
+       ],
+   )
+
+The ``"customers.id"`` reference is resolved to the physical table
+via the dimension registry.  If ``customers`` were an append-only
+dimension, the FK would point to the root table automatically.
+
+**Raw references** (bypass resolution):
+
+.. code-block:: python
+
+   PGCraftFK(
+       raw_references={
+           "{org_id}": "public.organizations.id"
+       },
+       name="fk_orders_org",
+   )
+
+Use ``raw_references`` when referencing tables outside pgcraft
+or when you want full control over the target.
+
+See :doc:`constraints_and_indices` for a walkthrough of the
+generated SQL.
