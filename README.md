@@ -129,3 +129,5 @@ See [PLAN.md](PLAN.md) for the full design philosophy. The short version:
 ## License
 
 See [LICENSE](LICENSE) for details.
+
+Triggering
