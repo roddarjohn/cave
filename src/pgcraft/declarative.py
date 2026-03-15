@@ -23,6 +23,7 @@ from pgcraft.factory.base import (
 )
 from pgcraft.factory.context import FactoryContext
 from pgcraft.plugins.check import TableCheckPlugin
+from pgcraft.plugins.protect import RawTableProtectionPlugin
 from pgcraft.plugins.simple import SimpleTablePlugin
 
 if TYPE_CHECKING:
@@ -138,7 +139,6 @@ def _create_register_api_view(
 
     class _RegisterSource:
         TRIGGER_PLUGIN_CLS = SimpleTriggerPlugin
-        PROTECTED_TABLE_KEYS = ("primary",)
 
     src = _RegisterSource()
     src.ctx = ctx  # type: ignore[attr-defined]
@@ -212,6 +212,7 @@ def register[T](  # noqa: PLR0913
     internal: list[Plugin] = [
         SimpleTablePlugin(),
         TableCheckPlugin(),
+        RawTableProtectionPlugin("primary"),
     ]
 
     def decorator(cls: type[T]) -> type[T]:
