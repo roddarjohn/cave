@@ -309,6 +309,12 @@ writes:
        grants=["select", "insert", "update", "delete"],
    )
 
+Grants drive triggers: INSTEAD OF triggers are only created for the
+DML operations listed in ``grants``.  A ``["select"]``-only view
+has no triggers and is read-only.  A view with
+``["select", "insert"]`` gets only an INSERT trigger — no UPDATE or
+DELETE.
+
 Changing the API schema
 ~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -65,6 +65,7 @@ The three built-in dimension factories are thin wrappers:
        _INTERNAL_PLUGINS = [
            SimpleTablePlugin(),
            TableCheckPlugin(),
+           RawTableProtectionPlugin("primary"),
        ]
 
 
@@ -257,12 +258,18 @@ so two independent pipelines can coexist in one factory without colliding.
 ``SimpleTablePlugin``
     Writes ``"primary"`` (the backing table).
 
-``APIPlugin``
-    Reads ``"primary"`` (via ``table_key``).  Writes ``"api"`` (via
-    ``view_key``).
-
 ``SimpleTriggerPlugin``
     Reads ``"primary"`` (via ``table_key``) and ``"api"`` (via ``view_key``).
+    Accepts ``columns`` (writable column subset) and
+    ``permitted_operations`` (which DML operations get INSTEAD OF
+    triggers).
+
+``RawTableProtectionPlugin``
+    Reads the table keys passed to its constructor (e.g. ``"primary"``,
+    ``"root_table"``, ``"attributes"``).  Installs BEFORE triggers that
+    block direct DML on raw backing tables — mutations must go through
+    the API view.  Included automatically in each factory's
+    ``_INTERNAL_PLUGINS``.
 
 ``AppendOnlyTablePlugin``
     Writes ``"root_table"`` and ``"attributes"``.
