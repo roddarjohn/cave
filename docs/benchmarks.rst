@@ -37,4 +37,4 @@ The tables below were generated with ``just bench-docs`` on a local
 development machine (PostgreSQL 16, Linux, NVMe SSD).  Your numbers
 will vary — run ``just bench`` to measure on your own hardware.
 
-.. include:: _generated/benchmark_results.rst
+.. include:: benchmark_results.rst

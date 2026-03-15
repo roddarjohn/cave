@@ -67,6 +67,4 @@ _docs-setup:
     uv run python scripts/generate_dimension_docs.py
     if [ -f docs/_generated/benchmark_results.json ]; then
         uv run python scripts/generate_benchmark_docs.py
-    elif [ ! -f docs/_generated/benchmark_results.rst ]; then
-        echo "No benchmark results available. Run \`\`just bench-docs\`\` to generate them." > docs/_generated/benchmark_results.rst
     fi

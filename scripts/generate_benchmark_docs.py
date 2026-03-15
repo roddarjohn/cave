@@ -1,4 +1,4 @@
-r"""Generate ``docs/_generated/benchmark_results.rst`` from JSON.
+r"""Generate ``docs/benchmark_results.rst`` from JSON.
 
 Usage::
 
@@ -16,13 +16,9 @@ import json
 import sys
 from pathlib import Path
 
-_RESULTS_JSON = (
-    Path(__file__).resolve().parents[1]
-    / "docs"
-    / "_generated"
-    / "benchmark_results.json"
-)
-_OUTPUT_RST = _RESULTS_JSON.with_suffix(".rst")
+_DOCS_DIR = Path(__file__).resolve().parents[1] / "docs"
+_RESULTS_JSON = _DOCS_DIR / "_generated" / "benchmark_results.json"
+_OUTPUT_RST = _DOCS_DIR / "benchmark_results.rst"
 
 # Map test file stems to display headings and ordinals.
 _SECTIONS: dict[str, tuple[int, str]] = {
