@@ -37,7 +37,7 @@ history.
 .. include:: _generated/dim_simple.rst
 
 
-Append-Only Dimension (SCD Type 2)
+Append-only dimension (SCD Type 2)
 ----------------------------------
 
 Tracks full change history using an append-only attributes log.
@@ -63,7 +63,7 @@ triggers manage the internal tables:
 .. include:: _generated/dim_append_only.rst
 
 
-EAV Dimension (Entity-Attribute-Value)
+EAV dimension (Entity-Attribute-Value)
 --------------------------------------
 
 Stores attributes as rows rather than columns, using typed value

@@ -1,4 +1,4 @@
-Ledger Tables
+Ledger tables
 =============
 
 Ledger tables are append-only tables designed for recording immutable
@@ -19,7 +19,7 @@ Choose the variant that matches your data:
   debits equal credits per ``entry_id``.  Best for financial journals.
 
 
-Basic Ledger
+Basic ledger
 ------------
 
 A single append-only table with an API view.  Insert-only: UPDATE and
