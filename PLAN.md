@@ -114,3 +114,5 @@ Source of truth tables should be very very clear.
 - Figure out how to benchmark / do performance analysis on this
 
 - Other ways to use a ledger
+
+- Add uuidv7 support iff postgres >= 18
