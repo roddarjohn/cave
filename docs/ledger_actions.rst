@@ -175,13 +175,8 @@ Create the factory, then pass events to
             Column("invoice_id", Integer, nullable=False),
             Column("account",    String, nullable=False),
         ],
-        config=config,
     )
 
-    PostgRESTView(
-        source=revenue,
-        grants=["select", "insert"],
-    )
     LedgerActions(source=revenue, events=[recognize])
 
 
@@ -189,7 +184,8 @@ Declarative style
 ~~~~~~~~~~~~~~~~~
 
 The ``@register`` decorator works with ledger events too.  Create
-an ``PostgRESTView`` via the ``api=`` kwarg and attach views separately::
+a ``PostgRESTView`` via the ``api=`` kwarg and attach
+views separately::
 
     from pgcraft import LedgerEvent, ledger_balances
     from pgcraft.declarative import register
