@@ -11,7 +11,7 @@ from sqlalchemy import (
 
 from pgcraft import pgcraft_build_naming_conventions
 from pgcraft.factory import PGCraftEAV
-from pgcraft.views import APIView
+from pgcraft.views import PostgRESTView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
@@ -28,7 +28,7 @@ products = PGCraftEAV(
     ],
 )
 
-APIView(source=products)
+PostgRESTView(source=products)
 # --- example end ---
 
 SCHEMA_DESCRIPTION = (

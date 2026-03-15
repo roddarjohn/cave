@@ -52,7 +52,7 @@ than historical sums:
 .. code-block:: python
 
    from pgcraft.factory import PGCraftLedger
-   from pgcraft.views import APIView, LatestView
+   from pgcraft.views import PostgRESTView, LatestView
 
    order_events = PGCraftLedger(
        tablename="order_events",
@@ -64,7 +64,7 @@ than historical sums:
        ],
    )
 
-   APIView(
+   PostgRESTView(
        source=order_events,
        grants=["select", "insert"],
    )
@@ -96,7 +96,7 @@ resource quotas, point systems):
 .. code-block:: python
 
    from pgcraft.factory import PGCraftLedger
-   from pgcraft.views import APIView, BalanceView
+   from pgcraft.views import PostgRESTView, BalanceView
 
    stock = PGCraftLedger(
        tablename="stock_movements",
@@ -108,7 +108,7 @@ resource quotas, point systems):
        ],
    )
 
-   APIView(
+   PostgRESTView(
        source=stock,
        grants=["select", "insert"],
    )
@@ -140,7 +140,7 @@ overdrafts, or exceeding resource quotas:
 
    from pgcraft.factory import PGCraftLedger
    from pgcraft.plugins.ledger import LedgerBalanceCheckPlugin
-   from pgcraft.views import APIView, BalanceView
+   from pgcraft.views import PostgRESTView, BalanceView
 
    stock = PGCraftLedger(
        tablename="stock_movements",
@@ -158,7 +158,7 @@ overdrafts, or exceeding resource quotas:
        ],
    )
 
-   APIView(
+   PostgRESTView(
        source=stock,
        grants=["select", "insert"],
    )
@@ -264,7 +264,7 @@ internal plugin override mechanism:
 
    from pgcraft.factory import PGCraftLedger
    from pgcraft.plugins.ledger import LedgerTablePlugin
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
 
    payments = PGCraftLedger(
        tablename="payments",
@@ -275,7 +275,7 @@ internal plugin override mechanism:
        ],
    )
 
-   APIView(
+   PostgRESTView(
        source=payments,
        grants=["select", "insert"],
    )
@@ -292,7 +292,7 @@ primary key with ``gen_random_uuid()`` as the server default:
 
    from pgcraft.factory import PGCraftLedger
    from pgcraft.plugins.pk import UUIDV4PKPlugin
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
 
    events = PGCraftLedger(
        tablename="events",
@@ -304,7 +304,7 @@ primary key with ``gen_random_uuid()`` as the server default:
        plugins=[UUIDV4PKPlugin()],
    )
 
-   APIView(
+   PostgRESTView(
        source=events,
        grants=["select", "insert"],
    )

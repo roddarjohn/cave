@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class Extension:
+class PGCraftExtension:
     """Base class for pgcraft extensions.
 
     An extension bundles plugins, metadata hooks, Alembic hooks,
@@ -28,7 +28,7 @@ class Extension:
     Example::
 
         @dataclass
-        class MyExtension(Extension):
+        class MyExtension(PGCraftExtension):
             name: str = "my-ext"
 
             def plugins(self) -> list[Plugin]:
@@ -92,7 +92,7 @@ class Extension:
         """
 
 
-def discover_extensions() -> dict[str, type[Extension]]:
+def discover_extensions() -> dict[str, type[PGCraftExtension]]:
     """Discover extensions via the ``pgcraft.extensions`` entry point group.
 
     Returns:
@@ -104,7 +104,7 @@ def discover_extensions() -> dict[str, type[Extension]]:
 
 
 def validate_extension_deps(
-    extensions: list[Extension],
+    extensions: list[PGCraftExtension],
 ) -> None:
     """Check that every extension's ``depends_on`` is satisfied.
 

@@ -6,9 +6,9 @@ from pgcraft.factory import PGCraftLedger
 from pgcraft.ledger.events import LedgerEvent, ledger_balances
 from pgcraft.utils.naming_convention import build_naming_convention
 from pgcraft.views import (
-    APIView,
     BalanceView,
     LedgerActions,
+    PostgRESTView,
 )
 
 metadata = MetaData(naming_convention=build_naming_convention())
@@ -43,7 +43,7 @@ inventory = PGCraftLedger(
     ],
 )
 
-APIView(source=inventory, grants=["select", "insert"])
+PostgRESTView(source=inventory, grants=["select", "insert"])
 BalanceView(
     source=inventory,
     dimensions=["warehouse", "sku"],

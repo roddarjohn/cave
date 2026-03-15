@@ -4,7 +4,7 @@ from sqlalchemy import Column, MetaData, String
 
 from pgcraft import pgcraft_build_naming_conventions
 from pgcraft.factory import PGCraftLedger
-from pgcraft.views import APIView, LatestView
+from pgcraft.views import LatestView, PostgRESTView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
@@ -19,7 +19,7 @@ order_events = PGCraftLedger(
     ],
 )
 
-APIView(source=order_events, grants=["select", "insert"])
+PostgRESTView(source=order_events, grants=["select", "insert"])
 LatestView(source=order_events, dimensions=["order_id"])
 # --- example end ---
 

@@ -7,12 +7,12 @@ from pgcraft.config import PGCraftConfig
 from pgcraft.extensions.postgrest import PostgRESTExtension
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.resource import APIResource, register_api_resource
-from pgcraft.views.api import APIView
+from pgcraft.views.api import PostgRESTView
 
 
 class TestPostgRESTExtensionIntegration:
     def test_full_factory_with_api_view_produces_grants(self):
-        """Factory -> APIView -> PostgREST extension registers grants."""
+        """Factory -> PostgRESTView -> PostgREST extension registers grants."""
         config = PGCraftConfig(auto_discover=False)
         config.use(PostgRESTExtension())
 
@@ -28,7 +28,7 @@ class TestPostgRESTExtensionIntegration:
             config=config,
         )
 
-        APIView(
+        PostgRESTView(
             source=factory,
             grants=["select", "insert"],
         )
@@ -54,7 +54,7 @@ class TestPostgRESTExtensionIntegration:
             config=config,
         )
 
-        APIView(source=factory)
+        PostgRESTView(source=factory)
 
         pgcraft_configure_metadata(metadata, config)
 

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pgcraft.extension import Extension
+    from pgcraft.extension import PGCraftExtension
     from pgcraft.plugin import Plugin
 
 
@@ -47,7 +47,7 @@ class PGCraftConfig:
     """
 
     plugins: list[Plugin] = field(default_factory=list)
-    extensions: list[Extension] = field(default_factory=list)
+    extensions: list[PGCraftExtension] = field(default_factory=list)
     auto_discover: bool = True
     utility_schema: str = "pgcraft"
 
@@ -64,7 +64,7 @@ class PGCraftConfig:
         self.plugins.extend(plugins)
         return self
 
-    def use(self, *extensions: Extension) -> PGCraftConfig:
+    def use(self, *extensions: PGCraftExtension) -> PGCraftConfig:
         """Register one or more extensions.
 
         Args:
@@ -77,7 +77,7 @@ class PGCraftConfig:
         self.extensions.extend(extensions)
         return self
 
-    def _resolved_extensions(self) -> list[Extension]:
+    def _resolved_extensions(self) -> list[PGCraftExtension]:
         """Return manual + discovered extensions, deduped by name.
 
         Manual extensions take precedence over discovered ones
@@ -92,7 +92,7 @@ class PGCraftConfig:
             validate_extension_deps,
         )
 
-        seen: dict[str, Extension] = {}
+        seen: dict[str, PGCraftExtension] = {}
         for ext in self.extensions:
             seen[ext.name] = ext
 

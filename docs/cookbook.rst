@@ -13,8 +13,8 @@ pgcraft factories, produce Alembic migrations, and export them as raw
 SQL. No pgcraft code runs at application time.
 
 API views are created separately via
-:class:`~pgcraft.views.api.APIView`.  Since this recipe does not
-use PostgREST, simply omit the ``APIView`` call.
+:class:`~pgcraft.views.api.PostgRESTView`.  Since this recipe does not
+use PostgREST, simply omit the ``PostgRESTView`` call.
 
 **Project layout**::
 
@@ -121,7 +121,7 @@ import time — access it via
 :class:`sqlalchemy.schema.Table` object.
 
 Since this recipe does not use PostgREST, simply omit the
-``APIView`` call.
+``PostgRESTView`` call.
 
 Shared models module
 ~~~~~~~~~~~~~~~~~~~~
@@ -244,12 +244,12 @@ Adding PostgREST API views
 pgcraft can generate PostgREST-compatible API views, INSTEAD OF
 triggers for write operations, and the role/grant declarations that
 PostgREST expects.  Create a factory, then call
-:class:`~pgcraft.views.api.APIView` to expose it.
+:class:`~pgcraft.views.api.PostgRESTView` to expose it.
 
 How it works
 ~~~~~~~~~~~~
 
-When :class:`~pgcraft.views.api.APIView` is called it:
+When :class:`~pgcraft.views.api.PostgRESTView` is called it:
 
 1. Creates a view in the ``api`` schema (configurable) that
    ``SELECT *`` s from the backing table.
@@ -267,7 +267,7 @@ Minimal example
    from sqlalchemy import Column, Integer, MetaData, Numeric, String
 
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
@@ -285,7 +285,7 @@ Minimal example
        ],
    )
 
-   APIView(source=products)
+   PostgRESTView(source=products)
 
 This creates:
 
@@ -299,12 +299,12 @@ Customising grants
 ~~~~~~~~~~~~~~~~~~
 
 By default the ``anon`` role gets only ``SELECT``. Pass a
-``grants`` list to :class:`~pgcraft.views.api.APIView` to allow
+``grants`` list to :class:`~pgcraft.views.api.PostgRESTView` to allow
 writes:
 
 .. code-block:: python
 
-   APIView(
+   PostgRESTView(
        source=products,
        grants=["select", "insert", "update", "delete"],
    )
@@ -323,7 +323,7 @@ parameter:
 
 .. code-block:: python
 
-   APIView(source=products, schema="reporting")
+   PostgRESTView(source=products, schema="reporting")
 
 PostgREST setup
 ~~~~~~~~~~~~~~~
@@ -364,7 +364,7 @@ the full query syntax and configuration reference.
 Exposing a subset of columns
 -----------------------------
 
-By default :class:`~pgcraft.views.api.APIView` creates a
+By default :class:`~pgcraft.views.api.PostgRESTView` creates a
 ``SELECT *`` view.  Pass a ``columns`` list to expose only
 specific columns through the API — useful when a table has
 internal columns that should not be visible to API consumers.
@@ -374,7 +374,7 @@ internal columns that should not be visible to API consumers.
    from sqlalchemy import Column, MetaData, Numeric, String, Text
 
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
@@ -393,7 +393,7 @@ internal columns that should not be visible to API consumers.
        ],
    )
 
-   APIView(
+   PostgRESTView(
        source=products,
        columns=["id", "name", "sku", "price"],
    )
@@ -416,7 +416,7 @@ tables:
 
 .. code-block:: python
 
-   APIView(
+   PostgRESTView(
        source=products,
        exclude_columns=["internal_notes"],
    )
@@ -430,7 +430,7 @@ Joining aggregate views into the API
 Create standalone aggregate views with
 :class:`~pgcraft.views.view.PGCraftView`, then join them into an
 API view using the ``query=`` parameter on
-:class:`~pgcraft.views.api.APIView`.
+:class:`~pgcraft.views.api.PostgRESTView`.
 
 Each ``PGCraftView`` exposes a ``.table`` property — a joinable
 SQLAlchemy selectable — so you can compose joins using standard
@@ -455,7 +455,7 @@ statistics:
    )
 
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
    from pgcraft.views.view import PGCraftView
    from pgcraft import (
        pgcraft_build_naming_conventions,
@@ -502,7 +502,7 @@ statistics:
 
    _os = order_stats.table
 
-   APIView(
+   PostgRESTView(
        source=customers,
        grants=["select", "insert", "update", "delete"],
        query=lambda q, t: (
@@ -539,7 +539,7 @@ How it works
 1. ``PGCraftView`` creates a standalone view from any SQLAlchemy
    ``select()`` expression and exposes ``.table`` for use in
    further joins.
-2. ``APIView`` with ``query=`` uses the lambda to customise the
+2. ``PostgRESTView`` with ``query=`` uses the lambda to customise the
    view definition. Grants drive which INSTEAD OF triggers are
    created.
 3. Writable columns are automatically restricted to the base
@@ -568,7 +568,7 @@ written to.
    )
 
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
    from pgcraft import pgcraft_build_naming_conventions
 
    metadata = MetaData(
@@ -588,7 +588,7 @@ written to.
        ],
    )
 
-   APIView(
+   PostgRESTView(
        source=products,
        grants=["select", "insert", "update", "delete"],
    )

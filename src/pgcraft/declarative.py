@@ -128,21 +128,21 @@ def _create_register_api_view(
     ctx: FactoryContext,
     api_kwargs: dict[str, Any],
 ) -> None:
-    """Create an APIView for a @register-decorated class.
+    """Create a PostgRESTView for a @register-decorated class.
 
     Uses deferred imports to avoid circular dependencies.
     """
     from pgcraft.plugins.simple import (  # noqa: PLC0415
         SimpleTriggerPlugin,
     )
-    from pgcraft.views.api import APIView  # noqa: PLC0415
+    from pgcraft.views.api import PostgRESTView  # noqa: PLC0415
 
     class _RegisterSource:
         TRIGGER_PLUGIN_CLS = SimpleTriggerPlugin
 
     src = _RegisterSource()
     src.ctx = ctx  # type: ignore[attr-defined]
-    APIView(source=src, **api_kwargs)  # type: ignore[arg-type]
+    PostgRESTView(source=src, **api_kwargs)  # type: ignore[arg-type]
 
 
 def register[T](  # noqa: PLR0913
@@ -196,10 +196,10 @@ def register[T](  # noqa: PLR0913
         plugins: Behaviour-modifying plugins (e.g.
             ``UUIDV4PKPlugin``).
         extra_plugins: Appended to the resolved plugin list.
-        api: When provided, creates an
-            :class:`~pgcraft.views.api.APIView` after table
+        api: When provided, creates a
+            :class:`~pgcraft.views.api.PostgRESTView` after table
             creation.  Accepts keyword arguments forwarded to
-            ``APIView`` (e.g. ``{"grants": ["select"]}``).
+            ``PostgRESTView`` (e.g. ``{"grants": ["select"]}``).
 
     Returns:
         A class decorator.

@@ -37,7 +37,7 @@ Pass this config to your factories and to
 Extension hooks
 ---------------
 
-:class:`~pgcraft.extension.Extension` provides five hooks.  Override
+:class:`~pgcraft.extension.PGCraftExtension` provides five hooks.  Override
 only the ones you need — every hook is a no-op by default.
 
 ``plugins()``
@@ -70,10 +70,10 @@ Declare dependencies using the ``depends_on`` class variable:
    from dataclasses import dataclass
    from typing import ClassVar
 
-   from pgcraft.extension import Extension
+   from pgcraft.extension import PGCraftExtension
 
    @dataclass
-   class MyExtension(Extension):
+   class MyExtension(PGCraftExtension):
        name: str = "my-ext"
        depends_on: ClassVar[list[str]] = ["postgrest"]
 
@@ -115,7 +115,7 @@ serial PK with a NanoID:
 
    from dataclasses import dataclass
 
-   from pgcraft.extension import Extension
+   from pgcraft.extension import PGCraftExtension
    from pgcraft.plugin import Plugin
 
 
@@ -125,7 +125,7 @@ serial PK with a NanoID:
 
 
    @dataclass
-   class NanoIDExtension(Extension):
+   class NanoIDExtension(PGCraftExtension):
        name: str = "nanoid"
 
        def plugins(self) -> list[Plugin]:
@@ -142,12 +142,12 @@ a trigger that writes to it:
 
    from dataclasses import dataclass
 
-   from pgcraft.extension import Extension
+   from pgcraft.extension import PGCraftExtension
    from pgcraft.plugin import Plugin
 
 
    @dataclass
-   class AuditExtension(Extension):
+   class AuditExtension(PGCraftExtension):
        name: str = "audit"
 
        def plugins(self) -> list[Plugin]:
@@ -168,13 +168,13 @@ metadata hooks for roles/grants.
    from dataclasses import dataclass
    from typing import TYPE_CHECKING
 
-   from pgcraft.extension import Extension
+   from pgcraft.extension import PGCraftExtension
 
    if TYPE_CHECKING:
        from sqlalchemy import MetaData
 
    @dataclass
-   class PostgRESTExtension(Extension):
+   class PostgRESTExtension(PGCraftExtension):
        name: str = "postgrest"
        schema: str = "api"
 
@@ -191,8 +191,19 @@ Built-in extensions
     per-resource grants on metadata.  Without this extension,
     no roles or grants are generated.
 
+    The module also re-exports the API view and plugin classes
+    as ``PostgRESTView`` and ``PostgRESTPlugin``:
+
     .. code-block:: python
 
-       from pgcraft.extensions.postgrest import PostgRESTExtension
+       from pgcraft.extensions.postgrest import (
+           PostgRESTExtension,
+           PostgRESTPlugin,
+           PostgRESTView,
+       )
 
+       config = PGCraftConfig()
        config.use(PostgRESTExtension())
+
+       # PostgRESTView is the primary API view class
+       PostgRESTView(source=factory, grants=["select"])

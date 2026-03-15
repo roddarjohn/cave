@@ -41,7 +41,7 @@ pip install pgcraft            # or: uv add pgcraft
 ```python
 from sqlalchemy import Column, MetaData, String
 from pgcraft.factory import PGCraftSimple
-from pgcraft.views import APIView
+from pgcraft.views import PostgRESTView
 
 metadata = MetaData()
 
@@ -55,7 +55,7 @@ users = PGCraftSimple(
     ],
 )
 
-APIView(source=users)
+PostgRESTView(source=users)
 ```
 
 This creates:

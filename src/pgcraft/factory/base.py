@@ -201,7 +201,7 @@ class ResourceFactory:
     """The factory context after plugin execution.
 
     Downstream view factories (e.g.
-    :class:`~pgcraft.views.api.APIView`) read this to access
+    :class:`~pgcraft.views.api.PostgRESTView`) read this to access
     tables, columns, and other plugin outputs.
     """
 

@@ -5,14 +5,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from pgcraft.extension import Extension
+from pgcraft.extension import PGCraftExtension
+from pgcraft.plugins.api import PostgRESTPlugin
+from pgcraft.views.api import PostgRESTView
 
 if TYPE_CHECKING:
     from sqlalchemy import MetaData
 
+__all__ = [
+    "PostgRESTExtension",
+    "PostgRESTPlugin",
+    "PostgRESTView",
+]
+
 
 @dataclass
-class PostgRESTExtension(Extension):
+class PostgRESTExtension(PGCraftExtension):
     """Wire PostgREST roles and grants into the pgcraft lifecycle.
 
     When registered on a :class:`~pgcraft.config.PGCraftConfig`,
@@ -23,11 +31,17 @@ class PostgRESTExtension(Extension):
 
     Without this extension, no roles or grants are registered.
 
+    This module also re-exports
+    :class:`~pgcraft.views.api.PostgRESTView` and
+    :class:`~pgcraft.plugins.api.PostgRESTPlugin` for
+    convenience.
+
     Example::
 
         from pgcraft.config import PGCraftConfig
         from pgcraft.extensions.postgrest import (
             PostgRESTExtension,
+            PostgRESTView,
         )
 
         config = PGCraftConfig()

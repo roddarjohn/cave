@@ -137,11 +137,12 @@ Extensions sit above plugins. An extension bundles plugins, metadata
 hooks, Alembic hooks, and CLI commands into a single installable unit.
 
 Key files:
-- `src/pgcraft/extension.py` -- `Extension` base class and
+- `src/pgcraft/extension.py` -- `PGCraftExtension` base class and
   `discover_extensions()` entry point discovery.
 - `src/pgcraft/extensions/` -- Built-in extensions.
 - `src/pgcraft/extensions/postgrest.py` -- `PostgRESTExtension`
-  (registers PostgREST roles and grants).
+  (registers PostgREST roles and grants).  Also re-exports
+  `PostgRESTView` and `PostgRESTPlugin`.
 
 How extensions work:
 - `PGCraftConfig.use(ext)` registers an extension instance.

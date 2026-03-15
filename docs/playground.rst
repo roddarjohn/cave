@@ -125,7 +125,7 @@ Define new models in ``playground/models.py`` using the pgcraft
 factory classes::
 
     from pgcraft.factory import PGCraftSimple
-    from pgcraft.views import APIView
+    from pgcraft.views import PostgRESTView
 
     users = PGCraftSimple(
         tablename="users",
@@ -136,7 +136,7 @@ factory classes::
         ],
     )
 
-    APIView(source=users)
+    PostgRESTView(source=users)
 
 Then generate and apply a migration::
 

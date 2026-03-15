@@ -4,7 +4,7 @@ from sqlalchemy import Column, MetaData, String
 
 from pgcraft import pgcraft_build_naming_conventions
 from pgcraft.factory import PGCraftSimple
-from pgcraft.views import APIView
+from pgcraft.views import PostgRESTView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
@@ -19,7 +19,7 @@ users = PGCraftSimple(
     ],
 )
 
-APIView(source=users)
+PostgRESTView(source=users)
 # --- example end ---
 
 SCHEMA_DESCRIPTION = (

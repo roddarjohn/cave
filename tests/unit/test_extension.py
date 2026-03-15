@@ -10,7 +10,7 @@ from sqlalchemy import MetaData
 from pgcraft.config import PGCraftConfig
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.extension import (
-    Extension,
+    PGCraftExtension,
     discover_extensions,
     validate_extension_deps,
 )
@@ -20,12 +20,12 @@ from pgcraft.plugin import Plugin
 
 
 @dataclass
-class _NoopExtension(Extension):
+class _NoopExtension(PGCraftExtension):
     name: str = "noop"
 
 
 @dataclass
-class _PluginExtension(Extension):
+class _PluginExtension(PGCraftExtension):
     name: str = "with-plugins"
 
     def plugins(self) -> list[Plugin]:
@@ -33,7 +33,7 @@ class _PluginExtension(Extension):
 
 
 @dataclass
-class _MetadataExtension(Extension):
+class _MetadataExtension(PGCraftExtension):
     name: str = "meta"
 
     def configure_metadata(self, metadata: MetaData) -> None:
@@ -41,19 +41,19 @@ class _MetadataExtension(Extension):
 
 
 @dataclass
-class _DependentExtension(Extension):
+class _DependentExtension(PGCraftExtension):
     name: str = "dependent"
     depends_on: ClassVar[list[str]] = ["noop"]
 
 
 @dataclass
-class _MissingDepExtension(Extension):
+class _MissingDepExtension(PGCraftExtension):
     name: str = "orphan"
     depends_on: ClassVar[list[str]] = ["nonexistent"]
 
 
 @dataclass
-class _ValidatingExtension(Extension):
+class _ValidatingExtension(PGCraftExtension):
     name: str = "validating"
 
     def validate(self, registered_names: frozenset[str]) -> None:
@@ -117,7 +117,7 @@ class TestExtensionDeps:
 
     def test_validate_hook_passes_when_peer_present(self):
         @dataclass
-        class _Peer(Extension):
+        class _Peer(PGCraftExtension):
             name: str = "required-peer"
 
         validate_extension_deps([_ValidatingExtension(), _Peer()])

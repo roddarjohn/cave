@@ -219,7 +219,7 @@ To replace the default plugin list entirely:
        ],
    )
 
-   APIView(source=events, schema="reporting")
+   PostgRESTView(source=events, schema="reporting")
 
 
 Singleton groups
@@ -515,7 +515,7 @@ has its own internal plugins and trigger strategy:
 
 **View factories** create derived views from a table factory:
 
-:class:`~pgcraft.views.api.APIView`
+:class:`~pgcraft.views.api.PostgRESTView`
     PostgREST-facing view with auto-selected INSTEAD OF triggers.
     Grants drive which triggers are created.  Supports
     ``columns``, ``exclude_columns``, and ``query=`` for

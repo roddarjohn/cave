@@ -8,7 +8,7 @@ from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
 )
-from pgcraft.views import APIView
+from pgcraft.views import PostgRESTView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
 
@@ -23,7 +23,7 @@ accounts = PGCraftSimple(
     ],
 )
 
-APIView(source=accounts)
+PostgRESTView(source=accounts)
 
 journal = PGCraftLedger(
     tablename="journal",
@@ -42,7 +42,7 @@ journal = PGCraftLedger(
     ],
 )
 
-APIView(
+PostgRESTView(
     source=journal,
     grants=["select", "insert"],
 )

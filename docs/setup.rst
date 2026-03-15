@@ -107,7 +107,7 @@ A simple dimension stores each row in one table and exposes it through an
 
    from sqlalchemy import Column, MetaData, String, Text
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
 
    metadata = MetaData()
 
@@ -121,7 +121,7 @@ A simple dimension stores each row in one table and exposes it through an
        ],
    )
 
-   APIView(source=products)
+   PostgRESTView(source=products)
 
 Append-only dimension (SCD Type 2)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -133,7 +133,7 @@ current state is always the most recent row in the attributes log:
 
    from sqlalchemy import Column, MetaData, Numeric, String
    from pgcraft.factory import PGCraftAppendOnly
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
 
    prices = PGCraftAppendOnly(
        tablename="prices",
@@ -146,7 +146,7 @@ current state is always the most recent row in the attributes log:
        ],
    )
 
-   APIView(source=prices)
+   PostgRESTView(source=prices)
 
 Ledger (append-only value table)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -159,7 +159,7 @@ is allowed through the API view:
 
    from sqlalchemy import Column, MetaData, String
    from pgcraft.factory import PGCraftLedger
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
 
    order_events = PGCraftLedger(
        tablename="order_events",
@@ -171,7 +171,7 @@ is allowed through the API view:
        ],
    )
 
-   APIView(
+   PostgRESTView(
        source=order_events,
        grants=["select", "insert"],
    )
@@ -190,7 +190,7 @@ frequently:
 
    from sqlalchemy import Boolean, Column, Integer, MetaData, String
    from pgcraft.factory import PGCraftEAV
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
 
    features = PGCraftEAV(
        tablename="features",
@@ -203,7 +203,7 @@ frequently:
        ],
    )
 
-   APIView(source=features)
+   PostgRESTView(source=features)
 
 Customising factory behaviour
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -217,14 +217,14 @@ Custom PK column name:
 
    from pgcraft.factory import PGCraftSimple
    from pgcraft.plugins.pk import UUIDV4PKPlugin
-   from pgcraft.views import APIView
+   from pgcraft.views import PostgRESTView
 
    products = PGCraftSimple(
        "products", "dim", metadata, schema_items,
        plugins=[UUIDV4PKPlugin()],
    )
 
-   APIView(source=products)
+   PostgRESTView(source=products)
 
 Custom API schema:
 
@@ -234,7 +234,7 @@ Custom API schema:
        "products", "dim", metadata, schema_items,
    )
 
-   APIView(source=products, schema="reporting")
+   PostgRESTView(source=products, schema="reporting")
 
 Apply a custom plugin to every factory via
 :class:`~pgcraft.config.PGCraftConfig`:
