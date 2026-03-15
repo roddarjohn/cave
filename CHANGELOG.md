@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.6.2...pgcraft-v0.6.3) (2026-03-15)
+
+
+### Features
+
+* triggering build ([235c5bc](https://github.com/roddarjohn/pgcraft/commit/235c5bc6768159638b103d6d6c9f43fe3df7c4ef))
+
 ## [0.6.2](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.6.1...pgcraft-v0.6.2) (2026-03-15)
 
 
