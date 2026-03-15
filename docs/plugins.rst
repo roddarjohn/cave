@@ -184,6 +184,40 @@ When a ctx key name is a constructor parameter rather than a fixed string, use
 The decorator validates at class definition time that the ``Dynamic`` attribute
 name is a real ``__init__`` parameter, so typos are caught immediately.
 
+PostgreSQL version requirements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Plugins that rely on features introduced in a specific PostgreSQL
+version can declare this via :class:`~pgcraft.plugin.MinPGVersion`
+inside the :func:`~pgcraft.plugin.requires` decorator:
+
+.. code-block:: python
+
+   from pgcraft.plugin import MinPGVersion, Plugin, produces, requires
+
+   @requires(MinPGVersion(18))
+   @produces("pk_columns")
+   class UUIDV7PKPlugin(Plugin):
+       """Requires PostgreSQL 18+ for uuidv7()."""
+       ...
+
+``MinPGVersion`` is filtered out of the ctx dependency graph — it
+only sets ``min_pg_version`` on the class.  To validate at runtime,
+call :func:`~pgcraft.plugin.check_pg_version` with the connected
+server's major version:
+
+.. code-block:: python
+
+   from pgcraft.plugin import check_pg_version
+
+   with engine.connect() as conn:
+       major = conn.dialect.server_version_info[0]
+       check_pg_version(major, factory.ctx.plugins)
+
+This raises :class:`~pgcraft.errors.PGCraftValidationError` with a
+clear message instead of letting PostgreSQL fail with "function does
+not exist".
+
 
 Plugin resolution
 -----------------
@@ -252,8 +286,9 @@ Plugins read and write objects in ``ctx`` using string keys.  Every built-in
 plugin accepts its key names as constructor arguments with sensible defaults,
 so two independent pipelines can coexist in one factory without colliding.
 
-``SerialPKPlugin``
-    Sets ``ctx.pk_columns`` (typed field, not a store key).
+``SerialPKPlugin`` / ``UUIDV4PKPlugin`` / ``UUIDV7PKPlugin``
+    Writes ``"pk_columns"``.  ``UUIDV7PKPlugin`` additionally
+    declares ``MinPGVersion(18)``.
 
 ``SimpleTablePlugin``
     Writes ``"primary"`` (the backing table).

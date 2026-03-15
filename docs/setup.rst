@@ -226,6 +226,17 @@ Custom PK column name:
 
    APIView(source=products)
 
+UUIDv7 primary key (PostgreSQL 18+):
+
+.. code-block:: python
+
+   from pgcraft.plugins.pk import UUIDV7PKPlugin
+
+   products = PGCraftSimple(
+       "products", "dim", metadata, schema_items,
+       plugins=[UUIDV7PKPlugin()],
+   )
+
 Custom API schema:
 
 .. code-block:: python
