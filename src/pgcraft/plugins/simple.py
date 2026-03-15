@@ -71,23 +71,44 @@ class SimpleTriggerPlugin(Plugin):
         self,
         table_key: str = "primary",
         view_key: str = "api",
+        columns: list[str] | None = None,
     ) -> None:
-        """Store the context keys."""
+        """Store the context keys.
+
+        Args:
+            table_key: Key in ``ctx`` for the backing table.
+            view_key: Key in ``ctx`` for the API view.
+            columns: Writable columns for the triggers.
+                When ``None``, uses all dim columns from ctx.
+
+        """
         self.table_key = table_key
         self.view_key = view_key
+        self.columns = columns
 
     def run(self, ctx: FactoryContext) -> None:
         """Register INSTEAD OF triggers on the target view."""
         api_view = ctx[self.view_key]
         primary = ctx[self.table_key]
         base_fullname = f"{ctx.schemaname}.{primary.name}"
-        dim_cols = ctx.dim_column_names
+        dim_cols = (
+            self.columns if self.columns is not None else ctx.dim_column_names
+        )
+
+        # When column subset is active, RETURNING must list
+        # only the view columns (PK + dim) instead of *.
+        if self.columns is not None:
+            pk_name = ctx.pk_column_name
+            ret = ", ".join([pk_name, *dim_cols])
+        else:
+            ret = "*"
 
         template_vars = {
             "base_table": base_fullname,
             "cols": ", ".join(dim_cols),
             "new_cols": ", ".join(f"NEW.{c}" for c in dim_cols),
             "set_clause": ", ".join(f"{c} = NEW.{c}" for c in dim_cols),
+            "returning_cols": ret,
         }
 
         api_schema = api_view.schema or "api"

@@ -221,11 +221,23 @@ class AppendOnlyTriggerPlugin(Plugin):
         root_key: str = "root_table",
         attributes_key: str = "attributes",
         view_key: str = "api",
+        columns: list[str] | None = None,
     ) -> None:
-        """Store the context keys."""
+        """Store the context keys.
+
+        Args:
+            root_key: Key in ``ctx`` for the root table.
+            attributes_key: Key in ``ctx`` for the attribute
+                table.
+            view_key: Key in ``ctx`` for the API view.
+            columns: Writable columns for the triggers.
+                When ``None``, uses all dim columns from ctx.
+
+        """
         self.root_key = root_key
         self.attributes_key = attributes_key
         self.view_key = view_key
+        self.columns = columns
 
     def run(self, ctx: FactoryContext) -> None:
         """Register INSTEAD OF triggers on join and API views."""
@@ -234,7 +246,9 @@ class AppendOnlyTriggerPlugin(Plugin):
         root_fullname = f"{ctx.schemaname}.{root_table.name}"
         attr_fullname = f"{ctx.schemaname}.{attribute_table.name}"
 
-        dim_cols = ctx.dim_column_names
+        dim_cols = (
+            self.columns if self.columns is not None else ctx.dim_column_names
+        )
         template_vars = {
             "attr_table": attr_fullname,
             "root_table": root_fullname,

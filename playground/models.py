@@ -21,7 +21,9 @@ from pgcraft import (
 )
 from pgcraft.check import PGCraftCheck
 from pgcraft.declarative import register
-from pgcraft.factory.dimension.append_only import PGCraftAppendOnly
+from pgcraft.factory.dimension.append_only import (
+    PGCraftAppendOnly,
+)
 from pgcraft.factory.dimension.eav import PGCraftEAV
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.factory.ledger import PGCraftLedger
@@ -113,6 +115,7 @@ Orders = PGCraftSimple(
     schema_items=[
         Column("customer_id", Integer, nullable=False),
         Column("total", Numeric(10, 2), nullable=False),
+        Column("internal_notes", String, nullable=True),
     ],
 )
 
@@ -132,26 +135,41 @@ APIView(
     source=users,
     grants=["select", "insert", "update", "delete"],
 )
-APIView(source=students)
+
+# columns=: only expose specific columns
+APIView(
+    source=students,
+    columns=["id", "name"],
+)
+
 APIView(source=Invoices)
 APIView(source=InvoiceLines)
-APIView(source=Orders)
 
-# -- Statistics via PGCraftView + APIView query lambda --
+# exclude_columns=: hide internal fields from the API
+APIView(
+    source=Orders,
+    exclude_columns=["internal_notes"],
+)
 
-_order_stats = PGCraftView(
-    "customers_orders_stats",
+# Standalone aggregate views
+_orders_t = Orders.table
+_customers_t = customers.table
+
+order_stats = PGCraftView(
+    "customer_order_stats",
     "public",
     metadata,
     query=select(
-        Orders.table.c.customer_id,
+        _orders_t.c.customer_id,
         func.count().label("order_count"),
-        func.sum(Orders.table.c.total).label("order_total"),
-    ).group_by(Orders.table.c.customer_id),
+        func.sum(_orders_t.c.total).label(
+            "order_total"
+        ),
+    ).group_by(_orders_t.c.customer_id),
 )
 
-_invoice_stats = PGCraftView(
-    "customers_invoices_stats",
+invoice_stats = PGCraftView(
+    "customer_invoice_stats",
     "public",
     metadata,
     query=select(
@@ -163,7 +181,51 @@ _invoice_stats = PGCraftView(
     ).group_by(Invoices.table.c.customer_id),
 )
 
-APIView(source=customers)
+# query=: full SQLAlchemy control over the API view.
+# PGCraftView.table is a joinable SQLAlchemy Table.
+_os = order_stats.table
+_iv = invoice_stats.table
+
+# query= changes the view shape — no auto-triggers
+# or protection are installed (the view is read-only).
+APIView(
+    source=customers,
+    grants=["select"],
+    query=lambda q, t: (
+        select(
+            t.c.id,
+            t.c.name,
+            t.c.email,
+            _os.c.order_count,
+            _os.c.order_total,
+            _iv.c.invoice_count,
+            _iv.c.invoiced_total,
+        )
+        .select_from(t)
+        .outerjoin(_os, t.c.id == _os.c.customer_id)
+        .outerjoin(_iv, t.c.id == _iv.c.customer_id)
+    ),
+)
+
+# PGCraftView with a join: orders enriched with
+# customer name, demonstrating a plain view factory.
+PGCraftView(
+    "orders_enriched",
+    "public",
+    metadata,
+    query=select(
+        _orders_t.c.id,
+        _orders_t.c.customer_id,
+        _orders_t.c.total,
+        _customers_t.c.name.label("customer_name"),
+    )
+    .select_from(
+        _orders_t.join(
+            _customers_t,
+            _orders_t.c.customer_id == _customers_t.c.id,
+        )
+    ),
+)
 
 # -- Inventory ledger (simple event) --------------------------------
 

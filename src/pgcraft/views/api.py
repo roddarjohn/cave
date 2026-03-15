@@ -196,11 +196,27 @@ def _build_select_cols(
 def _install_triggers(
     source: ResourceFactory,
     ctx: FactoryContext,
+    columns: list[str] | None = None,
 ) -> None:
-    """Auto-install triggers based on factory type."""
+    """Auto-install triggers based on factory type.
+
+    Args:
+        source: The factory whose trigger class to use.
+        ctx: The factory context.
+        columns: Writable column names for the triggers.
+            When ``None``, the trigger plugin uses all dim
+            columns from ctx.
+
+    """
     trigger_cls = getattr(source, "TRIGGER_PLUGIN_CLS", None)
     if trigger_cls is not None:
-        trigger_plugin = trigger_cls()
+        import inspect  # noqa: PLC0415
+
+        sig = inspect.signature(trigger_cls)
+        if columns is not None and "columns" in sig.parameters:
+            trigger_plugin = trigger_cls(columns=columns)
+        else:
+            trigger_plugin = trigger_cls()
         trigger_plugin.run(ctx)
 
     # Auto-install EAV check triggers on the API view.
@@ -295,6 +311,14 @@ class APIView:
         # Store the view in ctx so trigger plugins can find it.
         ctx.set("api", view, force=True)
 
+        # Resolve which writable columns the view exposes.
+        effective = _resolve_included_columns(primary, columns, exclude_columns)
+        if effective is not None:
+            dim_set = set(ctx.dim_column_names)
+            writable = [c for c in effective if c in dim_set]
+        else:
+            writable = None
+
         register_api_resource(
             ctx.metadata,
             APIResource(
@@ -304,7 +328,11 @@ class APIView:
             ),
         )
 
-        _install_triggers(source, ctx)
+        # Custom query= changes the view shape, so skip
+        # auto-generated CRUD triggers (the view is read-only
+        # or the caller manages writes externally).
+        if query is None:
+            _install_triggers(source, ctx, writable)
 
-        if protect_raw:
-            _install_protection(source, ctx)
+            if protect_raw:
+                _install_protection(source, ctx)
