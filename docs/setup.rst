@@ -71,7 +71,7 @@ Make three pgcraft-specific additions to ``migrations/env.py``:
 
    # ... your existing env.py setup (loading config, metadata, etc.) ...
 
-   pgcraft_configure_metadata(target_metadata)
+   pgcraft_configure_metadata(target_metadata, config=config)
 
    def run_migrations_offline() -> None:
        context.configure(
@@ -97,11 +97,29 @@ Make three pgcraft-specific additions to ``migrations/env.py``:
 Pass your ``MetaData`` instance to a pgcraft dimension factory so that
 generated tables are registered for autogenerate detection.
 
+PostgREST extension setup
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The PostgREST extension must be registered before using
+``PostgRESTView``.  Without it, no roles or grants are
+generated during Alembic autogenerate.  Set it up once and
+pass the config to every factory:
+
+.. code-block:: python
+
+   from pgcraft.config import PGCraftConfig
+   from pgcraft.extensions.postgrest import PostgRESTExtension
+
+   config = PGCraftConfig()
+   config.use(PostgRESTExtension())
+
+All examples below assume this ``config`` is already defined.
+
 Simple dimension (single table)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A simple dimension stores each row in one table and exposes it through an
-``api`` schema view with INSTEAD OF triggers:
+A simple dimension stores each row in one table and exposes it
+through an ``api`` schema view with INSTEAD OF triggers:
 
 .. code-block:: python
 
@@ -115,6 +133,7 @@ A simple dimension stores each row in one table and exposes it through an
        tablename="products",
        schemaname="dim",
        metadata=metadata,
+       config=config,
        schema_items=[
            Column("name", String, nullable=False),
            Column("description", Text),

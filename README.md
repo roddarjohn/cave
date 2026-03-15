@@ -40,8 +40,15 @@ pip install pgcraft            # or: uv add pgcraft
 
 ```python
 from sqlalchemy import Column, MetaData, String
+from pgcraft.config import PGCraftConfig
+from pgcraft.extensions.postgrest import (
+    PostgRESTExtension,
+)
 from pgcraft.factory import PGCraftSimple
 from pgcraft.views import PostgRESTView
+
+config = PGCraftConfig()
+config.register_extension(PostgRESTExtension())
 
 metadata = MetaData()
 
@@ -49,6 +56,7 @@ users = PGCraftSimple(
     tablename="users",
     schemaname="public",
     metadata=metadata,
+    config=config,
     schema_items=[
         Column("name", String, nullable=False),
         Column("email", String),
