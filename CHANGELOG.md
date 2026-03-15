@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.0](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.5.1...pgcraft-v0.6.0) (2026-03-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* plugin rework (again) ([#43](https://github.com/roddarjohn/pgcraft/issues/43))
+
+### Features
+
+* plugin rework (again) ([#43](https://github.com/roddarjohn/pgcraft/issues/43)) ([42fdccc](https://github.com/roddarjohn/pgcraft/commit/42fdccc80935b4523fa99f61e81923dbf2876f85))
+
 ## [0.5.1](https://github.com/roddarjohn/pgcraft/compare/pgcraft-v0.5.0...pgcraft-v0.5.1) (2026-03-14)
 
 
