@@ -16,10 +16,7 @@ class TestTableIndexPlugin:
         ctx = make_ctx(
             schema_items=[
                 Column("price", Integer),
-                PGCraftIndex(
-                    expressions=["{price}"],
-                    name="idx_price",
-                ),
+                PGCraftIndex("idx_price", "{price}"),
             ]
         )
         SimpleTablePlugin().run(ctx)
@@ -34,11 +31,7 @@ class TestTableIndexPlugin:
         ctx = make_ctx(
             schema_items=[
                 Column("code", String),
-                PGCraftIndex(
-                    expressions=["{code}"],
-                    name="uq_code",
-                    unique=True,
-                ),
+                PGCraftIndex("uq_code", "{code}", unique=True),
             ]
         )
         SimpleTablePlugin().run(ctx)
@@ -54,10 +47,7 @@ class TestTableIndexPlugin:
             schema_items=[
                 Column("a", Integer),
                 Column("b", Integer),
-                PGCraftIndex(
-                    expressions=["{a}", "{b}"],
-                    name="idx_ab",
-                ),
+                PGCraftIndex("idx_ab", "{a}", "{b}"),
             ]
         )
         SimpleTablePlugin().run(ctx)
@@ -80,10 +70,7 @@ class TestTableIndexPlugin:
         ctx = make_ctx(
             schema_items=[
                 Column("price", Integer),
-                PGCraftIndex(
-                    expressions=["{nonexistent}"],
-                    name="idx_bad",
-                ),
+                PGCraftIndex("idx_bad", "{nonexistent}"),
             ]
         )
         SimpleTablePlugin().run(ctx)
@@ -99,10 +86,7 @@ class TestTableIndexPlugin:
         ctx = make_ctx(
             schema_items=[
                 Column("price", Integer),
-                PGCraftIndex(
-                    expressions=["{price}"],
-                    name="idx_price",
-                ),
+                PGCraftIndex("idx_price", "{price}"),
             ]
         )
         SimpleTablePlugin(table_key="my_table").run(ctx)
@@ -121,10 +105,7 @@ class TestTableIndexPlugin:
         ctx = make_ctx(
             schema_items=[
                 Column("name", String),
-                PGCraftIndex(
-                    expressions=["lower({name})"],
-                    name="idx_lower_name",
-                ),
+                PGCraftIndex("idx_lower_name", "lower({name})"),
             ]
         )
         SimpleTablePlugin().run(ctx)

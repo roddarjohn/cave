@@ -1,8 +1,16 @@
 """Unit tests for pgcraft.fk module."""
 
 import pytest
+from sqlalchemy import MetaData
 
-from pgcraft.fk import PGCraftFK, collect_fks
+from pgcraft.errors import PGCraftValidationError
+from pgcraft.fk import (
+    DimensionRef,
+    PGCraftFK,
+    collect_fks,
+    register_dimension,
+    resolve_fk_reference,
+)
 
 
 class TestPGCraftFK:
@@ -32,10 +40,7 @@ class TestPGCraftFK:
     def test_multi_column(self):
         fk = PGCraftFK(
             columns=["{a}", "{b}"],
-            references=[
-                "public.other.x",
-                "public.other.y",
-            ],
+            references=["public.other.x", "public.other.y"],
             name="fk_ab",
         )
         assert fk.columns == ["{a}", "{b}"]
@@ -53,7 +58,7 @@ class TestPGCraftFK:
     def test_column_names(self):
         fk = PGCraftFK(
             columns=["{org_id}"],
-            references=["public.orgs.id"],
+            references=["customer.id"],
             name="fk_org",
         )
         assert fk.column_names() == ["org_id"]
@@ -69,10 +74,83 @@ class TestPGCraftFK:
     def test_resolve_identity(self):
         fk = PGCraftFK(
             columns=["{org_id}"],
-            references=["public.orgs.id"],
+            references=["customer.id"],
             name="fk_org",
         )
         assert fk.resolve(lambda c: c) == ["org_id"]
+
+
+class TestDimensionRegistry:
+    def test_register_and_resolve(self):
+        metadata = MetaData()
+        register_dimension(
+            metadata,
+            "customer",
+            DimensionRef(schema="dim", table="customer"),
+        )
+        result = resolve_fk_reference(metadata, "customer.id")
+        assert result == "dim.customer.id"
+
+    def test_resolve_append_only_root(self):
+        metadata = MetaData()
+        register_dimension(
+            metadata,
+            "customer",
+            DimensionRef(schema="dim", table="customer_root"),
+        )
+        result = resolve_fk_reference(metadata, "customer.id")
+        assert result == "dim.customer_root.id"
+
+    def test_three_part_passthrough(self):
+        metadata = MetaData()
+        result = resolve_fk_reference(metadata, "dim.customer.id")
+        assert result == "dim.customer.id"
+
+    def test_unknown_dimension_raises(self):
+        metadata = MetaData()
+        with pytest.raises(PGCraftValidationError, match="unknown"):
+            resolve_fk_reference(metadata, "nonexistent.id")
+
+    def test_error_lists_known_dimensions(self):
+        metadata = MetaData()
+        register_dimension(
+            metadata,
+            "org",
+            DimensionRef(schema="dim", table="org"),
+        )
+        with pytest.raises(PGCraftValidationError, match="org"):
+            resolve_fk_reference(metadata, "bogus.id")
+
+    def test_resolve_references_method(self):
+        metadata = MetaData()
+        register_dimension(
+            metadata,
+            "org",
+            DimensionRef(schema="dim", table="org"),
+        )
+        fk = PGCraftFK(
+            columns=["{org_id}"],
+            references=["org.id"],
+            name="fk_org",
+        )
+        resolved = fk.resolve_references(metadata)
+        assert resolved == ["dim.org.id"]
+
+    def test_resolve_references_mixed(self):
+        """Two-part resolved, three-part passed through."""
+        metadata = MetaData()
+        register_dimension(
+            metadata,
+            "org",
+            DimensionRef(schema="dim", table="org"),
+        )
+        fk = PGCraftFK(
+            columns=["{a}", "{b}"],
+            references=["org.id", "other.schema.col"],
+            name="fk_mixed",
+        )
+        resolved = fk.resolve_references(metadata)
+        assert resolved == ["dim.org.id", "other.schema.col"]
 
 
 class TestCollectFKs:
@@ -83,7 +161,7 @@ class TestCollectFKs:
             Column("org_id", Integer),
             PGCraftFK(
                 columns=["{org_id}"],
-                references=["public.orgs.id"],
+                references=["org.id"],
                 name="fk_org",
             ),
         ]

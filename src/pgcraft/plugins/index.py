@@ -24,6 +24,8 @@ class TableIndexPlugin(Plugin):
 
     Reads ``PGCraftIndex`` items from ``ctx.schema_items``, validates
     column names, and creates ``Index`` objects on the target table.
+    Extra keyword arguments on each ``PGCraftIndex`` are passed
+    through to the underlying ``sqlalchemy.Index``.
 
     Args:
         table_key: Key in ``ctx`` for the target table
@@ -58,6 +60,7 @@ class TableIndexPlugin(Plugin):
                 idx.name,
                 *cols,
                 unique=idx.unique,
+                **idx.kw,
             )
             if has_expressions:
                 table.append_constraint(sa_index)

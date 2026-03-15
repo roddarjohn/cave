@@ -348,9 +348,124 @@ the pivot view.
 
 **Parameters:**
 
-``view_key``
+``table_key``
     Which view's triggers to add checks to (default varies by
     dimension type).
+
+
+TableIndexPlugin
+----------------
+
+.. module:: pgcraft.plugins.index
+   :no-index:
+
+Resolves :class:`~pgcraft.index.PGCraftIndex` items into real
+``sqlalchemy.Index`` objects on the backing table.  Both simple
+column references (``"{col}"``) and functional expressions
+(``"lower({col})"``) are supported.  Extra keyword arguments on
+the ``PGCraftIndex`` are passed through to the underlying
+``sqlalchemy.Index`` (e.g. ``postgresql_using``,
+``postgresql_where``).
+
+**Requires:** ``"primary"`` (via ``table_key``)
+
+**Parameters:**
+
+``table_key``
+    Context key for the target table (default ``"primary"``).
+    Append-only dimensions use ``"attributes"``.
+
+**Example:**
+
+.. code-block:: python
+
+   from sqlalchemy import Column, Integer, String
+
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.index import PGCraftIndex
+
+   products = PGCraftSimple(
+       "products", "public", metadata,
+       schema_items=[
+           Column("name", String, nullable=False),
+           Column("price", Integer, nullable=False),
+           PGCraftIndex("idx_products_name", "{name}"),
+           PGCraftIndex(
+               "idx_products_price",
+               "{price}",
+               unique=True,
+           ),
+           PGCraftIndex(
+               "idx_products_lower_name",
+               "lower({name})",
+               postgresql_using="btree",
+           ),
+       ],
+   )
+
+
+TableFKPlugin
+-------------
+
+.. module:: pgcraft.plugins.fk
+   :no-index:
+
+Resolves :class:`~pgcraft.fk.PGCraftFK` items into
+``ForeignKeyConstraint`` objects on the backing table.
+
+Local columns use ``{column_name}`` markers.  References use
+either a two-part ``"dimension.column"`` format (resolved via the
+dimension registry) or a three-part ``"schema.table.column"``
+format (passed through directly).
+
+The dimension registry is populated automatically when factories
+run — each factory registers its FK-targetable table (the root
+table for append-only dimensions, the primary table for simple
+dimensions).
+
+**Requires:** ``"primary"`` (via ``table_key``)
+
+**Parameters:**
+
+``table_key``
+    Context key for the target table (default ``"primary"``).
+    Append-only dimensions use ``"attributes"``.
+
+**Example:**
+
+.. code-block:: python
+
+   from sqlalchemy import Column, Integer, String
+
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.fk import PGCraftFK
+
+   customers = PGCraftSimple(
+       "customers", "public", metadata,
+       schema_items=[
+           Column("name", String, nullable=False),
+       ],
+   )
+
+   orders = PGCraftSimple(
+       "orders", "public", metadata,
+       schema_items=[
+           Column("customer_id", Integer, nullable=False),
+           Column("total", Integer, nullable=False),
+           PGCraftFK(
+               columns=["{customer_id}"],
+               references=["customers.id"],
+               name="fk_orders_customer",
+               ondelete="CASCADE",
+           ),
+       ],
+   )
+
+Two-part references like ``"customers.id"`` are resolved to the
+physical table via the dimension registry.  If the ``customers``
+dimension is append-only, this resolves to the root table
+automatically.  Three-part references like
+``"public.customers.id"`` bypass resolution entirely.
 
 
 AppendOnlyTablePlugin
@@ -504,6 +619,8 @@ declarations.  A typical simple dimension pipeline runs:
    SerialPKPlugin              -> pk_columns
    SimpleTablePlugin           -> primary, __root__
    TableCheckPlugin            (reads __root__)
+   TableIndexPlugin            (reads primary)
+   TableFKPlugin               (reads primary)
    RawTableProtectionPlugin    (reads primary)
 
 API views and triggers are created separately via ``APIView``.

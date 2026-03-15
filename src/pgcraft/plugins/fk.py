@@ -2,7 +2,8 @@
 
 :class:`TableFKPlugin` converts :class:`~pgcraft.fk.PGCraftFK`
 items into real SQLAlchemy ``ForeignKeyConstraint`` objects on a
-table.
+table.  Two-part references (``"dimension.column"``) are resolved
+via the dimension registry in ``metadata.info``.
 """
 
 from __future__ import annotations
@@ -24,8 +25,9 @@ class TableFKPlugin(Plugin):
     """Materialize :class:`~pgcraft.fk.PGCraftFK` as FK constraints.
 
     Reads ``PGCraftFK`` items from ``ctx.schema_items``, validates
-    local column names, and creates ``ForeignKeyConstraint`` objects
-    on the target table.
+    local column names, resolves references via the dimension
+    registry, and creates ``ForeignKeyConstraint`` objects on the
+    target table.
 
     Args:
         table_key: Key in ``ctx`` for the target table
@@ -51,9 +53,10 @@ class TableFKPlugin(Plugin):
                 col_names,
             )
             resolved_columns = fk.resolve(lambda c: c)
+            resolved_refs = fk.resolve_references(ctx.metadata)
             constraint = ForeignKeyConstraint(
                 resolved_columns,
-                fk.references,
+                resolved_refs,
                 name=fk.name,
                 ondelete=fk.ondelete,
                 onupdate=fk.onupdate,

@@ -41,6 +41,8 @@ class PGCraftAppendOnly(ResourceFactory):
     through a PostgREST API view with CRUD triggers.
     """
 
+    _FK_TARGET_KEY: ClassVar[str] = "root_table"
+
     _INTERNAL_PLUGINS: ClassVar[list[Plugin]] = [
         CreatedAtPlugin(),
         AppendOnlyTablePlugin(),

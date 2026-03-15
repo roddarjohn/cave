@@ -7,50 +7,69 @@ from pgcraft.index import PGCraftIndex, collect_indices
 
 class TestPGCraftIndex:
     def test_basic_construction(self):
-        idx = PGCraftIndex(expressions=["{price}"], name="idx_price")
-        assert idx.expressions == ["{price}"]
+        idx = PGCraftIndex("idx_price", "{price}")
         assert idx.name == "idx_price"
+        assert idx.expressions == ["{price}"]
         assert idx.unique is False
+        assert idx.kw == {}
 
     def test_unique_flag(self):
-        idx = PGCraftIndex(
-            expressions=["{code}"],
-            name="uq_code",
-            unique=True,
-        )
+        idx = PGCraftIndex("uq_code", "{code}", unique=True)
         assert idx.unique is True
 
     def test_multi_column(self):
-        idx = PGCraftIndex(
-            expressions=["{a}", "{b}"],
-            name="idx_ab",
-        )
+        idx = PGCraftIndex("idx_ab", "{a}", "{b}")
         assert idx.expressions == ["{a}", "{b}"]
 
-    def test_is_frozen(self):
-        idx = PGCraftIndex(expressions=["{a}"], name="idx_a")
+    def test_is_immutable(self):
+        idx = PGCraftIndex("idx_a", "{a}")
         with pytest.raises(AttributeError):
             idx.name = "changed"  # type: ignore[misc]
 
+    def test_kwargs_passthrough(self):
+        idx = PGCraftIndex(
+            "idx_gin",
+            "{data}",
+            postgresql_using="gin",
+        )
+        assert idx.kw == {"postgresql_using": "gin"}
+
     def test_column_names(self):
-        idx = PGCraftIndex(expressions=["{a}", "{b}"], name="idx_ab")
+        idx = PGCraftIndex("idx_ab", "{a}", "{b}")
         assert idx.column_names() == ["a", "b"]
 
     def test_column_names_deduplicates(self):
-        idx = PGCraftIndex(expressions=["{a}", "{a}"], name="idx_aa")
+        idx = PGCraftIndex("idx_aa", "{a}", "{a}")
         assert idx.column_names() == ["a"]
 
     def test_column_names_functional(self):
-        idx = PGCraftIndex(expressions=["lower({name})"], name="idx_lower")
+        idx = PGCraftIndex("idx_lower", "lower({name})")
         assert idx.column_names() == ["name"]
 
     def test_resolve_identity(self):
-        idx = PGCraftIndex(expressions=["{a}", "{b}"], name="idx")
+        idx = PGCraftIndex("idx", "{a}", "{b}")
         assert idx.resolve(lambda c: c) == ["a", "b"]
 
     def test_resolve_functional(self):
-        idx = PGCraftIndex(expressions=["lower({name})"], name="idx")
+        idx = PGCraftIndex("idx", "lower({name})")
         assert idx.resolve(lambda c: c) == ["lower(name)"]
+
+    def test_repr(self):
+        idx = PGCraftIndex("idx", "{a}", unique=True)
+        r = repr(idx)
+        assert "idx" in r
+        assert "{a}" in r
+        assert "unique=True" in r
+
+    def test_eq(self):
+        a = PGCraftIndex("idx", "{a}", unique=True)
+        b = PGCraftIndex("idx", "{a}", unique=True)
+        assert a == b
+
+    def test_not_eq(self):
+        a = PGCraftIndex("idx", "{a}")
+        b = PGCraftIndex("idx", "{b}")
+        assert a != b
 
 
 class TestCollectIndices:
@@ -59,7 +78,7 @@ class TestCollectIndices:
 
         items = [
             Column("price", Integer),
-            PGCraftIndex(expressions=["{price}"], name="idx_price"),
+            PGCraftIndex("idx_price", "{price}"),
             Column("qty", Integer),
         ]
         result = collect_indices(items)

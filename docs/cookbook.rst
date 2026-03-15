@@ -547,6 +547,118 @@ How it works
    through the API view.
 
 
+.. _cookbook-indices-and-fks:
+
+Indices and foreign keys
+------------------------
+
+pgcraft supports declarative index and foreign key definitions
+using ``{column_name}`` markers — the same syntax used by
+:class:`~pgcraft.check.PGCraftCheck`.
+
+Adding indices
+~~~~~~~~~~~~~~
+
+Use :class:`~pgcraft.index.PGCraftIndex` in ``schema_items``.
+The constructor mirrors ``sqlalchemy.Index``: name first, then
+expressions, then keyword arguments passed through to the
+underlying index.
+
+.. code-block:: python
+
+   from sqlalchemy import Column, Integer, MetaData, String
+
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.index import PGCraftIndex
+   from pgcraft import pgcraft_build_naming_conventions
+
+   metadata = MetaData(
+       naming_convention=pgcraft_build_naming_conventions(),
+   )
+
+   products = PGCraftSimple(
+       "products", "inventory", metadata,
+       schema_items=[
+           Column("name", String, nullable=False),
+           Column("sku", String(32), nullable=False),
+           Column("price", Integer, nullable=False),
+           # Simple index
+           PGCraftIndex("idx_products_sku", "{sku}"),
+           # Unique index
+           PGCraftIndex(
+               "uq_products_name", "{name}", unique=True
+           ),
+           # Functional index with dialect kwargs
+           PGCraftIndex(
+               "idx_products_lower_name",
+               "lower({name})",
+               postgresql_using="btree",
+           ),
+           # Multi-column index
+           PGCraftIndex(
+               "idx_products_name_price",
+               "{name}", "{price}",
+           ),
+       ],
+   )
+
+Adding foreign keys
+~~~~~~~~~~~~~~~~~~~
+
+Use :class:`~pgcraft.fk.PGCraftFK` in ``schema_items``.
+References can be two-part (``"dimension.column"``) or three-part
+(``"schema.table.column"``).  Two-part references are resolved
+via the dimension registry — pgcraft automatically finds the
+correct physical table regardless of dimension type.
+
+.. code-block:: python
+
+   from sqlalchemy import Column, Integer, MetaData, String
+
+   from pgcraft.factory import PGCraftSimple
+   from pgcraft.fk import PGCraftFK
+   from pgcraft import pgcraft_build_naming_conventions
+
+   metadata = MetaData(
+       naming_convention=pgcraft_build_naming_conventions(),
+   )
+
+   customers = PGCraftSimple(
+       "customers", "public", metadata,
+       schema_items=[
+           Column("name", String, nullable=False),
+       ],
+   )
+
+   orders = PGCraftSimple(
+       "orders", "public", metadata,
+       schema_items=[
+           Column("customer_id", Integer, nullable=False),
+           Column("total", Integer, nullable=False),
+           PGCraftFK(
+               columns=["{customer_id}"],
+               references=["customers.id"],
+               name="fk_orders_customer",
+               ondelete="CASCADE",
+           ),
+       ],
+   )
+
+The ``"customers.id"`` reference is resolved to the physical table
+via the dimension registry.  If ``customers`` were an append-only
+dimension, the FK would point to the root table automatically.
+
+To bypass resolution entirely, use a three-part reference:
+
+.. code-block:: python
+
+   PGCraftFK(
+       columns=["{org_id}"],
+       references=["public.organizations.id"],
+       name="fk_orders_org",
+   )
+
+
 .. _cookbook-computed-columns:
 
 Computed columns
