@@ -1,4 +1,4 @@
-"""APIView: PostgREST-facing view with auto-triggers."""
+"""PostgRESTView: PostgREST-facing view with auto-triggers."""
 
 from __future__ import annotations
 
@@ -105,7 +105,10 @@ def _resolve_included_columns(
 ) -> list[str] | None:
     """Resolve the effective column list."""
     if columns is not None and exclude_columns is not None:
-        msg = "Cannot specify both 'columns' and 'exclude_columns' on APIView"
+        msg = (
+            "Cannot specify both 'columns' and"
+            " 'exclude_columns' on PostgRESTView"
+        )
         raise ValueError(msg)
 
     if exclude_columns is not None:
@@ -240,7 +243,7 @@ def _install_triggers(
         check_plugin.run(ctx)
 
 
-class APIView:
+class PostgRESTView:
     """Create a PostgREST-facing view with auto-selected triggers.
 
     Reads from a table factory's context to create an API view
@@ -287,7 +290,7 @@ class APIView:
         if "primary" not in ctx:
             msg = (
                 "Source factory must produce a 'primary' "
-                "context key for APIView."
+                "context key for PostgRESTView."
             )
             raise ValueError(msg)
         primary = ctx["primary"]

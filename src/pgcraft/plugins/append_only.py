@@ -133,7 +133,7 @@ class AppendOnlyViewPlugin(Plugin):
             (default ``"attributes"``).
         primary_key: Key in ``ctx`` to store the view proxy under,
             for downstream plugins such as
-            :class:`~pgcraft.plugins.api.APIPlugin` (default
+            :class:`~pgcraft.extensions.postgrest.PostgRESTPlugin` (default
             ``"primary"``).
 
     """
@@ -180,7 +180,7 @@ class AppendOnlyViewPlugin(Plugin):
             ),
         )
 
-        # Build a proxy Table so APIPlugin can SELECT from the view.
+        # Build a proxy Table so PostgRESTPlugin can SELECT from the view.
         proxy = Table(
             ctx.tablename,
             MetaData(),

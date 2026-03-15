@@ -31,7 +31,7 @@ def collect_trigger_views(
 
     Always includes the private dimension view in ``ctx.schemaname``.
     If ``view_key`` is present in ``ctx`` (e.g. the API view created
-    by ``APIPlugin``), that view's schema and fullname are appended.
+    by ``PostgRESTPlugin``), that view's schema and fullname are appended.
 
     Args:
         ctx: The active factory context.

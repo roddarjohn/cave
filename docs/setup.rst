@@ -71,7 +71,7 @@ Make three pgcraft-specific additions to ``migrations/env.py``:
 
    # ... your existing env.py setup (loading config, metadata, etc.) ...
 
-   pgcraft_configure_metadata(target_metadata)
+   pgcraft_configure_metadata(target_metadata, config=config)
 
    def run_migrations_offline() -> None:
        context.configure(
@@ -100,14 +100,10 @@ generated tables are registered for autogenerate detection.
 Simple dimension (single table)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A simple dimension stores each row in one table and exposes it through an
-``api`` schema view with INSTEAD OF triggers:
-
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, String, Text
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import APIView
 
    metadata = MetaData()
 
@@ -121,19 +117,17 @@ A simple dimension stores each row in one table and exposes it through an
        ],
    )
 
-   APIView(source=products)
-
 Append-only dimension (SCD Type 2)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-An append-only dimension keeps a full history of attribute changes.  The
-current state is always the most recent row in the attributes log:
+An append-only dimension keeps a full history of attribute
+changes.  The current state is always the most recent row in
+the attributes log:
 
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, Numeric, String
    from pgcraft.factory import PGCraftAppendOnly
-   from pgcraft.views import APIView
 
    prices = PGCraftAppendOnly(
        tablename="prices",
@@ -141,25 +135,24 @@ current state is always the most recent row in the attributes log:
        metadata=metadata,
        schema_items=[
            Column("sku", String, nullable=False),
-           Column("amount", Numeric(10, 2), nullable=False),
+           Column(
+               "amount", Numeric(10, 2), nullable=False,
+           ),
            Column("currency", String(3), nullable=False),
        ],
    )
 
-   APIView(source=prices)
-
 Ledger (append-only value table)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A ledger stores immutable entries with a ``value`` column, an ``entry_id``
-UUID for correlating related entries, and dimension columns.  Only INSERT
-is allowed through the API view:
+A ledger stores immutable entries with a ``value`` column, an
+``entry_id`` UUID for correlating related entries, and dimension
+columns:
 
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, String
    from pgcraft.factory import PGCraftLedger
-   from pgcraft.views import APIView
 
    order_events = PGCraftLedger(
        tablename="order_events",
@@ -171,26 +164,22 @@ is allowed through the API view:
        ],
    )
 
-   APIView(
-       source=order_events,
-       grants=["select", "insert"],
-   )
-
-See :doc:`ledgers` for balance views, double-entry enforcement, and
-numeric value types.
+See :doc:`ledgers` for balance views, double-entry enforcement,
+and numeric value types.
 
 EAV dimension (sparse / dynamic attributes)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-An EAV dimension stores each attribute as a separate row, making it
-efficient when rows have many nullable fields or when attributes are added
-frequently:
+An EAV dimension stores each attribute as a separate row,
+making it efficient when rows have many nullable fields or when
+attributes are added frequently:
 
 .. code-block:: python
 
-   from sqlalchemy import Boolean, Column, Integer, MetaData, String
+   from sqlalchemy import (
+       Boolean, Column, Integer, MetaData, String,
+   )
    from pgcraft.factory import PGCraftEAV
-   from pgcraft.views import APIView
 
    features = PGCraftEAV(
        tablename="features",
@@ -203,38 +192,35 @@ frequently:
        ],
    )
 
-   APIView(source=features)
-
 Customising factory behaviour
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Any factory argument can be changed by passing a custom plugin list.
-See :doc:`plugins` for a full explanation.
+Any factory argument can be changed by passing a custom plugin
+list.  See :doc:`plugins` for a full explanation.
 
-Custom PK column name:
+Custom PK type:
 
 .. code-block:: python
 
    from pgcraft.factory import PGCraftSimple
    from pgcraft.plugins.pk import UUIDV4PKPlugin
-   from pgcraft.views import APIView
 
    products = PGCraftSimple(
        "products", "dim", metadata, schema_items,
        plugins=[UUIDV4PKPlugin()],
    )
 
-   APIView(source=products)
-
-Custom API schema:
+UUIDv7 primary key (PostgreSQL 18+):
 
 .. code-block:: python
 
+   from pgcraft.plugins.pk import UUIDV7PKPlugin
+
    products = PGCraftSimple(
        "products", "dim", metadata, schema_items,
+       plugins=[UUIDV7PKPlugin()],
    )
 
-   APIView(source=products, schema="reporting")
 
 Apply a custom plugin to every factory via
 :class:`~pgcraft.config.PGCraftConfig`:
@@ -244,7 +230,9 @@ Apply a custom plugin to every factory via
    from pgcraft.config import PGCraftConfig
 
    pgcraft_cfg = PGCraftConfig()
-   pgcraft_cfg.register(TimestampPlugin(), TenantPlugin())
+   pgcraft_cfg.register(
+       TimestampPlugin(), TenantPlugin(),
+   )
 
    PGCraftSimple(
        "products", "dim", metadata, schema_items,
@@ -254,3 +242,5 @@ Apply a custom plugin to every factory via
        "orders", "dim", metadata, schema_items,
        config=pgcraft_cfg,
    )
+
+To add PostgREST API views, see :doc:`extensions`.

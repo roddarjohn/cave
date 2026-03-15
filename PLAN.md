@@ -106,7 +106,6 @@ Source of truth tables should be very very clear.
   - approvals
 
 - Indices don't work right now because we need a column resolution thing.
-
 - FK handling is scuffed because of the root table issue
 
 - Allow loading a dynamic configuration and dynamic migrations

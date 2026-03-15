@@ -1,11 +1,22 @@
-from sqlalchemy import MetaData
-from sqlalchemy_declarative_extensions.alembic import register_alembic_events
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from sqlalchemy_declarative_extensions.alembic import (
+    register_alembic_events,
+)
 
 from pgcraft.alembic.renderer import register_renderers
-from pgcraft.alembic.rewriter import pgcraft_process_revision_directives
+from pgcraft.alembic.rewriter import (
+    pgcraft_process_revision_directives,
+)
 from pgcraft.alembic.schema import register_schemas
-from pgcraft.models.roles import register_roles
 from pgcraft.patches import apply_all
+
+if TYPE_CHECKING:
+    from sqlalchemy import MetaData
+
+    from pgcraft.config import PGCraftConfig
 
 __all__ = [
     "pgcraft_alembic_hook",
@@ -14,8 +25,12 @@ __all__ = [
 ]
 
 
-def pgcraft_alembic_hook() -> None:
-    """Register pgcraft's alembic extensions (call before importing models).
+def pgcraft_alembic_hook(
+    config: PGCraftConfig | None = None,
+) -> None:
+    """Register pgcraft's alembic extensions.
+
+    Call before importing models.
 
     Usage in ``env.py``::
 
@@ -33,13 +48,41 @@ def pgcraft_alembic_hook() -> None:
 
     Then pass ``pgcraft_process_revision_directives`` to
     ``context.configure(process_revision_directives=...)``.
+
+    Args:
+        config: Optional config providing extensions
+            whose ``configure_alembic()`` hooks will be
+            called.
+
     """
     register_alembic_events()
     register_renderers()
     apply_all()
 
+    if config is not None:
+        for ext in config._resolved_extensions():  # noqa: SLF001
+            ext.configure_alembic()
 
-def pgcraft_configure_metadata(metadata: MetaData) -> None:
-    """Register schemas, roles, and grants on *metadata* (call after models)."""
+
+def pgcraft_configure_metadata(
+    metadata: MetaData,
+    config: PGCraftConfig | None = None,
+) -> None:
+    """Register schemas and extension hooks on *metadata*.
+
+    Roles and grants are no longer registered automatically.
+    Register :class:`~pgcraft.extensions.postgrest.PostgRESTExtension`
+    on your config to enable PostgREST roles.
+
+    Args:
+        metadata: The SQLAlchemy ``MetaData`` to configure.
+        config: Optional config providing extensions.
+            If ``None``, falls back to
+            ``metadata.info["pgcraft_config"]``.
+
+    """
     register_schemas(metadata)
-    register_roles(metadata)
+    cfg = config or metadata.info.get("pgcraft_config")
+    if cfg is not None:
+        for ext in cfg._resolved_extensions():  # noqa: SLF001
+            ext.configure_metadata(metadata)

@@ -8,9 +8,11 @@
 
 **Configuration-driven PostgreSQL data schemas, migrations, and APIs.**
 
-pgcraft generates SQLAlchemy models, Alembic migrations, and
-[PostgREST](https://postgrest.org) API views from declarative dimension
-configurations. Define your schema once; pgcraft handles the rest.
+pgcraft generates SQLAlchemy models and Alembic migrations from
+declarative dimension configurations. Define your schema once;
+pgcraft handles the rest. An optional
+[PostgREST](https://postgrest.org) extension adds API views,
+roles, and grants.
 
 ---
 
@@ -23,8 +25,8 @@ configurations. Define your schema once; pgcraft handles the rest.
   decorators, executed in topological order.
 - **Automatic migrations** — Alembic integration with SQL-formatted migration
   scripts via sqlglot.
-- **PostgREST API layer** — API views, roles, and grants declared alongside
-  your models.
+- **Extension system** — Opt-in extensions for PostgREST API views,
+  roles, and grants. Third-party extensions via entry points.
 - **Postgres is king** — Logic lives in the database (views, triggers, check
   constraints). Python orchestrates; Postgres enforces.
 
@@ -41,7 +43,6 @@ pip install pgcraft            # or: uv add pgcraft
 ```python
 from sqlalchemy import Column, MetaData, String
 from pgcraft.factory import PGCraftSimple
-from pgcraft.views import APIView
 
 metadata = MetaData()
 
@@ -54,15 +55,10 @@ users = PGCraftSimple(
         Column("email", String),
     ],
 )
-
-APIView(source=users)
 ```
 
-This creates:
-
-- A `public.users` table with `id`, `name`, and `email` columns.
-- An `api.users` view exposing the same columns for PostgREST.
-- Alembic migration support out of the box.
+This creates a `public.users` table with `id`, `name`, and `email`
+columns, with Alembic migration support out of the box.
 
 ### Generate migrations
 
@@ -91,6 +87,7 @@ Full documentation is available at
 - [Setup & installation](https://roddarjohn.github.io/pgcraft/setup.html)
 - [Built-in dimensions](https://roddarjohn.github.io/pgcraft/dimensions.html)
 - [Plugin system](https://roddarjohn.github.io/pgcraft/plugins.html)
+- [Extensions](https://roddarjohn.github.io/pgcraft/extensions.html)
 - [API reference](https://roddarjohn.github.io/pgcraft/api.html)
 - [Development guide](https://roddarjohn.github.io/pgcraft/development.html)
 - [Playground](https://roddarjohn.github.io/pgcraft/playground.html)

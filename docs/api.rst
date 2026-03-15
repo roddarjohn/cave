@@ -61,7 +61,7 @@ Ledger resource factory
 View factories
 --------------
 
-.. automodule:: pgcraft.views.api
+.. automodule:: pgcraft.extensions.postgrest
    :members:
 
 .. automodule:: pgcraft.views.view
@@ -98,9 +98,6 @@ Built-in plugins
    :members:
 
 .. automodule:: pgcraft.plugins.simple
-   :members:
-
-.. automodule:: pgcraft.plugins.api
    :members:
 
 .. automodule:: pgcraft.plugins.append_only

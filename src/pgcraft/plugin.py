@@ -38,9 +38,29 @@ class Dynamic:
     attr: str
 
 
+@dataclass(frozen=True)
+class MinPGVersion:
+    """Minimum PostgreSQL version requirement for a plugin.
+
+    Use inside :func:`requires` to declare that a plugin needs a
+    specific PostgreSQL major version::
+
+        @requires(MinPGVersion(18))
+        @produces("pk_columns")
+        class UUIDV7PKPlugin(Plugin):
+            ...
+
+    The factory stores the requirement as ``min_pg_version`` on the
+    class.  Call :func:`check_pg_version` with the connected
+    server's major version to validate before applying DDL.
+    """
+
+    version: int
+
+
 def _validate_dynamic_keys(
     cls: type,
-    keys: tuple[str | Dynamic, ...],
+    keys: tuple[str | Dynamic | MinPGVersion, ...],
     decorator_name: str,
 ) -> None:
     """Raise TypeError if any Dynamic attr is not an __init__ parameter.
@@ -105,23 +125,26 @@ def produces[T: type[Plugin]](
 
 
 def requires[T: type[Plugin]](
-    *keys: str | Dynamic,
+    *keys: str | Dynamic | MinPGVersion,
 ) -> Callable[[T], T]:
     """Declare the ctx keys this plugin's ``run`` method reads.
 
     Applied as a class decorator, alongside :func:`produces` and
-    :func:`singleton`::
+    :func:`singleton`.  Accepts :class:`MinPGVersion` sentinels to declare
+    a minimum PostgreSQL version requirement::
 
-        @requires(Dynamic("table_key"), "schema_info")
-        class MyViewPlugin(Plugin):
+        @requires(MinPGVersion(18), "pk_columns")
+        class MyPlugin(Plugin):
             ...
 
     Args:
-        *keys: Ctx key strings or :class:`Dynamic` references to
-            instance attributes that hold the actual key names.
+        *keys: Ctx key strings, :class:`Dynamic` references, or
+            :class:`MinPGVersion` version requirements.
 
     Returns:
-        A class decorator that attaches ``_requires`` to the class.
+        A class decorator that attaches ``_requires`` to the class
+        and sets ``min_pg_version`` if any :class:`MinPGVersion` sentinel
+        is present.
 
     Raises:
         TypeError: If a Dynamic attr name is not an ``__init__``
@@ -131,7 +154,13 @@ def requires[T: type[Plugin]](
 
     def decorator(cls: T) -> T:
         _validate_dynamic_keys(cls, keys, "requires")
-        cls._requires = list(keys)
+        ctx_keys: list[str | Dynamic] = []
+        for key in keys:
+            if isinstance(key, MinPGVersion):
+                cls.min_pg_version = key.version
+            else:
+                ctx_keys.append(key)
+        cls._requires = ctx_keys
         return cls
 
     return decorator
@@ -203,6 +232,37 @@ def singleton[T: type[Plugin]](
         return cls
 
     return decorator
+
+
+def check_pg_version(
+    server_version: int,
+    plugins: list[Plugin],
+) -> None:
+    """Raise if any plugin requires a newer PostgreSQL version.
+
+    Call this with the server's major version (e.g.
+    ``conn.dialect.server_version_info[0]``) to get an early,
+    clear error instead of a cryptic "function does not exist"
+    from PostgreSQL.
+
+    Args:
+        server_version: Major version of the connected server.
+        plugins: The resolved plugin list to check.
+
+    Raises:
+        PGCraftValidationError: When a plugin's
+            ``min_pg_version`` exceeds *server_version*.
+
+    """
+    for p in plugins:
+        required: int = getattr(p, "min_pg_version", 0)
+        if required > server_version:
+            name = type(p).__name__
+            msg = (
+                f"{name} requires PostgreSQL >= {required}, "
+                f"but the server is version {server_version}."
+            )
+            raise PGCraftValidationError(msg)
 
 
 class Plugin:

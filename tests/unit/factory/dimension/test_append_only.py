@@ -4,10 +4,10 @@ import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 
 from pgcraft.errors import PGCraftValidationError
+from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.append_only import (
     PGCraftAppendOnly,
 )
-from pgcraft.views.api import APIView
 
 
 class TestPGCraftAppendOnlyTables:
@@ -144,7 +144,7 @@ class TestPGCraftAppendOnlyViews:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        PostgRESTView(source=f)
         views = metadata.info["views"].views
         api_views = [v for v in views if v.schema == "api"]
         assert len(api_views) == 1
@@ -161,8 +161,8 @@ class TestPGCraftAppendOnlyViews:
         )
         assert len(metadata.info["views"].views) == 1
 
-    def test_exactly_two_views_with_apiview(self):
-        """Factory + APIView creates two views total."""
+    def test_exactly_two_views_with_postgrest_view(self):
+        """Factory + PostgRESTView creates two views total."""
         metadata = MetaData()
         f = PGCraftAppendOnly(
             "product",
@@ -170,7 +170,7 @@ class TestPGCraftAppendOnlyViews:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        PostgRESTView(source=f)
         assert len(metadata.info["views"].views) == 2
 
     def test_api_view_schema_respects_configuration(self):
@@ -181,7 +181,7 @@ class TestPGCraftAppendOnlyViews:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f, schema="custom_api")
+        PostgRESTView(source=f, schema="custom_api")
         views = metadata.info["views"].views
         api_views = [v for v in views if v.schema == "custom_api"]
         assert len(api_views) == 1
@@ -214,7 +214,7 @@ class TestPGCraftAppendOnlyTriggers:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         functions = metadata.info.get("functions")
         assert functions is not None
         # 2 views x 3 ops = 6 INSTEAD OF functions
@@ -229,7 +229,7 @@ class TestPGCraftAppendOnlyTriggers:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         triggers = metadata.info.get("triggers")
         assert triggers is not None
         # 6 INSTEAD OF triggers + 6 BEFORE protection
@@ -244,7 +244,7 @@ class TestPGCraftAppendOnlyTriggers:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         fn_names = {f.name for f in metadata.info["functions"].functions}
         # Each op appears twice (once per view schema).
         # Protection functions are named without an op
@@ -262,7 +262,7 @@ class TestPGCraftAppendOnlyAPIResource:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        PostgRESTView(source=f)
         resources = metadata.info.get("api_resources", [])
         assert len(resources) == 1
 
@@ -274,7 +274,7 @@ class TestPGCraftAppendOnlyAPIResource:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f)
+        PostgRESTView(source=f)
         assert metadata.info["api_resources"][0].name == "product"
 
 

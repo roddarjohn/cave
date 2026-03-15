@@ -7,9 +7,9 @@ from sqlalchemy_declarative_extensions.dialects.postgresql.trigger import (
 )
 
 from pgcraft.errors import PGCraftValidationError
+from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.plugins.pk import SerialPKPlugin
-from pgcraft.views.api import APIView
 
 _CRUD_OPS = ("insert", "update", "delete")
 _CRUD_GRANTS = ["select", "insert", "update", "delete"]
@@ -81,17 +81,17 @@ class TestPGCraftSimpleViews:
         views = metadata.info.get("views")
         assert views is None or len(views.views) == 0
 
-    def test_api_view_registered_with_apiview(self):
+    def test_api_view_registered_with_postgrest_view(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f)
+        PostgRESTView(source=f)
         views = metadata.info.get("views")
         assert views is not None
 
     def test_api_view_has_correct_name(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f)
+        PostgRESTView(source=f)
         views = metadata.info["views"]
         view_names = [v.name for v in views.views]
         assert "product" in view_names
@@ -99,7 +99,7 @@ class TestPGCraftSimpleViews:
     def test_api_view_schema_defaults_to_api(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f)
+        PostgRESTView(source=f)
         views = metadata.info["views"]
         api_view = next(v for v in views.views if v.name == "product")
         assert api_view.schema == "api"
@@ -112,7 +112,7 @@ class TestPGCraftSimpleViews:
             metadata,
             [Column("name", String)],
         )
-        APIView(source=f, schema="public_api")
+        PostgRESTView(source=f, schema="public_api")
         views = metadata.info["views"]
         api_view = next(v for v in views.views if v.name == "product")
         assert api_view.schema == "public_api"
@@ -120,7 +120,7 @@ class TestPGCraftSimpleViews:
     def test_view_definition_references_base_table(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f)
+        PostgRESTView(source=f)
         views = metadata.info["views"]
         api_view = next(v for v in views.views if v.name == "product")
         assert "dim" in api_view.definition
@@ -129,7 +129,7 @@ class TestPGCraftSimpleViews:
     def test_exactly_one_view_created(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f)
+        PostgRESTView(source=f)
         views = metadata.info["views"]
         assert len(views.views) == 1
 
@@ -138,7 +138,7 @@ class TestPGCraftSimpleTriggers:
     def test_functions_registered(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         functions = metadata.info.get("functions")
         assert functions is not None
         # 3 INSTEAD OF functions + 1 protection function
@@ -147,7 +147,7 @@ class TestPGCraftSimpleTriggers:
     def test_triggers_registered(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         triggers = metadata.info.get("triggers")
         assert triggers is not None
         # 3 INSTEAD OF + 3 BEFORE protection triggers
@@ -156,28 +156,28 @@ class TestPGCraftSimpleTriggers:
     def test_insert_function_exists(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_insert" in fn_names
 
     def test_update_function_exists(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_update" in fn_names
 
     def test_delete_function_exists(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_delete" in fn_names
 
     def test_insert_trigger_is_instead_of(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(source=f, grants=_CRUD_GRANTS)
         triggers = metadata.info["triggers"].triggers
         instead_of_inserts = [
             t
@@ -189,7 +189,7 @@ class TestPGCraftSimpleTriggers:
     def test_select_only_creates_no_triggers(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f)
+        PostgRESTView(source=f)
         triggers = metadata.info.get("triggers")
         assert triggers is not None
         instead_of = [
@@ -202,21 +202,21 @@ class TestPGCraftSimpleAPIResource:
     def test_api_resource_registered(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f)
+        PostgRESTView(source=f)
         resources = metadata.info.get("api_resources", [])
         assert len(resources) == 1
 
     def test_api_resource_name_is_tablename(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f)
+        PostgRESTView(source=f)
         resource = metadata.info["api_resources"][0]
         assert resource.name == "product"
 
     def test_api_resource_schema_defaults_to_api(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        APIView(source=f)
+        PostgRESTView(source=f)
         resource = metadata.info["api_resources"][0]
         assert resource.schema == "api"
 

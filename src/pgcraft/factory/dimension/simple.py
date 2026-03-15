@@ -28,8 +28,9 @@ class PGCraftSimple(ResourceFactory):
     A :class:`~pgcraft.plugins.pk.SerialPKPlugin` is auto-added
     when no user plugin produces ``pk_columns``.
 
-    Use :class:`~pgcraft.views.api.APIView` to expose this table
-    through a PostgREST API view with CRUD triggers.
+    Use :class:`~pgcraft.extensions.postgrest.PostgRESTView`
+    to expose this table through a PostgREST API view with
+    CRUD triggers.
 
     Args:
         tablename: Name of the dimension table.

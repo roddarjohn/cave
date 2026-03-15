@@ -40,6 +40,81 @@ Adds an auto-incrementing integer primary key column.
    SerialPKPlugin(column_name="user_id")
 
 
+UUIDV4PKPlugin
+--------------
+
+Adds a UUIDv4 primary key column using PostgreSQL's
+``gen_random_uuid()`` as the server default.
+
+**Produces:** ``pk_columns``
+
+**Singleton group:** ``__pk__``
+
+**Parameters:**
+
+``column_name``
+    Name for the PK column (default ``"id"``).
+
+**Example:**
+
+.. code-block:: python
+
+   from pgcraft.plugins.pk import UUIDV4PKPlugin
+
+   # Default: adds "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+   UUIDV4PKPlugin()
+
+   # Custom column name
+   UUIDV4PKPlugin(column_name="user_id")
+
+
+UUIDV7PKPlugin
+--------------
+
+Adds a UUIDv7 primary key column using PostgreSQL 18's
+``uuidv7()`` as the server default.  UUIDv7 values are
+time-ordered, making them friendlier to B-tree indexes than
+random UUIDv4 values.
+
+Requires PostgreSQL 18 or later (declared via
+``@requires(MinPGVersion(18))``).  Use
+:func:`~pgcraft.plugin.check_pg_version` to validate the
+server version before applying DDL.
+
+**Produces:** ``pk_columns``
+
+**Requires:** ``MinPGVersion(18)``
+
+**Singleton group:** ``__pk__``
+
+**Parameters:**
+
+``column_name``
+    Name for the PK column (default ``"id"``).
+
+**Example:**
+
+.. code-block:: python
+
+   from pgcraft.plugins.pk import UUIDV7PKPlugin
+
+   # Default: adds "id UUID PRIMARY KEY DEFAULT uuidv7()"
+   UUIDV7PKPlugin()
+
+   # Custom column name
+   UUIDV7PKPlugin(column_name="ticket_id")
+
+To validate the server version at runtime:
+
+.. code-block:: python
+
+   from pgcraft.plugin import check_pg_version
+
+   with engine.connect() as conn:
+       major = conn.dialect.server_version_info[0]
+       check_pg_version(major, factory.ctx.plugins)
+
+
 CreatedAtPlugin
 ---------------
 
@@ -102,16 +177,30 @@ This creates ``public.users`` with columns ``id``, ``name``,
 ``email``.
 
 
-APIView
--------
+PostgRESTView
+-------------
 
-.. module:: pgcraft.views.api
+.. module:: pgcraft.extensions.postgrest.view
    :no-index:
 
+.. note::
+
+   ``PostgRESTView`` lives in the PostgREST extension package
+   (``pgcraft.extensions.postgrest``).  Install the extension
+   and register it on your
+   :class:`~pgcraft.config.PGCraftConfig` before use.
+
 API views are created separately from the factory using
-:class:`~pgcraft.views.api.APIView`.  This creates a
-PostgREST-facing view and registers the API resource for
-role/grant generation.
+:class:`~pgcraft.extensions.postgrest.PostgRESTView`.  This
+creates a PostgREST-facing view and registers the API resource
+for role/grant generation.
+
+.. note::
+
+   The PostgREST extension must be registered on your
+   :class:`~pgcraft.config.PGCraftConfig` for roles and grants
+   to be generated.  See the setup snippet in the first example
+   below.
 
 Grants drive triggers: INSTEAD OF triggers are only created for
 the DML operations listed in ``grants``.  A ``["select"]``-only
@@ -147,8 +236,15 @@ Default behaviour — ``SELECT *``
 
 .. code-block:: python
 
+   from pgcraft.config import PGCraftConfig
+   from pgcraft.extensions.postgrest import (
+       PostgRESTExtension,
+       PostgRESTView,
+   )
    from pgcraft.factory import PGCraftSimple
-   from pgcraft.views import APIView
+
+   config = PGCraftConfig()
+   config.use(PostgRESTExtension())
 
    users = PGCraftSimple(
        "users", "public", metadata,
@@ -156,13 +252,14 @@ Default behaviour — ``SELECT *``
            Column("name", String, nullable=False),
            Column("email", String),
        ],
+       config=config,
    )
 
    # Exposes all columns, SELECT only (read-only, no triggers)
-   APIView(source=users)
+   PostgRESTView(source=users)
 
    # Full CRUD — creates INSERT, UPDATE, DELETE triggers
-   APIView(
+   PostgRESTView(
        source=users,
        grants=["select", "insert", "update", "delete"],
    )
@@ -175,7 +272,7 @@ internal columns that should not be visible through the API:
 
 .. code-block:: python
 
-   APIView(source=users, columns=["id", "name"])
+   PostgRESTView(source=users, columns=["id", "name"])
 
 The generated view:
 
@@ -192,7 +289,7 @@ included automatically:
 
 .. code-block:: python
 
-   APIView(
+   PostgRESTView(
        source=users,
        exclude_columns=["internal_notes"],
    )
@@ -220,7 +317,7 @@ transforms, or any valid ``Select``:
 
    _s = stats.table
 
-   APIView(
+   PostgRESTView(
        source=customers,
        grants=["select", "insert", "update"],
        query=lambda q, t: (
@@ -281,7 +378,7 @@ SimpleTriggerPlugin
 
 Registers INSTEAD OF ``INSERT`` / ``UPDATE`` / ``DELETE`` triggers
 on the API view, forwarding writes to the backing table.  This is
-an internal plugin used by ``APIView`` — not typically configured
+an internal plugin used by ``PostgRESTView`` — not typically configured
 directly by users.
 
 **Requires:** ``"primary"`` (via ``table_key``),
@@ -549,9 +646,11 @@ To expose via PostgREST:
 
 .. code-block:: python
 
-   from pgcraft.views import APIView
+   from pgcraft.extensions.postgrest import (
+       PostgRESTView,
+   )
 
-   APIView(source=students)
+   PostgRESTView(source=students)
 
 
 EAVTablePlugin
@@ -621,9 +720,11 @@ To expose via PostgREST:
 
 .. code-block:: python
 
-   from pgcraft.views import APIView
+   from pgcraft.extensions.postgrest import (
+       PostgRESTView,
+   )
 
-   APIView(source=products)
+   PostgRESTView(source=products)
 
 
 Plugin execution order
@@ -642,7 +743,10 @@ declarations.  A typical simple dimension pipeline runs:
    TableFKPlugin               (reads primary)
    RawTableProtectionPlugin    (reads primary)
 
-API views and triggers are created separately via ``APIView``.
+API views and triggers are created separately via
+``PostgRESTView``, which is part of the optional PostgREST
+extension (``pgcraft.extensions.postgrest``).  It is not
+included in the core plugin pipeline.
 
 All context key names are overridable via constructor arguments,
 so two independent pipelines can coexist in one factory.

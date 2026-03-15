@@ -1,0 +1,161 @@
+"""Benchmarks for simple dimension operations."""
+
+import pytest
+from sqlalchemy import Column, String, text
+
+from tests.benchmarks.conftest import (
+    SCHEMA,
+    BenchSimple,
+    build_metadata,
+    create_all_from_metadata,
+)
+
+
+@pytest.fixture(scope="module")
+def _simple_tables(db_engine, bench_schema):  # noqa: ARG001
+    meta, _ = build_metadata(BenchSimple, "bm_simple", [Column("name", String)])
+    with db_engine.connect() as conn:
+        create_all_from_metadata(conn, meta)
+
+
+@pytest.fixture(scope="module")
+def _seeded_tables(db_engine, bench_schema):  # noqa: ARG001
+    meta, _ = build_metadata(
+        BenchSimple,
+        "bm_simple_big",
+        [Column("name", String)],
+    )
+    with db_engine.connect() as conn:
+        create_all_from_metadata(conn, meta)
+        values = ", ".join(f"('item_{i}')" for i in range(10_000))
+        conn.execute(
+            text(f"INSERT INTO {SCHEMA}.bm_simple_big (name) VALUES {values}")
+        )
+        conn.commit()
+
+
+# -- single-row operations ------------------------------------------------
+
+
+@pytest.mark.usefixtures("_simple_tables")
+class TestSimpleSingleRow:
+    def test_insert_single(self, benchmark, bench_conn):
+        schema = SCHEMA
+        counter = {"i": 0}
+
+        def do_insert():
+            counter["i"] += 1
+            bench_conn.execute(
+                text(
+                    f"INSERT INTO {schema}.bm_simple"
+                    f" (name) VALUES ('item_{counter['i']}')"
+                )
+            )
+            bench_conn.commit()
+
+        benchmark.pedantic(do_insert, rounds=10_000)
+
+    def test_update_single(self, benchmark, bench_conn):
+        schema = SCHEMA
+        bench_conn.execute(
+            text(f"INSERT INTO {schema}.bm_simple (name) VALUES ('to_update')")
+        )
+        bench_conn.commit()
+        row_id = bench_conn.execute(
+            text(f"SELECT id FROM {schema}.bm_simple WHERE name = 'to_update'")
+        ).scalar()
+
+        counter = {"i": 0}
+
+        def do_update():
+            counter["i"] += 1
+            bench_conn.execute(
+                text(
+                    f"UPDATE {schema}.bm_simple"
+                    f" SET name = 'upd_{counter['i']}'"
+                    f" WHERE id = {row_id}"
+                )
+            )
+            bench_conn.commit()
+
+        benchmark.pedantic(do_update, rounds=10_000)
+
+    def test_delete_single(self, benchmark, bench_conn):
+        schema = SCHEMA
+
+        def do_delete():
+            bench_conn.execute(
+                text(f"INSERT INTO {schema}.bm_simple (name) VALUES ('del_me')")
+            )
+            bench_conn.commit()
+            bench_conn.execute(
+                text(f"DELETE FROM {schema}.bm_simple WHERE name = 'del_me'")
+            )
+            bench_conn.commit()
+
+        benchmark.pedantic(do_delete, rounds=10_000)
+
+
+# -- batch operations ------------------------------------------------------
+
+
+@pytest.mark.usefixtures("_simple_tables")
+class TestSimpleBatch:
+    def test_insert_batch_100(self, benchmark, bench_conn):
+        schema = SCHEMA
+        counter = {"i": 0}
+
+        def do_batch():
+            counter["i"] += 1
+            base = counter["i"] * 100
+            values = ", ".join(f"('b100_{base + j}')" for j in range(100))
+            bench_conn.execute(
+                text(f"INSERT INTO {schema}.bm_simple (name) VALUES {values}")
+            )
+            bench_conn.commit()
+
+        benchmark.pedantic(do_batch, rounds=100)
+
+    def test_insert_batch_1000(self, benchmark, bench_conn):
+        schema = SCHEMA
+        counter = {"i": 0}
+
+        def do_batch():
+            counter["i"] += 1
+            base = counter["i"] * 1000
+            values = ", ".join(f"('b1k_{base + j}')" for j in range(1000))
+            bench_conn.execute(
+                text(f"INSERT INTO {schema}.bm_simple (name) VALUES {values}")
+            )
+            bench_conn.commit()
+
+        benchmark.pedantic(do_batch, rounds=100)
+
+
+# -- SELECT operations ----------------------------------------------------
+
+
+@pytest.mark.usefixtures("_seeded_tables")
+class TestSimpleSelect:
+    def test_select_all(self, benchmark, bench_conn):
+        schema = SCHEMA
+
+        def do_select():
+            bench_conn.execute(
+                text(f"SELECT * FROM {schema}.bm_simple_big")
+            ).fetchall()
+
+        benchmark.pedantic(do_select, rounds=1_000)
+
+    def test_select_filtered(self, benchmark, bench_conn):
+        schema = SCHEMA
+
+        def do_select():
+            bench_conn.execute(
+                text(
+                    f"SELECT * FROM {schema}.bm_simple_big"
+                    f" WHERE name = 'item_500'"
+                )
+            ).fetchall()
+
+        benchmark.pedantic(do_select, rounds=1_000)

@@ -36,6 +36,9 @@ Issues = "https://github.com/roddarjohn/pgcraft/issues"
 [project.scripts]
 pgcraft = "pgcraft.cli:app"
 
+[project.entry-points."pgcraft.extensions"]
+postgrest = "pgcraft.extensions.postgrest:PostgRESTExtension"
+
 [project.entry-points.sqlfluff]
 sqlfluff_templater_mako = "pgcraft.sqlfluff"
 
@@ -49,6 +52,7 @@ dev = [
   "psycopg[binary]>=3.3.3",
   "pytest>=8",
   "pytest-alembic>=0.12.1",
+  "pytest-benchmark>=5.1",
   "python-dotenv>=1.2.2",
   "slipcover>=1.0.17",
   "tox>=4.49.1",
@@ -108,6 +112,7 @@ ignore = [
   "PLC0415", # local imports acceptable in test methods
   "RUF003",  # unicode × in comments is fine
   "RUF059",  # unpacked dummy variables are fine in tests
+  "SLF001",  # testing private methods is fine in tests
 ]
 "**/migrations/versions/*.py" = [
   "INP001",  # migration versions aren't a package
@@ -124,6 +129,10 @@ extra-paths = ["tests/db"]
 [tool.ty.analysis]
 # pglast has no type stubs.
 allowed-unresolved-imports = ["pglast.**", "sqlfluff.**"]
+
+[tool.pytest.ini_options]
+# Exclude benchmarks from normal test runs; use `just bench` instead
+addopts = "--ignore=tests/benchmarks"
 
 [tool.tox]
 requires = ["tox-uv>=1"]

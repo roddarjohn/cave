@@ -22,6 +22,16 @@ type-check:
 test *args:
     uv run tox -- {{args}}
 
+# Run performance benchmarks (requires DATABASE_URL)
+bench *args:
+    uv run pytest tests/benchmarks/ {{args}}
+
+# Run benchmarks and regenerate docs/benchmarks.rst results
+bench-docs:
+    mkdir -p docs/_generated
+    uv run pytest tests/benchmarks/ --benchmark-json=docs/_generated/benchmark_results.json
+    uv run python scripts/generate_benchmark_docs.py
+
 # Run tests directly via uv (faster, for local development)
 dev-test *args:
     uv run pytest {{args}}
@@ -55,3 +65,6 @@ _docs-setup:
     just --list | uv run python scripts/just_to_rst.py > docs/_generated/just_commands.rst
     just --justfile playground/Justfile --list | uv run python scripts/just_to_rst.py > docs/_generated/playground_just_commands.rst
     uv run python scripts/generate_dimension_docs.py
+    if [ -f docs/_generated/benchmark_results.json ]; then
+        uv run python scripts/generate_benchmark_docs.py
+    fi
