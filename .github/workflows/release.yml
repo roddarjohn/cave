@@ -14,20 +14,30 @@ jobs:
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       pr_number: ${{ steps.release.outputs.pr }}
+      pr_branch: ${{ steps.branch.outputs.branch }}
     steps:
       - id: release
         uses: googleapis/release-please-action@v4
         with:
           token: ${{ secrets.RELEASE_TOKEN }}
+      - name: Get PR branch
+        id: branch
+        if: ${{ steps.release.outputs.pr }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          branch=$(gh pr view ${{ steps.release.outputs.pr }} \
+            --repo ${{ github.repository }} --json headRefName -q .headRefName)
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
 
   update-lockfile:
     needs: release-please
-    if: ${{ needs.release-please.outputs.pr_number }}
+    if: ${{ needs.release-please.outputs.pr_branch }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: release-please--branches--main
+          ref: ${{ needs.release-please.outputs.pr_branch }}
           token: ${{ secrets.RELEASE_TOKEN }}
       - uses: astral-sh/setup-uv@v5
       - run: uv lock
