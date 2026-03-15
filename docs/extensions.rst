@@ -46,7 +46,7 @@ Pass this config to your factories and to
 Extension hooks
 ---------------
 
-:class:`~pgcraft.extension.PGCraftExtension` provides five hooks.
+:class:`~pgcraft.PGCraftExtension` provides five hooks.
 Override only the ones you need — every hook is a no-op by
 default.
 

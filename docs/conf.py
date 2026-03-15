@@ -93,6 +93,13 @@ nitpick_ignore = [
     # check module-level docstring references bare names
     ("py:class", "TableCheckPlugin"),
     ("py:class", "TriggerCheckPlugin"),
+    # re-exported at package level but autodoc resolves the
+    # original module path
+    ("py:class", "pgcraft.extension.PGCraftExtension"),
+    (
+        "py:func",
+        "pgcraft.pgcraft_build_naming_conventions",
+    ),
 ]
 
 intersphinx_mapping = {
@@ -101,5 +108,7 @@ intersphinx_mapping = {
     "sqlalchemy": ("https://docs.sqlalchemy.org/en/20", None),
     "typer": ("https://typer.tiangolo.com", None),
 }
+
+suppress_warnings = ["sphinx_autodoc_typehints.forward_reference"]
 
 templates_path = ["_templates"]

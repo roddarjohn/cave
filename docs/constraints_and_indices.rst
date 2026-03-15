@@ -1,5 +1,5 @@
 Constraints and indices
-======================
+=======================
 
 pgcraft dimensions are defined with ``schema_items`` — a list of
 SQLAlchemy ``Column`` objects mixed with pgcraft constraint and

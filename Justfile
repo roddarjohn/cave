@@ -30,24 +30,25 @@ bench *args:
 bench-docs:
     mkdir -p docs/_generated
     uv run pytest tests/benchmarks/ --benchmark-json=docs/_generated/benchmark_results.json
-    uv run python scripts/generate_benchmark_docs.py
+    uv run python scripts/docs/generate_benchmark_docs.py
 
 # Run tests directly via uv (faster, for local development)
 dev-test *args:
     uv run pytest {{args}}
 
-# Run tests with slipcover coverage report (branch + line coverage)
+# Run tests with coverage report (branch + line coverage)
 coverage *args:
-    uv run python -m slipcover --branch --source src/pgcraft -m pytest {{args}}
+    uv run coverage run -m pytest {{args}}
+    uv run coverage report
 
 # Run coverage and write XML output (used by CI)
 coverage-ci *args:
-    uv run python -m slipcover --branch --xml --out coverage.xml \
-        --source src/pgcraft -m pytest {{args}}
+    uv run coverage run -m pytest {{args}}
+    uv run coverage xml -o coverage.xml
 
 # Build HTML docs for all versions (output in docs/_build/html)
 docs: _docs-setup
-    uv run python scripts/build_versioned_docs.py
+    uv run python scripts/docs/build_versioned_docs.py
 
 # Serve docs with live reload for editing (http://127.0.0.1:8000)
 serve-docs-autoreload: _docs-setup
@@ -62,9 +63,9 @@ _docs-setup:
     #!/usr/bin/env bash
     export DATABASE_URL="${DATABASE_URL:-postgresql+psycopg:///pgcraft}"
     mkdir -p docs/_generated
-    just --list | uv run python scripts/just_to_rst.py > docs/_generated/just_commands.rst
-    just --justfile playground/Justfile --list | uv run python scripts/just_to_rst.py > docs/_generated/playground_just_commands.rst
-    uv run python scripts/generate_dimension_docs.py
+    just --list | uv run python scripts/docs/just_to_rst.py > docs/_generated/just_commands.rst
+    just --justfile playground/Justfile --list | uv run python scripts/docs/just_to_rst.py > docs/_generated/playground_just_commands.rst
+    uv run python scripts/docs/generate_dimension_docs.py
     if [ -f docs/_generated/benchmark_results.json ]; then
-        uv run python scripts/generate_benchmark_docs.py
+        uv run python scripts/docs/generate_benchmark_docs.py
     fi
