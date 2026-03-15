@@ -43,6 +43,39 @@ def db_schema(db_conn):
     return "cave_test"
 
 
+def _fn_to_sql(fn):
+    """Build CREATE OR REPLACE FUNCTION SQL from a Function object.
+
+    The library's ``to_sql_create`` assumes ``returns`` is a
+    ``FunctionReturn`` object, but pgcraft stores it as a plain
+    string.  This helper handles both cases.
+    """
+    schema = fn.schema or "public"
+    fqn = f"{schema}.{fn.name}"
+
+    params = ""
+    if fn.parameters:
+        params = ", ".join(
+            p.to_sql_create() if hasattr(p, "to_sql_create") else str(p)
+            for p in fn.parameters
+        )
+
+    returns = fn.returns
+    if hasattr(returns, "to_sql_create"):
+        returns = returns.to_sql_create()
+
+    parts = [f"CREATE OR REPLACE FUNCTION {fqn}({params})"]
+    parts.append(f"RETURNS {returns}")
+    parts.append(f"LANGUAGE {fn.language}")
+
+    security = getattr(fn, "security", None)
+    if security and security.value == "DEFINER":
+        parts.append("SECURITY DEFINER")
+
+    parts.append(f"AS $${fn.definition}$$")
+    return " ".join(parts)
+
+
 def create_all_from_metadata(conn, metadata):
     """Create tables, views, functions, and triggers from *metadata*.
 
@@ -59,8 +92,7 @@ def create_all_from_metadata(conn, metadata):
     funcs_obj = metadata.info.get("functions")
     if funcs_obj:
         for fn in funcs_obj.functions:
-            for stmt in fn.to_sql_create(replace=True):
-                conn.execute(text(stmt))
+            conn.execute(text(_fn_to_sql(fn)))
 
     views_obj = metadata.info.get("views")
     if views_obj:
