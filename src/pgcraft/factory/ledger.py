@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from sqlalchemy.schema import SchemaItem
 
     from pgcraft.check import PGCraftCheck
+    from pgcraft.fk import PGCraftFK
+    from pgcraft.index import PGCraftIndex
     from pgcraft.plugin import Plugin
     from pgcraft.statistics import PGCraftStatisticsView
 
@@ -62,7 +64,13 @@ class PGCraftLedger(ResourceFactory):
         tablename: str,
         schemaname: str,
         metadata: MetaData,
-        schema_items: list[SchemaItem | PGCraftCheck | PGCraftStatisticsView],
+        schema_items: list[
+            SchemaItem
+            | PGCraftCheck
+            | PGCraftFK
+            | PGCraftIndex
+            | PGCraftStatisticsView
+        ],
         *,
         events: list | None = None,
         config: object | None = None,

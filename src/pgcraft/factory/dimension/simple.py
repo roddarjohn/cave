@@ -5,6 +5,8 @@ from typing import ClassVar
 from pgcraft.factory.base import ResourceFactory
 from pgcraft.plugin import Plugin
 from pgcraft.plugins.check import TableCheckPlugin
+from pgcraft.plugins.fk import TableFKPlugin
+from pgcraft.plugins.index import TableIndexPlugin
 from pgcraft.plugins.protect import RawTableProtectionPlugin
 from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 
@@ -18,6 +20,10 @@ class PGCraftSimple(ResourceFactory):
        backing table.
     2. :class:`~pgcraft.plugins.check.TableCheckPlugin` --
        materializes :class:`~pgcraft.check.PGCraftCheck` items.
+    3. :class:`~pgcraft.plugins.index.TableIndexPlugin` --
+       materializes :class:`~pgcraft.index.PGCraftIndex` items.
+    4. :class:`~pgcraft.plugins.fk.TableFKPlugin` --
+       materializes :class:`~pgcraft.fk.PGCraftFK` items.
 
     A :class:`~pgcraft.plugins.pk.SerialPKPlugin` is auto-added
     when no user plugin produces ``pk_columns``.
@@ -39,6 +45,8 @@ class PGCraftSimple(ResourceFactory):
     _INTERNAL_PLUGINS: ClassVar[list[Plugin]] = [
         SimpleTablePlugin(),
         TableCheckPlugin(),
+        TableIndexPlugin(),
+        TableFKPlugin(),
         RawTableProtectionPlugin("primary"),
     ]
 
