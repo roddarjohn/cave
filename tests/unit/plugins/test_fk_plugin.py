@@ -18,7 +18,7 @@ class TestTableFKPlugin:
                 Column("org_id", Integer),
                 PGCraftFK(
                     columns=["{org_id}"],
-                    references=["public.orgs.id"],
+                    raw_references=["public.orgs.id"],
                     name="fk_org",
                 ),
             ]
@@ -41,7 +41,7 @@ class TestTableFKPlugin:
                 Column("org_id", Integer),
                 PGCraftFK(
                     columns=["{org_id}"],
-                    references=["public.orgs.id"],
+                    raw_references=["public.orgs.id"],
                     name="fk_org",
                     ondelete="CASCADE",
                     onupdate="SET NULL",
@@ -73,7 +73,7 @@ class TestTableFKPlugin:
                 Column("org_id", Integer),
                 PGCraftFK(
                     columns=["{nonexistent}"],
-                    references=["public.orgs.id"],
+                    raw_references=["public.orgs.id"],
                     name="fk_bad",
                 ),
             ]
@@ -93,7 +93,7 @@ class TestTableFKPlugin:
                 Column("org_id", Integer),
                 PGCraftFK(
                     columns=["{org_id}"],
-                    references=["public.orgs.id"],
+                    raw_references=["public.orgs.id"],
                     name="fk_org",
                 ),
             ]

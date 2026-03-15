@@ -17,6 +17,7 @@ pgcraft
    :caption: Guides
 
    dimensions
+   indices_and_fks
    ledgers
    ledger_actions
    naming_conventions

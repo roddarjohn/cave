@@ -606,10 +606,16 @@ Adding foreign keys
 ~~~~~~~~~~~~~~~~~~~
 
 Use :class:`~pgcraft.fk.PGCraftFK` in ``schema_items``.
-References can be two-part (``"dimension.column"``) or three-part
-(``"schema.table.column"``).  Two-part references are resolved
-via the dimension registry — pgcraft automatically finds the
-correct physical table regardless of dimension type.
+Exactly one of ``references`` or ``raw_references`` must be
+provided:
+
+- ``references`` — ``"dimension.column"`` strings resolved via the
+  dimension registry.  pgcraft finds the correct physical table
+  regardless of dimension type (simple vs append-only).
+- ``raw_references`` — ``"schema.table.column"`` strings passed
+  through to SQLAlchemy directly, bypassing resolution.
+
+**Resolved references** (dimension registry):
 
 .. code-block:: python
 
@@ -648,15 +654,20 @@ The ``"customers.id"`` reference is resolved to the physical table
 via the dimension registry.  If ``customers`` were an append-only
 dimension, the FK would point to the root table automatically.
 
-To bypass resolution entirely, use a three-part reference:
+**Raw references** (bypass resolution):
 
 .. code-block:: python
 
    PGCraftFK(
        columns=["{org_id}"],
-       references=["public.organizations.id"],
+       raw_references=["public.organizations.id"],
        name="fk_orders_org",
    )
+
+Use ``raw_references`` when referencing tables outside pgcraft
+or when you want full control over the target.
+
+See :doc:`indices_and_fks` for a walkthrough of the generated SQL.
 
 
 .. _cookbook-computed-columns:

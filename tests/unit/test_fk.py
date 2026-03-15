@@ -14,22 +14,32 @@ from pgcraft.fk import (
 
 
 class TestPGCraftFK:
-    def test_basic_construction(self):
+    def test_basic_raw_references(self):
         fk = PGCraftFK(
             columns=["{org_id}"],
-            references=["public.orgs.id"],
+            raw_references=["public.orgs.id"],
             name="fk_org",
         )
         assert fk.columns == ["{org_id}"]
-        assert fk.references == ["public.orgs.id"]
+        assert fk.raw_references == ["public.orgs.id"]
+        assert fk.references == []
         assert fk.name == "fk_org"
         assert fk.ondelete is None
         assert fk.onupdate is None
 
+    def test_basic_references(self):
+        fk = PGCraftFK(
+            columns=["{org_id}"],
+            references=["org.id"],
+            name="fk_org",
+        )
+        assert fk.references == ["org.id"]
+        assert fk.raw_references == []
+
     def test_cascade_options(self):
         fk = PGCraftFK(
             columns=["{org_id}"],
-            references=["public.orgs.id"],
+            raw_references=["public.orgs.id"],
             name="fk_org",
             ondelete="CASCADE",
             onupdate="SET NULL",
@@ -37,14 +47,36 @@ class TestPGCraftFK:
         assert fk.ondelete == "CASCADE"
         assert fk.onupdate == "SET NULL"
 
-    def test_multi_column(self):
+    def test_multi_column_raw(self):
         fk = PGCraftFK(
             columns=["{a}", "{b}"],
-            references=["public.other.x", "public.other.y"],
+            raw_references=[
+                "public.other.x",
+                "public.other.y",
+            ],
             name="fk_ab",
         )
         assert fk.columns == ["{a}", "{b}"]
-        assert len(fk.references) == 2
+        assert len(fk.raw_references) == 2
+
+    def test_both_references_raises(self):
+        with pytest.raises(PGCraftValidationError, match="not both"):
+            PGCraftFK(
+                columns=["{a}"],
+                references=["org.id"],
+                raw_references=["public.orgs.id"],
+                name="fk_bad",
+            )
+
+    def test_neither_references_raises(self):
+        with pytest.raises(
+            PGCraftValidationError,
+            match="provide either",
+        ):
+            PGCraftFK(
+                columns=["{a}"],
+                name="fk_bad",
+            )
 
     def test_is_frozen(self):
         fk = PGCraftFK(
@@ -66,7 +98,7 @@ class TestPGCraftFK:
     def test_column_names_multi(self):
         fk = PGCraftFK(
             columns=["{a}", "{b}"],
-            references=["t.x", "t.y"],
+            raw_references=["s.t.x", "s.t.y"],
             name="fk_ab",
         )
         assert fk.column_names() == ["a", "b"]
@@ -78,6 +110,16 @@ class TestPGCraftFK:
             name="fk_org",
         )
         assert fk.resolve(lambda c: c) == ["org_id"]
+
+    def test_resolve_references_raw_passthrough(self):
+        metadata = MetaData()
+        fk = PGCraftFK(
+            columns=["{org_id}"],
+            raw_references=["public.orgs.id"],
+            name="fk_org",
+        )
+        resolved = fk.resolve_references(metadata)
+        assert resolved == ["public.orgs.id"]
 
 
 class TestDimensionRegistry:
@@ -101,10 +143,14 @@ class TestDimensionRegistry:
         result = resolve_fk_reference(metadata, "customer.id")
         assert result == "dim.customer_root.id"
 
-    def test_three_part_passthrough(self):
+    def test_three_part_raises(self):
+        """Three-part refs must use raw_references."""
         metadata = MetaData()
-        result = resolve_fk_reference(metadata, "dim.customer.id")
-        assert result == "dim.customer.id"
+        with pytest.raises(
+            PGCraftValidationError,
+            match="raw_references",
+        ):
+            resolve_fk_reference(metadata, "dim.customer.id")
 
     def test_unknown_dimension_raises(self):
         metadata = MetaData()
@@ -135,22 +181,6 @@ class TestDimensionRegistry:
         )
         resolved = fk.resolve_references(metadata)
         assert resolved == ["dim.org.id"]
-
-    def test_resolve_references_mixed(self):
-        """Two-part resolved, three-part passed through."""
-        metadata = MetaData()
-        register_dimension(
-            metadata,
-            "org",
-            DimensionRef(schema="dim", table="org"),
-        )
-        fk = PGCraftFK(
-            columns=["{a}", "{b}"],
-            references=["org.id", "other.schema.col"],
-            name="fk_mixed",
-        )
-        resolved = fk.resolve_references(metadata)
-        assert resolved == ["dim.org.id", "other.schema.col"]
 
 
 class TestCollectFKs:

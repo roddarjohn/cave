@@ -413,10 +413,13 @@ TableFKPlugin
 Resolves :class:`~pgcraft.fk.PGCraftFK` items into
 ``ForeignKeyConstraint`` objects on the backing table.
 
-Local columns use ``{column_name}`` markers.  References use
-either a two-part ``"dimension.column"`` format (resolved via the
-dimension registry) or a three-part ``"schema.table.column"``
-format (passed through directly).
+Local columns use ``{column_name}`` markers.  Exactly one of
+``references`` or ``raw_references`` must be provided:
+
+- ``references`` — ``"dimension.column"`` strings resolved via
+  the dimension registry.
+- ``raw_references`` — ``"schema.table.column"`` strings passed
+  through directly to SQLAlchemy.
 
 The dimension registry is populated automatically when factories
 run — each factory registers its FK-targetable table (the root
@@ -431,7 +434,7 @@ dimensions).
     Context key for the target table (default ``"primary"``).
     Append-only dimensions use ``"attributes"``.
 
-**Example:**
+**Example (resolved references):**
 
 .. code-block:: python
 
@@ -461,11 +464,25 @@ dimensions).
        ],
    )
 
-Two-part references like ``"customers.id"`` are resolved to the
-physical table via the dimension registry.  If the ``customers``
-dimension is append-only, this resolves to the root table
-automatically.  Three-part references like
-``"public.customers.id"`` bypass resolution entirely.
+``"customers.id"`` is resolved to the physical table via the
+dimension registry.  If ``customers`` is append-only, this
+resolves to the root table automatically.
+
+**Example (raw references):**
+
+.. code-block:: python
+
+   PGCraftFK(
+       columns=["{org_id}"],
+       raw_references=["public.organizations.id"],
+       name="fk_orders_org",
+   )
+
+Use ``raw_references`` for tables outside pgcraft or when you
+want full control over the FK target.
+
+See :doc:`indices_and_fks` for a walkthrough of the generated
+SQL.
 
 
 AppendOnlyTablePlugin

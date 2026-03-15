@@ -3,11 +3,15 @@
 Provides :class:`PGCraftFK`, a declarative foreign key constraint
 definition that uses ``{column_name}`` markers for local columns.
 
-References use a two-part ``"dimension.column"`` format that is
-resolved at factory time to the correct physical table via the
-dimension registry in ``metadata.info["pgcraft_dimensions"]``.
-Three-part ``"schema.table.column"`` references bypass resolution
-and are passed through to SQLAlchemy directly.
+Two reference modes are supported:
+
+- ``references`` — two-part ``"dimension.column"`` strings resolved
+  at factory time via the dimension registry in
+  ``metadata.info["pgcraft_dimensions"]``.
+- ``raw_references`` — three-part ``"schema.table.column"`` strings
+  passed through to SQLAlchemy directly, bypassing resolution.
+
+Exactly one of the two must be provided.
 """
 
 from __future__ import annotations
@@ -64,27 +68,33 @@ def resolve_fk_reference(
     metadata: MetaData,
     reference: str,
 ) -> str:
-    """Resolve a FK reference to a full SQLAlchemy FK string.
+    """Resolve a ``"dimension.column"`` reference to a full FK string.
 
-    Two-part references (``"dimension.column"``) are resolved via
-    the dimension registry.  Three-or-more-part references
-    (``"schema.table.column"``) are returned as-is.
+    Looks up the dimension name in the registry and expands it to
+    ``"schema.table.column"``.
 
     Args:
         metadata: SQLAlchemy MetaData for registry lookup.
-        reference: FK reference string.
+        reference: Two-part ``"dimension.column"`` string.
 
     Returns:
         Fully qualified ``"schema.table.column"`` string.
 
     Raises:
-        PGCraftValidationError: If a two-part reference names
-            an unknown dimension.
+        PGCraftValidationError: If the reference does not
+            contain exactly one dot, or names an unknown
+            dimension.
 
     """
     parts = reference.split(".")
     if len(parts) != 2:  # noqa: PLR2004
-        return reference
+        msg = (
+            f"FK reference {reference!r} must be "
+            f"'dimension.column' format. "
+            f"Use raw_references for "
+            f"'schema.table.column' references."
+        )
+        raise PGCraftValidationError(msg)
 
     dim_name, col_name = parts
     registry: dict[str, DimensionRef] = metadata.info.get(
@@ -96,8 +106,8 @@ def resolve_fk_reference(
             f"FK reference {reference!r} names unknown "
             f"dimension {dim_name!r}. "
             f"Known dimensions: {known}. "
-            f"Use 'schema.table.column' format to bypass "
-            f"dimension resolution."
+            f"Use raw_references for "
+            f"'schema.table.column' references."
         )
         raise PGCraftValidationError(msg)
 
@@ -112,26 +122,51 @@ class PGCraftFK:
     Local columns use ``{column_name}`` markers that get resolved
     against the target table.
 
-    References use a two-part ``"dimension.column"`` format that
-    is resolved via the dimension registry, or a three-part
-    ``"schema.table.column"`` format passed through directly.
+    Exactly one of ``references`` or ``raw_references`` must be
+    provided:
+
+    - ``references`` — ``"dimension.column"`` strings resolved via
+      the dimension registry (e.g. ``["customers.id"]``).
+    - ``raw_references`` — ``"schema.table.column"`` strings passed
+      through directly (e.g. ``["public.orgs.id"]``).
 
     Args:
         columns: Local column markers, e.g. ``["{org_id}"]``.
-        references: Target references, e.g.
-            ``["customer.id"]`` (resolved) or
-            ``["dim.customer.id"]`` (passthrough).
+        references: Dimension references resolved via the registry.
+        raw_references: Literal ``"schema.table.column"`` refs.
         name: Required constraint name — no auto-naming.
         ondelete: ON DELETE action (e.g. ``"CASCADE"``).
         onupdate: ON UPDATE action (e.g. ``"CASCADE"``).
+
+    Raises:
+        PGCraftValidationError: If both or neither of
+            ``references`` and ``raw_references`` are provided.
 
     """
 
     columns: list[str] = field(default_factory=list)
     references: list[str] = field(default_factory=list)
+    raw_references: list[str] = field(default_factory=list)
     name: str = ""
     ondelete: str | None = None
     onupdate: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validate that exactly one reference mode is used."""
+        has_refs = bool(self.references)
+        has_raw = bool(self.raw_references)
+        if has_refs and has_raw:
+            msg = (
+                f"PGCraftFK {self.name!r}: provide either "
+                f"'references' or 'raw_references', not both."
+            )
+            raise PGCraftValidationError(msg)
+        if not has_refs and not has_raw:
+            msg = (
+                f"PGCraftFK {self.name!r}: provide either "
+                f"'references' or 'raw_references'."
+            )
+            raise PGCraftValidationError(msg)
 
     def column_names(self) -> list[str]:
         """Extract ``{name}`` markers from local columns.
@@ -167,7 +202,11 @@ class PGCraftFK:
         self,
         metadata: Any,  # noqa: ANN401
     ) -> list[str]:
-        """Resolve all references via the dimension registry.
+        """Resolve references to fully qualified FK strings.
+
+        If ``raw_references`` was used, returns them as-is.
+        If ``references`` was used, resolves each via the
+        dimension registry.
 
         Args:
             metadata: SQLAlchemy MetaData for registry lookup.
@@ -176,6 +215,8 @@ class PGCraftFK:
             List of fully qualified FK reference strings.
 
         """
+        if self.raw_references:
+            return list(self.raw_references)
         return [resolve_fk_reference(metadata, ref) for ref in self.references]
 
 
