@@ -210,6 +210,18 @@ Custom PK type:
        plugins=[UUIDV4PKPlugin()],
    )
 
+UUIDv7 primary key (PostgreSQL 18+):
+
+.. code-block:: python
+
+   from pgcraft.plugins.pk import UUIDV7PKPlugin
+
+   products = PGCraftSimple(
+       "products", "dim", metadata, schema_items,
+       plugins=[UUIDV7PKPlugin()],
+   )
+
+
 Apply a custom plugin to every factory via
 :class:`~pgcraft.config.PGCraftConfig`:
 

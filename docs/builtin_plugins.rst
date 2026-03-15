@@ -40,6 +40,81 @@ Adds an auto-incrementing integer primary key column.
    SerialPKPlugin(column_name="user_id")
 
 
+UUIDV4PKPlugin
+--------------
+
+Adds a UUIDv4 primary key column using PostgreSQL's
+``gen_random_uuid()`` as the server default.
+
+**Produces:** ``pk_columns``
+
+**Singleton group:** ``__pk__``
+
+**Parameters:**
+
+``column_name``
+    Name for the PK column (default ``"id"``).
+
+**Example:**
+
+.. code-block:: python
+
+   from pgcraft.plugins.pk import UUIDV4PKPlugin
+
+   # Default: adds "id UUID PRIMARY KEY DEFAULT gen_random_uuid()"
+   UUIDV4PKPlugin()
+
+   # Custom column name
+   UUIDV4PKPlugin(column_name="user_id")
+
+
+UUIDV7PKPlugin
+--------------
+
+Adds a UUIDv7 primary key column using PostgreSQL 18's
+``uuidv7()`` as the server default.  UUIDv7 values are
+time-ordered, making them friendlier to B-tree indexes than
+random UUIDv4 values.
+
+Requires PostgreSQL 18 or later (declared via
+``@requires(MinPGVersion(18))``).  Use
+:func:`~pgcraft.plugin.check_pg_version` to validate the
+server version before applying DDL.
+
+**Produces:** ``pk_columns``
+
+**Requires:** ``MinPGVersion(18)``
+
+**Singleton group:** ``__pk__``
+
+**Parameters:**
+
+``column_name``
+    Name for the PK column (default ``"id"``).
+
+**Example:**
+
+.. code-block:: python
+
+   from pgcraft.plugins.pk import UUIDV7PKPlugin
+
+   # Default: adds "id UUID PRIMARY KEY DEFAULT uuidv7()"
+   UUIDV7PKPlugin()
+
+   # Custom column name
+   UUIDV7PKPlugin(column_name="ticket_id")
+
+To validate the server version at runtime:
+
+.. code-block:: python
+
+   from pgcraft.plugin import check_pg_version
+
+   with engine.connect() as conn:
+       major = conn.dialect.server_version_info[0]
+       check_pg_version(major, factory.ctx.plugins)
+
+
 CreatedAtPlugin
 ---------------
 
