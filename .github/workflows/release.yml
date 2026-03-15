@@ -24,10 +24,9 @@ jobs:
         id: branch
         if: ${{ steps.release.outputs.pr }}
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          PR_JSON: ${{ steps.release.outputs.pr }}
         run: |
-          branch=$(gh pr view ${{ steps.release.outputs.pr }} \
-            --repo ${{ github.repository }} --json headRefName -q .headRefName)
+          branch=$(echo "$PR_JSON" | jq -r '.headBranchName')
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
 
   update-lockfile:
