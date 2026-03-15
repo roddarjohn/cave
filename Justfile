@@ -22,6 +22,10 @@ type-check:
 test *args:
     uv run tox -- {{args}}
 
+# Run performance benchmarks (requires DATABASE_URL)
+bench *args:
+    uv run pytest tests/benchmarks/ {{args}}
+
 # Run tests directly via uv (faster, for local development)
 dev-test *args:
     uv run pytest {{args}}

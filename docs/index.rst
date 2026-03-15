@@ -29,6 +29,7 @@ pgcraft
    plugins
    builtin_plugins
    api
+   benchmarks
 
 .. toctree::
    :maxdepth: 1

@@ -102,6 +102,55 @@ scope::
     just coverage tests/unit
     just coverage tests/integration
 
+Benchmarks
+----------
+
+pgcraft ships with a performance benchmark suite built on
+`pytest-benchmark <https://pytest-benchmark.readthedocs.io/>`_.
+Benchmarks exercise the trigger-based API views for each dimension type
+against a real PostgreSQL instance.
+
+Benchmarks are **excluded** from normal test runs (``just dev-test`` and
+``just test``) via the ``addopts = "--ignore=tests/benchmarks"`` setting in
+``pyproject.toml``.  Run them explicitly with::
+
+    just bench
+
+You can pass any ``pytest-benchmark`` flags through::
+
+    # Save results for later comparison
+    just bench --benchmark-save=baseline
+
+    # Compare against a saved baseline
+    just bench --benchmark-compare=0001_baseline
+
+    # Only run ledger benchmarks
+    just bench -k ledger
+
+Each benchmark row in the output table shows:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Column
+     - Meaning
+   * - **Min**
+     - Fastest observed round
+   * - **Max**
+     - Slowest observed round
+   * - **Mean**
+     - Arithmetic mean across all rounds
+   * - **StdDev**
+     - Standard deviation (lower is more consistent)
+   * - **Median**
+     - Middle value (robust to outliers)
+   * - **Rounds**
+     - Number of times the function was called
+
+See :doc:`benchmarks` for the full list of benchmarks and representative
+results.
+
 Linting and formatting
 -----------------------
 
