@@ -1,17 +1,20 @@
 """EAV dimension resource factory."""
 
-from typing import ClassVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 
 from pgcraft.factory.base import ResourceFactory
-from pgcraft.plugin import Plugin
 from pgcraft.plugins.check import TriggerCheckPlugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.eav import (
     EAVTablePlugin,
-    EAVTriggerPlugin,
     EAVViewPlugin,
 )
 from pgcraft.plugins.protect import RawTableProtectionPlugin
+
+if TYPE_CHECKING:
+    from pgcraft.plugin import Plugin
 
 
 class PGCraftEAV(ResourceFactory):
@@ -43,5 +46,3 @@ class PGCraftEAV(ResourceFactory):
         TriggerCheckPlugin(),
         RawTableProtectionPlugin("entity", "attribute"),
     ]
-
-    TRIGGER_PLUGIN_CLS = staticmethod(EAVTriggerPlugin)

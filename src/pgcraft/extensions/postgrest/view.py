@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from pgcraft.factory.base import ResourceFactory
     from pgcraft.factory.context import FactoryContext
+    from pgcraft.plugin import Plugin
     from pgcraft.statistics import JoinedView
 
 
@@ -195,75 +196,25 @@ def _build_select_cols(
     return [col.label(col.key) for col in primary.columns]
 
 
-def _install_triggers(
-    source: ResourceFactory,
-    ctx: FactoryContext,
-    columns: list[str] | None = None,
-    permitted_operations: list[str] | None = None,
-) -> None:
-    """Auto-install triggers based on factory type.
-
-    Args:
-        source: The factory whose trigger class to use.
-        ctx: The factory context.
-        columns: Writable column names for the triggers.
-            When ``None``, the trigger plugin uses all dim
-            columns from ctx.
-        permitted_operations: Which DML operations get
-            INSTEAD OF triggers.  When ``None``, creates
-            all supported triggers.
-
-    """
-    trigger_cls = getattr(source, "TRIGGER_PLUGIN_CLS", None)
-    if trigger_cls is not None:
-        import inspect  # noqa: PLC0415
-
-        sig = inspect.signature(trigger_cls)
-        kwargs: dict[str, Any] = {}
-        if columns is not None and "columns" in sig.parameters:
-            kwargs["columns"] = columns
-        if (
-            permitted_operations is not None
-            and "permitted_operations" in sig.parameters
-        ):
-            kwargs["permitted_operations"] = permitted_operations
-        trigger_plugin = trigger_cls(**kwargs)
-        trigger_plugin.run(ctx)
-
-    # Auto-install EAV check triggers on the API view.
-    from pgcraft.factory.dimension.eav import (  # noqa: PLC0415
-        PGCraftEAV,
-    )
-    from pgcraft.plugins.check import (  # noqa: PLC0415
-        TriggerCheckPlugin,
-    )
-
-    if isinstance(source, PGCraftEAV):
-        check_plugin = TriggerCheckPlugin(table_key="api")
-        check_plugin.run(ctx)
-
-
 class PostgRESTView:
-    """Create a PostgREST-facing view with auto-selected triggers.
+    """Create a PostgREST-facing view with optional plugins.
 
     Reads from a table factory's context to create an API view
-    and INSTEAD OF triggers.  The trigger strategy is
-    auto-selected based on the factory type
-    (``source.TRIGGER_PLUGIN_CLS``).
-
-    Grants drive triggers: only operations listed in *grants*
-    get INSTEAD OF triggers.  ``"select"``-only views have no
-    triggers and are read-only.
+    and register it as an API resource.  Any plugins passed via
+    ``plugins`` are run against the factory context after the
+    view is created (e.g. trigger plugins).
 
     Args:
         source: A :class:`~pgcraft.factory.base.ResourceFactory`
             instance whose table/context to expose.
         schema: Schema for the API view (default ``"api"``).
         grants: PostgREST privileges (default ``["select"]``).
-            Determines which INSTEAD OF triggers are created.
         query: Optional callable ``(query, source_table) ->
             Select`` for SQLAlchemy-style view customization
             (joins, column filtering, etc.).
+        plugins: Plugins to run after the view is created.
+            Typically trigger plugins such as
+            :class:`~pgcraft.plugins.simple.SimpleTriggerPlugin`.
         columns: Column names to include.  Mutually exclusive
             with ``exclude_columns``.
         exclude_columns: Column names to exclude.  Mutually
@@ -278,10 +229,11 @@ class PostgRESTView:
         grants: list[Grant] | None = None,
         query: Callable[[Select, Table], Select] | None = None,
         *,
+        plugins: list[Plugin] | None = None,
         columns: list[str] | None = None,
         exclude_columns: list[str] | None = None,
     ) -> None:
-        """Create the API view and triggers."""
+        """Create the API view and run plugins."""
         self.source = source
         self.schema = schema
         self.grants: list[Grant] = grants if grants is not None else ["select"]
@@ -303,25 +255,8 @@ class PostgRESTView:
         register_view(ctx.metadata, view)
         self.view = view
 
-        # Store the view in ctx so trigger plugins can find it.
+        # Store the view in ctx so plugins can find it.
         ctx.set("api", view, force=True)
-
-        # Resolve which writable columns the view exposes.
-        effective = _resolve_included_columns(primary, columns, exclude_columns)
-        if effective is not None:
-            dim_set = set(ctx.dim_column_names)
-            writable: list[str] | None = [c for c in effective if c in dim_set]
-        elif query is not None:
-            # query= may add non-table columns (joins, etc.)
-            # so restrict triggers to base dim columns.
-            writable = list(ctx.dim_column_names)
-        else:
-            writable = None
-
-        # Derive DML operations from grants.
-        dml_ops: list[str] = [
-            g for g in self.grants if g in {"insert", "update", "delete"}
-        ]
 
         register_api_resource(
             ctx.metadata,
@@ -332,5 +267,5 @@ class PostgRESTView:
             ),
         )
 
-        if dml_ops:
-            _install_triggers(source, ctx, writable, dml_ops)
+        for p in plugins or []:
+            p.run(ctx)

@@ -1,18 +1,21 @@
 """Append-only dimension resource factory."""
 
-from typing import ClassVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 
 from pgcraft.factory.base import ResourceFactory
-from pgcraft.plugin import Plugin
 from pgcraft.plugins.append_only import (
     AppendOnlyTablePlugin,
-    AppendOnlyTriggerPlugin,
     AppendOnlyViewPlugin,
 )
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.fk import TableFKPlugin
 from pgcraft.plugins.index import TableIndexPlugin
 from pgcraft.plugins.protect import RawTableProtectionPlugin
+
+if TYPE_CHECKING:
+    from pgcraft.plugin import Plugin
 
 
 class PGCraftAppendOnly(ResourceFactory):
@@ -52,5 +55,3 @@ class PGCraftAppendOnly(ResourceFactory):
         TableFKPlugin(table_key="attributes"),
         RawTableProtectionPlugin("root_table", "attributes"),
     ]
-
-    TRIGGER_PLUGIN_CLS = staticmethod(AppendOnlyTriggerPlugin)

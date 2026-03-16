@@ -10,6 +10,7 @@ from pgcraft.errors import PGCraftValidationError
 from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.plugins.pk import SerialPKPlugin
+from pgcraft.plugins.simple import SimpleTriggerPlugin
 
 _CRUD_OPS = ("insert", "update", "delete")
 _CRUD_GRANTS = ["select", "insert", "update", "delete"]
@@ -138,7 +139,11 @@ class TestPGCraftSimpleTriggers:
     def test_functions_registered(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[SimpleTriggerPlugin()],
+        )
         functions = metadata.info.get("functions")
         assert functions is not None
         # 3 INSTEAD OF functions + 1 protection function
@@ -147,7 +152,11 @@ class TestPGCraftSimpleTriggers:
     def test_triggers_registered(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[SimpleTriggerPlugin()],
+        )
         triggers = metadata.info.get("triggers")
         assert triggers is not None
         # 3 INSTEAD OF + 3 BEFORE protection triggers
@@ -156,28 +165,44 @@ class TestPGCraftSimpleTriggers:
     def test_insert_function_exists(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[SimpleTriggerPlugin()],
+        )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_insert" in fn_names
 
     def test_update_function_exists(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[SimpleTriggerPlugin()],
+        )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_update" in fn_names
 
     def test_delete_function_exists(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[SimpleTriggerPlugin()],
+        )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_delete" in fn_names
 
     def test_insert_trigger_is_instead_of(self):
         metadata = MetaData()
         f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[SimpleTriggerPlugin()],
+        )
         triggers = metadata.info["triggers"].triggers
         instead_of_inserts = [
             t

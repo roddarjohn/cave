@@ -18,7 +18,9 @@ from sqlalchemy.sql.expression import Label
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.eav import PGCraftEAV
+from pgcraft.plugins.check import TriggerCheckPlugin
 from pgcraft.plugins.eav import (
+    EAVTriggerPlugin,
     _EAVMapping,
     _needed_value_columns,
     _pivot_aggregate,
@@ -391,7 +393,14 @@ class TestPGCraftEAVTriggers:
             metadata,
             [Column("name", String)],
         )
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[
+                EAVTriggerPlugin(),
+                TriggerCheckPlugin(table_key="api"),
+            ],
+        )
         functions = metadata.info.get("functions")
         assert functions is not None
         # 6 INSTEAD OF functions (2 views x 3 ops)
@@ -406,7 +415,14 @@ class TestPGCraftEAVTriggers:
             metadata,
             [Column("name", String)],
         )
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[
+                EAVTriggerPlugin(),
+                TriggerCheckPlugin(table_key="api"),
+            ],
+        )
         triggers = metadata.info.get("triggers")
         assert triggers is not None
         # 6 INSTEAD OF + 6 BEFORE protection (2 tables x 3)

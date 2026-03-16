@@ -11,8 +11,7 @@ from sqlalchemy import (
 )
 
 from pgcraft.check import PGCraftCheck
-from pgcraft.extensions.postgrest.trigger import SimpleTriggerPlugin
-from pgcraft.plugins.simple import SimpleTablePlugin
+from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
 from tests.unit.plugins.conftest import make_ctx, make_view
 
 

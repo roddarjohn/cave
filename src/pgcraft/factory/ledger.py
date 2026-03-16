@@ -7,10 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 from pgcraft.factory.base import ResourceFactory
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
-from pgcraft.plugins.ledger import (
-    LedgerTablePlugin,
-    LedgerTriggerPlugin,
-)
+from pgcraft.plugins.ledger import LedgerTablePlugin
 
 if TYPE_CHECKING:
     from sqlalchemy import MetaData
@@ -57,8 +54,6 @@ class PGCraftLedger(ResourceFactory):
         CreatedAtPlugin(),
         LedgerTablePlugin(),
     ]
-
-    TRIGGER_PLUGIN_CLS = staticmethod(LedgerTriggerPlugin)
 
     def __init__(  # noqa: PLR0913
         self,

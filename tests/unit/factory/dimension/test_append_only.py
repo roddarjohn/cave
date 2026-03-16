@@ -8,6 +8,9 @@ from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.append_only import (
     PGCraftAppendOnly,
 )
+from pgcraft.plugins.append_only import (
+    AppendOnlyTriggerPlugin,
+)
 
 
 class TestPGCraftAppendOnlyTables:
@@ -214,7 +217,11 @@ class TestPGCraftAppendOnlyTriggers:
             metadata,
             [Column("name", String)],
         )
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[AppendOnlyTriggerPlugin()],
+        )
         functions = metadata.info.get("functions")
         assert functions is not None
         # 2 views x 3 ops = 6 INSTEAD OF functions
@@ -229,7 +236,11 @@ class TestPGCraftAppendOnlyTriggers:
             metadata,
             [Column("name", String)],
         )
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[AppendOnlyTriggerPlugin()],
+        )
         triggers = metadata.info.get("triggers")
         assert triggers is not None
         # 6 INSTEAD OF triggers + 6 BEFORE protection
@@ -244,7 +255,11 @@ class TestPGCraftAppendOnlyTriggers:
             metadata,
             [Column("name", String)],
         )
-        PostgRESTView(source=f, grants=_CRUD_GRANTS)
+        PostgRESTView(
+            source=f,
+            grants=_CRUD_GRANTS,
+            plugins=[AppendOnlyTriggerPlugin()],
+        )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         # Each op appears twice (once per view schema).
         # Protection functions are named without an op

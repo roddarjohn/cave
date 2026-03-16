@@ -32,10 +32,17 @@ from pgcraft.factory.dimension.append_only import (
 from pgcraft.factory.dimension.eav import PGCraftEAV
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.factory.ledger import PGCraftLedger
+from pgcraft.plugins.append_only import (
+    AppendOnlyTriggerPlugin,
+)
+from pgcraft.plugins.check import TriggerCheckPlugin
+from pgcraft.plugins.eav import EAVTriggerPlugin
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
+    LedgerTriggerPlugin,
 )
+from pgcraft.plugins.simple import SimpleTriggerPlugin
 from pgcraft.views.actions import LedgerActions
 from pgcraft.views.balance import BalanceView
 from pgcraft.views.view import PGCraftView
@@ -142,6 +149,15 @@ customers = PGCraftSimple(
 PostgRESTView(
     source=users,
     grants=["select", "insert", "update", "delete"],
+    plugins=[
+        SimpleTriggerPlugin(
+            permitted_operations=[
+                "insert",
+                "update",
+                "delete",
+            ],
+        ),
+    ],
 )
 
 # columns=: only expose specific columns
@@ -201,6 +217,15 @@ _iv = invoice_stats.table
 PostgRESTView(
     source=customers,
     grants=["select", "insert", "update", "delete"],
+    plugins=[
+        SimpleTriggerPlugin(
+            permitted_operations=[
+                "insert",
+                "update",
+                "delete",
+            ],
+        ),
+    ],
     query=lambda q, t: (
         select(
             t.c.id,
@@ -263,6 +288,7 @@ inventory = PGCraftLedger(
 PostgRESTView(
     source=inventory,
     grants=["select", "insert"],
+    plugins=[LedgerTriggerPlugin()],
 )
 BalanceView(
     source=inventory, dimensions=["warehouse", "sku"]
@@ -338,6 +364,7 @@ ledger = PGCraftLedger(
 PostgRESTView(
     source=ledger,
     grants=["select", "insert"],
+    plugins=[LedgerTriggerPlugin()],
 )
 BalanceView(
     source=ledger,

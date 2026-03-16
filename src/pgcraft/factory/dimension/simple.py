@@ -1,11 +1,15 @@
 """Simple dimension resource factory."""
 
-from typing import ClassVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 
 from pgcraft.factory.base import ResourceFactory
-from pgcraft.plugin import Plugin
 from pgcraft.plugins.protect import RawTableProtectionPlugin
-from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+from pgcraft.plugins.simple import SimpleTablePlugin
+
+if TYPE_CHECKING:
+    from pgcraft.plugin import Plugin
 
 
 class PGCraftSimple(ResourceFactory):
@@ -43,5 +47,3 @@ class PGCraftSimple(ResourceFactory):
         SimpleTablePlugin(),
         RawTableProtectionPlugin("primary"),
     ]
-
-    TRIGGER_PLUGIN_CLS = SimpleTriggerPlugin

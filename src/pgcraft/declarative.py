@@ -134,16 +134,13 @@ def _create_register_api_view(
     from pgcraft.extensions.postgrest import (  # noqa: PLC0415
         PostgRESTView,
     )
-    from pgcraft.plugins.simple import (  # noqa: PLC0415
-        SimpleTriggerPlugin,
+    from pgcraft.factory.base import (  # noqa: PLC0415
+        ResourceFactory,
     )
 
-    class _RegisterSource:
-        TRIGGER_PLUGIN_CLS = SimpleTriggerPlugin
-
-    src = _RegisterSource()
-    src.ctx = ctx  # type: ignore[attr-defined]
-    PostgRESTView(source=src, **api_kwargs)  # type: ignore[arg-type]
+    src = ResourceFactory.__new__(ResourceFactory)
+    src.ctx = ctx
+    PostgRESTView(source=src, **api_kwargs)
 
 
 def register[T](  # noqa: PLR0913
