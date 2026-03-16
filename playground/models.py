@@ -33,7 +33,7 @@ from pgcraft.factory.dimension.eav import PGCraftEAV
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.factory.ledger import PGCraftLedger
 from pgcraft.plugins.append_only import (
-    AppendOnlyTriggerPlugin,
+    append_only_trigger_plugin,
 )
 from pgcraft.plugins.check import TriggerCheckPlugin
 from pgcraft.plugins.eav import EAVTriggerPlugin

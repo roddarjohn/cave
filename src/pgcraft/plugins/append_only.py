@@ -130,7 +130,12 @@ def _make_ops_builder(
         root_fullname = f"{ctx.schemaname}.{root_table.name}"
         attr_fullname = f"{ctx.schemaname}.{attribute_table.name}"
 
-        dim_cols = columns if columns is not None else ctx.dim_column_names
+        if columns is not None:
+            dim_cols = columns
+        elif "writable_columns" in ctx:
+            dim_cols = ctx["writable_columns"]
+        else:
+            dim_cols = ctx.dim_column_names
         template_vars = {
             "attr_table": attr_fullname,
             "root_table": root_fullname,
@@ -265,11 +270,11 @@ def AppendOnlyViewPlugin(  # noqa: N802
     )
 
 
-def AppendOnlyTriggerPlugin(  # noqa: N802
+def append_only_trigger_plugin(
+    columns: list[str] | None = None,
     root_key: str = "root_table",
     attributes_key: str = "attributes",
     view_key: str = "api",
-    columns: list[str] | None = None,
 ) -> InsteadOfTriggerPlugin:
     """Create a configured InsteadOfTriggerPlugin for append-only.
 

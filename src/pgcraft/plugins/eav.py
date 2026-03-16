@@ -400,7 +400,7 @@ def EAVViewPlugin(  # noqa: N802
     )
 
 
-def EAVTriggerPlugin(  # noqa: N802
+def eav_trigger_plugin(
     entity_key: str = "entity",
     attribute_key: str = "attribute",
     mappings_key: str = "eav_mappings",

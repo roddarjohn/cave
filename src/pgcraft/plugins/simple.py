@@ -43,7 +43,12 @@ def _build_simple_ops_with_columns(
     def builder(ctx: FactoryContext) -> list[TriggerOp]:
         primary = ctx[table_key]
         base_fullname = f"{ctx.schemaname}.{primary.name}"
-        dim_cols = columns if columns is not None else ctx.dim_column_names
+        if columns is not None:
+            dim_cols = columns
+        elif "writable_columns" in ctx:
+            dim_cols = ctx["writable_columns"]
+        else:
+            dim_cols = ctx.dim_column_names
 
         if columns is not None:
             pk_name = ctx.pk_column_name
@@ -116,42 +121,37 @@ class SimpleTablePlugin(Plugin):
         ctx["__root__"] = table
 
 
-class SimpleTriggerPlugin(InsteadOfTriggerPlugin):
-    """Register INSERT/UPDATE/DELETE INSTEAD OF triggers on a view.
-
-    Configured :class:`InsteadOfTriggerPlugin` for simple
-    dimensions.
+def simple_trigger_plugin(
+    columns: list[str] | None = None,
+    permitted_operations: list[str] | None = None,
+    table_key: str = "primary",
+    view_key: str = "api",
+) -> InsteadOfTriggerPlugin:
+    """Create a configured InsteadOfTriggerPlugin for simple dims.
 
     Args:
-        table_key: Key in ``ctx`` for the backing table
-            (default ``"primary"``).
-        view_key: Key in ``ctx`` for the trigger target view
-            (default ``"api"``).
         columns: Writable columns for the triggers.
             When ``None``, uses all dim columns from ctx.
         permitted_operations: DML operations to create
             INSTEAD OF triggers for (``"insert"``,
             ``"update"``, ``"delete"``).  When ``None``,
             creates all three.
+        table_key: Key in ``ctx`` for the backing table
+            (default ``"primary"``).
+        view_key: Key in ``ctx`` for the trigger target view
+            (default ``"api"``).
+
+    Returns:
+        A configured
+        :class:`~pgcraft.plugins.trigger.InsteadOfTriggerPlugin`.
 
     """
-
-    def __init__(
-        self,
-        table_key: str = "primary",
-        view_key: str = "api",
-        columns: list[str] | None = None,
-        permitted_operations: list[str] | None = None,
-    ) -> None:
-        """Store the context keys."""
-        self.table_key = table_key
-        super().__init__(
-            ops_builder=_build_simple_ops_with_columns(columns, table_key),
-            naming_defaults=_NAMING_DEFAULTS,
-            function_key="simple_function",
-            trigger_key="simple_trigger",
-            view_key=view_key,
-            permitted_operations=permitted_operations,
-            include_private_view=False,
-        )
-        self.columns = columns
+    return InsteadOfTriggerPlugin(
+        ops_builder=_build_simple_ops_with_columns(columns, table_key),
+        naming_defaults=_NAMING_DEFAULTS,
+        function_key="simple_function",
+        trigger_key="simple_trigger",
+        view_key=view_key,
+        permitted_operations=permitted_operations,
+        include_private_view=False,
+    )

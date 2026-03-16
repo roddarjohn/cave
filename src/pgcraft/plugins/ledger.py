@@ -221,7 +221,7 @@ class LedgerTablePlugin(Plugin):
         ctx["__root__"] = table
 
 
-def LedgerTriggerPlugin(  # noqa: N802
+def ledger_trigger_plugin(
     table_key: str = "primary",
     view_key: str = "api",
 ) -> InsteadOfTriggerPlugin:
