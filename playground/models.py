@@ -40,9 +40,9 @@ from pgcraft.plugins.eav import eav_trigger_plugin
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
-    LedgerTriggerPlugin,
+    ledger_trigger_plugin,
 )
-from pgcraft.plugins.simple import SimpleTriggerPlugin
+from pgcraft.plugins.simple import simple_trigger_plugin
 from pgcraft.views.actions import LedgerActions
 from pgcraft.views.balance import BalanceView
 from pgcraft.views.view import PGCraftView
@@ -150,7 +150,7 @@ PostgRESTView(
     source=users,
     grants=["select", "insert", "update", "delete"],
     plugins=[
-        SimpleTriggerPlugin(
+        simple_trigger_plugin(
             permitted_operations=[
                 "insert",
                 "update",
@@ -218,7 +218,7 @@ PostgRESTView(
     source=customers,
     grants=["select", "insert", "update", "delete"],
     plugins=[
-        SimpleTriggerPlugin(
+        simple_trigger_plugin(
             permitted_operations=[
                 "insert",
                 "update",
@@ -288,7 +288,7 @@ inventory = PGCraftLedger(
 PostgRESTView(
     source=inventory,
     grants=["select", "insert"],
-    plugins=[LedgerTriggerPlugin()],
+    plugins=[ledger_trigger_plugin()],
 )
 BalanceView(
     source=inventory, dimensions=["warehouse", "sku"]
@@ -364,7 +364,7 @@ ledger = PGCraftLedger(
 PostgRESTView(
     source=ledger,
     grants=["select", "insert"],
-    plugins=[LedgerTriggerPlugin()],
+    plugins=[ledger_trigger_plugin()],
 )
 BalanceView(
     source=ledger,

@@ -20,11 +20,11 @@ from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.eav import PGCraftEAV
 from pgcraft.plugins.check import TriggerCheckPlugin
 from pgcraft.plugins.eav import (
-    EAVTriggerPlugin,
     _EAVMapping,
     _needed_value_columns,
     _pivot_aggregate,
     _resolve_value_column,
+    eav_trigger_plugin,
 )
 
 # -----------------------------------------------------------
@@ -397,7 +397,7 @@ class TestPGCraftEAVTriggers:
             source=f,
             grants=_CRUD_GRANTS,
             plugins=[
-                EAVTriggerPlugin(),
+                eav_trigger_plugin(),
                 TriggerCheckPlugin(table_key="api"),
             ],
         )
@@ -419,7 +419,7 @@ class TestPGCraftEAVTriggers:
             source=f,
             grants=_CRUD_GRANTS,
             plugins=[
-                EAVTriggerPlugin(),
+                eav_trigger_plugin(),
                 TriggerCheckPlugin(table_key="api"),
             ],
         )

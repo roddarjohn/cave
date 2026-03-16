@@ -1,5 +1,5 @@
-"""Re-export SimpleTriggerPlugin for backward compatibility."""
+"""Re-export simple_trigger_plugin for backward compatibility."""
 
-from pgcraft.plugins.simple import SimpleTriggerPlugin
+from pgcraft.plugins.simple import simple_trigger_plugin
 
-__all__ = ["SimpleTriggerPlugin"]
+__all__ = ["simple_trigger_plugin"]

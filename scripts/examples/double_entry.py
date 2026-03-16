@@ -8,7 +8,7 @@ from pgcraft.factory import PGCraftLedger, PGCraftSimple
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
-    LedgerTriggerPlugin,
+    ledger_trigger_plugin,
 )
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
@@ -46,7 +46,7 @@ journal = PGCraftLedger(
 PostgRESTView(
     source=journal,
     grants=["select", "insert"],
-    plugins=[LedgerTriggerPlugin()],
+    plugins=[ledger_trigger_plugin()],
 )
 # --- example end ---
 

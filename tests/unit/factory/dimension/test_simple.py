@@ -10,7 +10,7 @@ from pgcraft.errors import PGCraftValidationError
 from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.plugins.pk import SerialPKPlugin
-from pgcraft.plugins.simple import SimpleTriggerPlugin
+from pgcraft.plugins.simple import simple_trigger_plugin
 
 _CRUD_OPS = ("insert", "update", "delete")
 _CRUD_GRANTS = ["select", "insert", "update", "delete"]
@@ -142,7 +142,7 @@ class TestPGCraftSimpleTriggers:
         PostgRESTView(
             source=f,
             grants=_CRUD_GRANTS,
-            plugins=[SimpleTriggerPlugin()],
+            plugins=[simple_trigger_plugin()],
         )
         functions = metadata.info.get("functions")
         assert functions is not None
@@ -155,7 +155,7 @@ class TestPGCraftSimpleTriggers:
         PostgRESTView(
             source=f,
             grants=_CRUD_GRANTS,
-            plugins=[SimpleTriggerPlugin()],
+            plugins=[simple_trigger_plugin()],
         )
         triggers = metadata.info.get("triggers")
         assert triggers is not None
@@ -168,7 +168,7 @@ class TestPGCraftSimpleTriggers:
         PostgRESTView(
             source=f,
             grants=_CRUD_GRANTS,
-            plugins=[SimpleTriggerPlugin()],
+            plugins=[simple_trigger_plugin()],
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_insert" in fn_names
@@ -179,7 +179,7 @@ class TestPGCraftSimpleTriggers:
         PostgRESTView(
             source=f,
             grants=_CRUD_GRANTS,
-            plugins=[SimpleTriggerPlugin()],
+            plugins=[simple_trigger_plugin()],
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_update" in fn_names
@@ -190,7 +190,7 @@ class TestPGCraftSimpleTriggers:
         PostgRESTView(
             source=f,
             grants=_CRUD_GRANTS,
-            plugins=[SimpleTriggerPlugin()],
+            plugins=[simple_trigger_plugin()],
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_delete" in fn_names
@@ -201,7 +201,7 @@ class TestPGCraftSimpleTriggers:
         PostgRESTView(
             source=f,
             grants=_CRUD_GRANTS,
-            plugins=[SimpleTriggerPlugin()],
+            plugins=[simple_trigger_plugin()],
         )
         triggers = metadata.info["triggers"].triggers
         instead_of_inserts = [

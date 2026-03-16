@@ -102,11 +102,19 @@ class InsteadOfTriggerPlugin(Plugin):
         return [(api_schema, f"{api_schema}.{ctx.tablename}")]
 
     def run(self, ctx: FactoryContext) -> None:
-        """Register INSTEAD OF triggers on target views."""
+        """Register INSTEAD OF triggers on target views.
+
+        When ``permitted_operations`` was not set at construction
+        time, falls back to ``ctx["permitted_operations"]`` if
+        present.  This lets :class:`PostgRESTView` control which
+        DML operations get triggers based on grants.
+        """
         ops = self.ops_builder(ctx)
-        if self.permitted_operations is not None:
-            allowed = set(self.permitted_operations)
-            ops = [o for o in ops if o.name in allowed]
+        allowed = self.permitted_operations
+        if allowed is None and "permitted_operations" in ctx:
+            allowed = ctx["permitted_operations"]
+        if allowed is not None:
+            ops = [o for o in ops if o.name in set(allowed)]
 
         rendered: list[tuple[str, str]] = [(o.name, o.body) for o in ops]
         if not rendered:

@@ -5,7 +5,7 @@ from sqlalchemy import Column, MetaData, String
 from pgcraft import pgcraft_build_naming_conventions
 from pgcraft.extensions.postgrest import PostgRESTView
 from pgcraft.factory import PGCraftLedger
-from pgcraft.plugins.ledger import LedgerTriggerPlugin
+from pgcraft.plugins.ledger import ledger_trigger_plugin
 from pgcraft.views import LatestView
 
 metadata = MetaData(naming_convention=pgcraft_build_naming_conventions())
@@ -24,7 +24,7 @@ order_events = PGCraftLedger(
 PostgRESTView(
     source=order_events,
     grants=["select", "insert"],
-    plugins=[LedgerTriggerPlugin()],
+    plugins=[ledger_trigger_plugin()],
 )
 LatestView(source=order_events, dimensions=["order_id"])
 # --- example end ---

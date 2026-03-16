@@ -9,7 +9,7 @@ from pgcraft.factory.dimension.append_only import (
     PGCraftAppendOnly,
 )
 from pgcraft.plugins.append_only import (
-    AppendOnlyTriggerPlugin,
+    append_only_trigger_plugin,
 )
 
 
@@ -220,7 +220,7 @@ class TestPGCraftAppendOnlyTriggers:
         PostgRESTView(
             source=f,
             grants=_CRUD_GRANTS,
-            plugins=[AppendOnlyTriggerPlugin()],
+            plugins=[append_only_trigger_plugin()],
         )
         functions = metadata.info.get("functions")
         assert functions is not None
@@ -239,7 +239,7 @@ class TestPGCraftAppendOnlyTriggers:
         PostgRESTView(
             source=f,
             grants=_CRUD_GRANTS,
-            plugins=[AppendOnlyTriggerPlugin()],
+            plugins=[append_only_trigger_plugin()],
         )
         triggers = metadata.info.get("triggers")
         assert triggers is not None
@@ -258,7 +258,7 @@ class TestPGCraftAppendOnlyTriggers:
         PostgRESTView(
             source=f,
             grants=_CRUD_GRANTS,
-            plugins=[AppendOnlyTriggerPlugin()],
+            plugins=[append_only_trigger_plugin()],
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         # Each op appears twice (once per view schema).

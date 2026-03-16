@@ -4,8 +4,8 @@ from sqlalchemy import Boolean, Column, Integer, String, Table
 
 from pgcraft.plugins.eav import (
     EAVTablePlugin,
-    EAVTriggerPlugin,
     EAVViewPlugin,
+    eav_trigger_plugin,
 )
 from tests.unit.plugins.conftest import make_ctx, make_view
 
@@ -177,7 +177,7 @@ class TestEAVTriggerPlugin:
         return ctx
 
     def test_registers_functions_for_both_views(self):
-        plugin = EAVTriggerPlugin()
+        plugin = eav_trigger_plugin()
         ctx = self._ctx_with_tables_and_view()
         plugin.run(ctx)
         functions = ctx.metadata.info.get("functions")
@@ -185,13 +185,13 @@ class TestEAVTriggerPlugin:
         assert len(functions.functions) == 6  # dim + api views × 3 ops
 
     def test_registers_triggers_for_both_views(self):
-        plugin = EAVTriggerPlugin()
+        plugin = eav_trigger_plugin()
         ctx = self._ctx_with_tables_and_view()
         plugin.run(ctx)
         assert len(ctx.metadata.info["triggers"].triggers) == 6
 
     def test_skips_api_view_when_key_absent(self):
-        plugin = EAVTriggerPlugin(view_key="nonexistent")
+        plugin = eav_trigger_plugin(view_key="nonexistent")
         ctx = make_ctx()
         EAVTablePlugin().run(ctx)
         EAVViewPlugin().run(ctx)
@@ -200,7 +200,7 @@ class TestEAVTriggerPlugin:
 
     def test_nullable_false_mapping_rendered_in_function(self):
         """Insert function body should raise for non-nullable attributes."""
-        plugin = EAVTriggerPlugin()
+        plugin = eav_trigger_plugin()
         ctx = make_ctx(schema_items=[Column("sku", String, nullable=False)])
         EAVTablePlugin().run(ctx)
         EAVViewPlugin().run(ctx)
@@ -222,7 +222,7 @@ class TestEAVTriggerPlugin:
             ctx
         )
         ctx["api"] = make_view("product", "api")
-        trigger_plugin = EAVTriggerPlugin(
+        trigger_plugin = eav_trigger_plugin(
             entity_key="e", attribute_key="a", mappings_key="m"
         )
         trigger_plugin.run(ctx)

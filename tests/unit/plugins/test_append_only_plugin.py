@@ -4,8 +4,8 @@ from sqlalchemy import Column, String, Table
 
 from pgcraft.plugins.append_only import (
     AppendOnlyTablePlugin,
-    AppendOnlyTriggerPlugin,
     AppendOnlyViewPlugin,
+    append_only_trigger_plugin,
 )
 from tests.unit.plugins.conftest import make_ctx, make_view
 
@@ -129,7 +129,7 @@ class TestAppendOnlyTriggerPlugin:
         return ctx
 
     def test_registers_functions_for_primary_view(self):
-        plugin = AppendOnlyTriggerPlugin()
+        plugin = append_only_trigger_plugin()
         ctx = self._ctx_with_tables_and_view()
         plugin.run(ctx)
         functions = ctx.metadata.info.get("functions")
@@ -138,13 +138,13 @@ class TestAppendOnlyTriggerPlugin:
         assert len(functions.functions) == 6
 
     def test_registers_triggers_for_primary_view(self):
-        plugin = AppendOnlyTriggerPlugin()
+        plugin = append_only_trigger_plugin()
         ctx = self._ctx_with_tables_and_view()
         plugin.run(ctx)
         assert len(ctx.metadata.info["triggers"].triggers) == 6
 
     def test_skips_api_view_when_key_absent(self):
-        plugin = AppendOnlyTriggerPlugin(view_key="nonexistent")
+        plugin = append_only_trigger_plugin(view_key="nonexistent")
         table_plugin = AppendOnlyTablePlugin()
         ctx = make_ctx()
         table_plugin.run(ctx)

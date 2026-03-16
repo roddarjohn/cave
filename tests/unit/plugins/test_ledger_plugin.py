@@ -13,7 +13,7 @@ from pgcraft.plugins.ledger import (
     LedgerBalanceViewPlugin,
     LedgerLatestViewPlugin,
     LedgerTablePlugin,
-    LedgerTriggerPlugin,
+    ledger_trigger_plugin,
 )
 from tests.unit.plugins.conftest import make_ctx, make_view
 
@@ -135,7 +135,7 @@ class TestLedgerTriggerPlugin:
         return ctx
 
     def test_registers_three_functions(self):
-        plugin = LedgerTriggerPlugin()
+        plugin = ledger_trigger_plugin()
         ctx = self._ctx_with_table_and_view()
         plugin.run(ctx)
         functions = ctx.metadata.info.get("functions")
@@ -143,7 +143,7 @@ class TestLedgerTriggerPlugin:
         assert len(functions.functions) == 3
 
     def test_registers_three_triggers(self):
-        plugin = LedgerTriggerPlugin()
+        plugin = ledger_trigger_plugin()
         ctx = self._ctx_with_table_and_view()
         plugin.run(ctx)
         triggers = ctx.metadata.info.get("triggers")
@@ -151,13 +151,13 @@ class TestLedgerTriggerPlugin:
         assert len(triggers.triggers) == 3
 
     def test_custom_table_key_and_view_key(self):
-        plugin = LedgerTriggerPlugin(table_key="t", view_key="v")
+        plugin = ledger_trigger_plugin(table_key="t", view_key="v")
         ctx = self._ctx_with_table_and_view(table_key="t", view_key="v")
         plugin.run(ctx)
         assert len(ctx.metadata.info["functions"].functions) == 3
 
     def test_missing_view_key_raises(self):
-        plugin = LedgerTriggerPlugin(view_key="nonexistent")
+        plugin = ledger_trigger_plugin(view_key="nonexistent")
         ctx = _ledger_ctx()
         LedgerTablePlugin().run(ctx)
         with pytest.raises(KeyError):

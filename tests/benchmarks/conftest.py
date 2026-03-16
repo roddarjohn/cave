@@ -16,15 +16,15 @@ from pgcraft.factory.base import ResourceFactory
 from pgcraft.plugin import Plugin
 from pgcraft.plugins.append_only import (
     AppendOnlyTablePlugin,
-    AppendOnlyTriggerPlugin,
     AppendOnlyViewPlugin,
+    append_only_trigger_plugin,
 )
 from pgcraft.plugins.check import TableCheckPlugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.eav import (
     EAVTablePlugin,
-    EAVTriggerPlugin,
     EAVViewPlugin,
+    eav_trigger_plugin,
 )
 from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
 from pgcraft.plugins.ledger import LedgerTablePlugin
@@ -57,7 +57,7 @@ class BenchAppendOnly(ResourceFactory):
         CreatedAtPlugin(),
         AppendOnlyTablePlugin(),
         AppendOnlyViewPlugin(),
-        AppendOnlyTriggerPlugin(),
+        append_only_trigger_plugin(),
         TableCheckPlugin(),
     ]
 
@@ -69,7 +69,7 @@ class BenchEAV(ResourceFactory):
         CreatedAtPlugin(),
         EAVTablePlugin(),
         EAVViewPlugin(),
-        EAVTriggerPlugin(),
+        eav_trigger_plugin(),
     ]
 
 

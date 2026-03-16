@@ -1,4 +1,4 @@
-"""Unit tests for SimpleTablePlugin and SimpleTriggerPlugin."""
+"""Unit tests for SimpleTablePlugin and simple_trigger_plugin."""
 
 import pytest
 from sqlalchemy import (
@@ -11,7 +11,7 @@ from sqlalchemy import (
 )
 
 from pgcraft.check import PGCraftCheck
-from pgcraft.plugins.simple import SimpleTablePlugin, SimpleTriggerPlugin
+from pgcraft.plugins.simple import SimpleTablePlugin, simple_trigger_plugin
 from tests.unit.plugins.conftest import make_ctx, make_view
 
 
@@ -130,7 +130,7 @@ class TestSimpleTriggerPlugin:
         return ctx
 
     def test_registers_functions(self):
-        plugin = SimpleTriggerPlugin()
+        plugin = simple_trigger_plugin()
         ctx = self._ctx_with_table_and_view()
         plugin.run(ctx)
         functions = ctx.metadata.info.get("functions")
@@ -138,7 +138,7 @@ class TestSimpleTriggerPlugin:
         assert len(functions.functions) == 3
 
     def test_registers_triggers(self):
-        plugin = SimpleTriggerPlugin()
+        plugin = simple_trigger_plugin()
         ctx = self._ctx_with_table_and_view()
         plugin.run(ctx)
         triggers = ctx.metadata.info.get("triggers")
@@ -146,13 +146,13 @@ class TestSimpleTriggerPlugin:
         assert len(triggers.triggers) == 3
 
     def test_custom_table_key_and_view_key(self):
-        plugin = SimpleTriggerPlugin(table_key="t", view_key="v")
+        plugin = simple_trigger_plugin(table_key="t", view_key="v")
         ctx = self._ctx_with_table_and_view(table_key="t", view_key="v")
         plugin.run(ctx)
         assert len(ctx.metadata.info["functions"].functions) == 3
 
     def test_missing_view_key_raises(self):
-        plugin = SimpleTriggerPlugin(view_key="nonexistent")
+        plugin = simple_trigger_plugin(view_key="nonexistent")
         ctx = make_ctx()
         SimpleTablePlugin().run(ctx)
         with pytest.raises(KeyError):
