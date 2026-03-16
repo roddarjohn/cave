@@ -1,120 +1,23 @@
 """Integration tests for LedgerEvent SQL functions.
 
 Creates real database objects and exercises the generated functions
-directly in SQL.
+directly in SQL.  The ledger table setup uses pgcraft's factory;
+the event functions are intentionally hand-crafted SQL that tests
+the LedgerEvent generation patterns.
 """
 
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import Column, MetaData, String, text
 
-# -------------------------------------------------------------------
-# Setup helpers
-# -------------------------------------------------------------------
-
-
-def _setup_event_ledger(  # noqa: PLR0913
-    conn,
-    schema: str,
-    tablename: str,
-    dim_keys: list[str],
-    dim_types: list[str],
-    extra_cols: list[str] | None = None,
-    extra_types: list[str] | None = None,
-) -> None:
-    """Create table, API view, INSERT trigger."""
-    extra_cols = extra_cols or []
-    extra_types = extra_types or []
-
-    base = f"{schema}.{tablename}"
-    view = f"{schema}.api_{tablename}"
-
-    dim_col_defs = "".join(
-        f", {k} {t} NOT NULL" for k, t in zip(dim_keys, dim_types, strict=False)
-    )
-    extra_col_defs = "".join(
-        f", {k} {t}" for k, t in zip(extra_cols, extra_types, strict=False)
-    )
-
-    conn.execute(
-        text(f"""
-        CREATE TABLE {base} (
-            id SERIAL PRIMARY KEY,
-            entry_id UUID NOT NULL
-                DEFAULT gen_random_uuid(),
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            value INTEGER NOT NULL
-            {dim_col_defs}
-            {extra_col_defs}
-        )
-    """)
-    )
-
-    all_cols = ", ".join(
-        [
-            "id",
-            "entry_id",
-            "created_at",
-            "value",
-            *dim_keys,
-            *extra_cols,
-        ]
-    )
-    conn.execute(text(f"CREATE VIEW {view} AS SELECT {all_cols} FROM {base}"))
-
-    # INSERT INSTEAD OF trigger.
-    ins_cols = ", ".join(["entry_id", "value", *dim_keys, *extra_cols])
-    ins_new = ", ".join(
-        [
-            "COALESCE(NEW.entry_id, gen_random_uuid())",
-            "NEW.value",
-            *[f"NEW.{k}" for k in dim_keys],
-            *[f"NEW.{k}" for k in extra_cols],
-        ]
-    )
-    conn.execute(
-        text(f"""
-        CREATE FUNCTION {schema}.{tablename}_ins()
-        RETURNS trigger LANGUAGE plpgsql AS $$
-        BEGIN
-            INSERT INTO {base} ({ins_cols})
-            VALUES ({ins_new})
-            RETURNING * INTO NEW;
-            RETURN NEW;
-        END; $$
-    """)
-    )
-    conn.execute(
-        text(f"""
-        CREATE TRIGGER {tablename}_ins
-        INSTEAD OF INSERT ON {view}
-        FOR EACH ROW
-        EXECUTE FUNCTION {schema}.{tablename}_ins()
-    """)
-    )
-
-    # UPDATE / DELETE reject triggers.
-    for op in ("update", "delete"):
-        conn.execute(
-            text(f"""
-            CREATE FUNCTION {schema}.{tablename}_{op}()
-            RETURNS trigger LANGUAGE plpgsql AS $$
-            BEGIN
-                RAISE EXCEPTION
-                    'cannot {op} immutable ledger entries';
-            END; $$
-        """)
-        )
-        conn.execute(
-            text(f"""
-            CREATE TRIGGER {tablename}_{op}
-            INSTEAD OF {op.upper()} ON {view}
-            FOR EACH ROW
-            EXECUTE FUNCTION {schema}.{tablename}_{op}()
-        """)
-        )
-
+from pgcraft.config import PGCraftConfig
+from pgcraft.extensions.postgrest import (
+    PostgRESTExtension,
+    PostgRESTView,
+)
+from pgcraft.factory.ledger import PGCraftLedger
+from tests.integration.conftest import create_all_from_metadata
 
 # -------------------------------------------------------------------
 # Fixtures
@@ -124,15 +27,27 @@ def _setup_event_ledger(  # noqa: PLR0913
 @pytest.fixture
 def inv(db_conn, db_schema):
     """Inventory ledger: warehouse + sku dimensions."""
-    _setup_event_ledger(
-        db_conn,
-        db_schema,
+    config = PGCraftConfig(auto_discover=False)
+    config.use(PostgRESTExtension())
+
+    metadata = MetaData()
+    factory = PGCraftLedger(
         "inventory",
-        dim_keys=["warehouse", "sku"],
-        dim_types=["TEXT", "TEXT"],
-        extra_cols=["source", "reason"],
-        extra_types=["TEXT", "TEXT"],
+        db_schema,
+        metadata,
+        schema_items=[
+            Column("warehouse", String, nullable=False),
+            Column("sku", String, nullable=False),
+            Column("source", String),
+            Column("reason", String),
+        ],
+        config=config,
     )
+    PostgRESTView(
+        source=factory,
+        grants=["select", "insert", "update", "delete"],
+    )
+    create_all_from_metadata(db_conn, metadata)
     return db_conn, db_schema
 
 
@@ -143,9 +58,9 @@ def inv(db_conn, db_schema):
 
 def _create_simple_event_fn(  # noqa: PLR0913
     conn, schema, tablename, name, dim_keys, dim_types
-) -> None:
+):
     """Create a simple LANGUAGE sql event function."""
-    view = f"{schema}.api_{tablename}"
+    view = f"api.{tablename}"
     all_cols = ", ".join([*dim_keys, "value"])
 
     param_defs = ", ".join(
@@ -180,9 +95,9 @@ def _create_simple_event_fn_with_extra(  # noqa: PLR0913
     dim_types,
     extra_cols,
     extra_types,
-) -> None:
+):
     """Create a simple event function with extra columns."""
-    view = f"{schema}.api_{tablename}"
+    view = f"api.{tablename}"
     all_cols = ", ".join([*dim_keys, "value", *extra_cols])
 
     param_defs = ", ".join(
@@ -228,12 +143,12 @@ def _create_diff_event_fn(  # noqa: PLR0913
     dim_types,
     extra_cols=None,
     extra_types=None,
-) -> None:
+):
     """Create a diff-mode LANGUAGE sql event function."""
     extra_cols = extra_cols or []
     extra_types = extra_types or []
     base = f"{schema}.{tablename}"
-    view = f"{schema}.api_{tablename}"
+    view = f"api.{tablename}"
 
     all_cols_list = [*dim_keys, "value", *extra_cols]
     all_cols = ", ".join(all_cols_list)
@@ -266,11 +181,8 @@ def _create_diff_event_fn(  # noqa: PLR0913
         f") GROUP BY {dk_cols}"
     )
 
-    # Desired cols for union: all columns as-is.
     desired_union_cols = ", ".join(all_cols_list)
 
-    # Existing cols for union: dim_keys + value + NULLs
-    # for extra.
     existing_union_parts = [
         *dim_keys,
         "value",
@@ -278,7 +190,6 @@ def _create_diff_event_fn(  # noqa: PLR0913
     ]
     existing_union_cols = ", ".join(existing_union_parts)
 
-    # Build GROUP BY + aggregation for deltas CTE.
     group_cols = ", ".join(dim_keys)
     agg_select = ", ".join(
         [
@@ -350,7 +261,6 @@ class TestSimpleEvent:
         ).fetchall()
         assert len(rows) == 1
         row = rows[0]
-        # Check returned row has correct values.
         assert row.value == 42
         assert row.warehouse == "NYC"
         assert row.sku == "A"
@@ -387,8 +297,10 @@ class TestSimpleEvent:
         )
         total = conn.execute(
             text(
-                f"SELECT SUM(value) FROM {schema}.inventory "
-                f"WHERE warehouse='NYC' AND sku='A'"
+                f"SELECT SUM(value)"
+                f" FROM {schema}.inventory"
+                f" WHERE warehouse='NYC'"
+                f" AND sku='A'"
             )
         ).scalar()
         assert total == 30
@@ -402,12 +314,11 @@ class TestSimpleEvent:
 class TestDiffEvent:
     def test_reconciliation_inserts_correcting_deltas(self, inv):
         conn, schema = inv
-        # Seed: 50 of A in NYC.
         conn.execute(
             text(
-                f"INSERT INTO {schema}.api_inventory "
-                f"(warehouse, sku, value) "
-                f"VALUES ('NYC', 'A', 50)"
+                "INSERT INTO api.inventory"
+                " (warehouse, sku, value)"
+                " VALUES ('NYC', 'A', 50)"
             )
         )
 
@@ -422,7 +333,6 @@ class TestDiffEvent:
             extra_types=["TEXT"],
         )
 
-        # Reconcile to 100.
         rows = conn.execute(
             text(
                 f"SELECT * FROM {schema}.{schema}"
@@ -435,13 +345,14 @@ class TestDiffEvent:
             )
         ).fetchall()
         assert len(rows) == 1
-        assert rows[0].value == 50  # delta = 100 - 50
+        assert rows[0].value == 50
 
-        # Balance should now be 100.
         balance = conn.execute(
             text(
-                f"SELECT SUM(value) FROM {schema}.inventory "
-                f"WHERE warehouse='NYC' AND sku='A'"
+                f"SELECT SUM(value)"
+                f" FROM {schema}.inventory"
+                f" WHERE warehouse='NYC'"
+                f" AND sku='A'"
             )
         ).scalar()
         assert balance == 100
@@ -457,7 +368,6 @@ class TestDiffEvent:
             dim_types=["TEXT", "TEXT"],
         )
 
-        # First call: sets balance to 100.
         conn.execute(
             text(
                 f"SELECT * FROM {schema}.{schema}"
@@ -469,7 +379,6 @@ class TestDiffEvent:
             )
         )
 
-        # Second call with same desired: no new rows.
         rows = conn.execute(
             text(
                 f"SELECT * FROM {schema}.{schema}"
@@ -508,12 +417,11 @@ class TestDiffEvent:
 
     def test_zero_desired_with_existing_inserts_negation(self, inv):
         conn, schema = inv
-        # Seed: 75 of B in LAX.
         conn.execute(
             text(
-                f"INSERT INTO {schema}.api_inventory "
-                f"(warehouse, sku, value) "
-                f"VALUES ('LAX', 'B', 75)"
+                "INSERT INTO api.inventory"
+                " (warehouse, sku, value)"
+                " VALUES ('LAX', 'B', 75)"
             )
         )
 
@@ -526,7 +434,6 @@ class TestDiffEvent:
             dim_types=["TEXT", "TEXT"],
         )
 
-        # Reconcile to 0.
         rows = conn.execute(
             text(
                 f"SELECT * FROM {schema}.{schema}"
@@ -537,16 +444,15 @@ class TestDiffEvent:
                 f")"
             )
         ).fetchall()
-        # desired=0, existing=-(-75)=... let's check:
-        # desired row: value=0, existing row: value=-75
-        # union: 0 + (-75) after filter != 0 → only -75
         assert len(rows) == 1
         assert rows[0].value == -75
 
         balance = conn.execute(
             text(
-                f"SELECT SUM(value) FROM {schema}.inventory "
-                f"WHERE warehouse='LAX' AND sku='B'"
+                f"SELECT SUM(value)"
+                f" FROM {schema}.inventory"
+                f" WHERE warehouse='LAX'"
+                f" AND sku='B'"
             )
         ).scalar()
         assert balance == 0

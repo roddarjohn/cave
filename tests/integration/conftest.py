@@ -39,4 +39,70 @@ def db_schema(db_conn):
     ``db_conn`` undoes the ``CREATE SCHEMA`` automatically.
     """
     db_conn.execute(text("CREATE SCHEMA IF NOT EXISTS cave_test"))
+    db_conn.execute(text("CREATE SCHEMA IF NOT EXISTS api"))
     return "cave_test"
+
+
+def _fn_to_sql(fn):
+    """Build CREATE OR REPLACE FUNCTION SQL from a Function object.
+
+    The library's ``to_sql_create`` assumes ``returns`` is a
+    ``FunctionReturn`` object, but pgcraft stores it as a plain
+    string.  This helper handles both cases.
+    """
+    schema = fn.schema or "public"
+    fqn = f"{schema}.{fn.name}"
+
+    params = ""
+    if fn.parameters:
+        params = ", ".join(
+            p.to_sql_create() if hasattr(p, "to_sql_create") else str(p)
+            for p in fn.parameters
+        )
+
+    returns = fn.returns
+    if hasattr(returns, "to_sql_create"):
+        returns = returns.to_sql_create()
+
+    parts = [f"CREATE OR REPLACE FUNCTION {fqn}({params})"]
+    parts.append(f"RETURNS {returns}")
+    parts.append(f"LANGUAGE {fn.language}")
+
+    security = getattr(fn, "security", None)
+    if security and security.value == "DEFINER":
+        parts.append("SECURITY DEFINER")
+
+    parts.append(f"AS $${fn.definition}$$")
+    return " ".join(parts)
+
+
+def create_all_from_metadata(conn, metadata):
+    """Create tables, views, functions, and triggers from *metadata*.
+
+    Mirrors what Alembic does at migration time: tables via
+    SQLAlchemy's ``create_all``, then views, functions, and triggers
+    from the ``sqlalchemy_declarative_extensions`` registrations.
+
+    Does **not** commit — the caller controls transaction boundaries.
+    Integration tests rely on a transactional rollback for isolation,
+    so committing here would break that pattern.
+    """
+    metadata.create_all(conn)
+
+    funcs_obj = metadata.info.get("functions")
+    if funcs_obj:
+        for fn in funcs_obj.functions:
+            conn.execute(text(_fn_to_sql(fn)))
+
+    views_obj = metadata.info.get("views")
+    if views_obj:
+        for view in views_obj:
+            schema = view.schema or "public"
+            defn = view.compile_definition()
+            fqn = f"{schema}.{view.name}"
+            conn.execute(text(f"CREATE OR REPLACE VIEW {fqn} AS {defn}"))
+
+    triggers_obj = metadata.info.get("triggers")
+    if triggers_obj:
+        for trg in triggers_obj.triggers:
+            conn.execute(text(trg.to_sql_create()))

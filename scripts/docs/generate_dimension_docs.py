@@ -18,8 +18,8 @@ from types import ModuleType
 from sqlalchemy import Column, MetaData, create_engine, text
 
 _HERE = Path(__file__).resolve().parent
-_EXAMPLES = _HERE / "examples"
-_OUT = _HERE.parent / "docs" / "_generated"
+_EXAMPLES = _HERE.parent / "examples"
+_OUT = _HERE.parent.parent / "docs" / "_generated"
 
 
 # -- Module loading --------------------------------------------------

@@ -54,7 +54,7 @@ dev = [
   "pytest-alembic>=0.12.1",
   "pytest-benchmark>=5.1",
   "python-dotenv>=1.2.2",
-  "slipcover>=1.0.17",
+  "coverage[toml]>=7.0",
   "tox>=4.49.1",
   "tox-uv>=1.33.2",
 ]
@@ -129,6 +129,17 @@ extra-paths = ["tests/db"]
 [tool.ty.analysis]
 # pglast has no type stubs.
 allowed-unresolved-imports = ["pglast.**", "sqlfluff.**"]
+
+[tool.coverage.run]
+source = ["pgcraft"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+]
 
 [tool.pytest.ini_options]
 # Exclude benchmarks from normal test runs; use `just bench` instead
