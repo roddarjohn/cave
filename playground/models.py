@@ -36,7 +36,7 @@ from pgcraft.plugins.append_only import (
     append_only_trigger_plugin,
 )
 from pgcraft.plugins.check import TriggerCheckPlugin
-from pgcraft.plugins.eav import EAVTriggerPlugin
+from pgcraft.plugins.eav import eav_trigger_plugin
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
