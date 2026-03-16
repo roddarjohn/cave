@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.plugin import Dynamic, Plugin, produces, requires, singleton
-from pgcraft.plugins.trigger import InsteadOfTriggerPlugin, TriggerOp
+from pgcraft.plugins.trigger import TriggerOp
 from pgcraft.utils.naming import resolve_name
 from pgcraft.utils.query import compile_query
 from pgcraft.utils.template import load_template
@@ -219,38 +219,6 @@ class LedgerTablePlugin(Plugin):
         )
         ctx[self.table_key] = table
         ctx["__root__"] = table
-
-
-def ledger_trigger_plugin(
-    table_key: str = "primary",
-    view_key: str = "api",
-) -> InsteadOfTriggerPlugin:
-    """Create a configured InsteadOfTriggerPlugin for ledgers.
-
-    Only INSERT is supported -- ledger entries are immutable.
-    UPDATE and DELETE on the API view will raise a PostgreSQL
-    error.
-
-    Args:
-        table_key: Key in ``ctx`` for the backing table
-            (default ``"primary"``).
-        view_key: Key in ``ctx`` for the trigger target view
-            (default ``"api"``).
-
-    Returns:
-        A :class:`~pgcraft.plugins.trigger.InsteadOfTriggerPlugin`
-        configured for ledger dimensions.
-
-    """
-    return InsteadOfTriggerPlugin(
-        ops_builder=_make_ledger_ops_builder(table_key, view_key),
-        naming_defaults=_NAMING_DEFAULTS,
-        function_key="ledger_function",
-        trigger_key="ledger_trigger",
-        view_key=view_key,
-        include_private_view=False,
-        extra_requires=[table_key, "entry_id_column"],
-    )
 
 
 class _LedgerDerivedViewPlugin(Plugin):

@@ -36,7 +36,7 @@ from pgcraft.plugin import (
     requires,
     singleton,
 )
-from pgcraft.plugins.trigger import InsteadOfTriggerPlugin, TriggerOp
+from pgcraft.plugins.trigger import TriggerOp
 from pgcraft.plugins.view import ViewPlugin
 from pgcraft.utils.naming import resolve_name
 from pgcraft.utils.query import compile_query
@@ -396,44 +396,5 @@ def EAVViewPlugin(  # noqa: N802
             mappings_key,
             "pk_columns",
             "created_at_column",
-        ],
-    )
-
-
-def eav_trigger_plugin(
-    entity_key: str = "entity",
-    attribute_key: str = "attribute",
-    mappings_key: str = "eav_mappings",
-    view_key: str = "api",
-) -> InsteadOfTriggerPlugin:
-    """Create a configured InsteadOfTriggerPlugin for EAV dims.
-
-    Args:
-        entity_key: Key in ``ctx`` for the entity root table
-            (default ``"entity"``).
-        attribute_key: Key in ``ctx`` for the attribute log
-            (default ``"attribute"``).
-        mappings_key: Key in ``ctx`` for the EAV mappings list
-            (default ``"eav_mappings"``).
-        view_key: Key in ``ctx`` for the API view
-            (default ``"api"``).
-
-    Returns:
-        A :class:`~pgcraft.plugins.trigger.InsteadOfTriggerPlugin`
-        configured for EAV dimensions.
-
-    """
-    return InsteadOfTriggerPlugin(
-        ops_builder=_make_eav_ops_builder(
-            entity_key, attribute_key, mappings_key
-        ),
-        naming_defaults=_NAMING_DEFAULTS,
-        function_key="eav_function",
-        trigger_key="eav_trigger",
-        view_key=view_key,
-        extra_requires=[
-            entity_key,
-            attribute_key,
-            mappings_key,
         ],
     )

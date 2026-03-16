@@ -8,9 +8,9 @@ from sqlalchemy_declarative_extensions.dialects.postgresql.trigger import (
 
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.extensions.postgrest import PostgRESTView
+from pgcraft.extensions.postgrest.plugin import PostgRESTPlugin
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.plugins.pk import SerialPKPlugin
-from pgcraft.plugins.simple import simple_trigger_plugin
 
 _CRUD_OPS = ("insert", "update", "delete")
 _CRUD_GRANTS = ["select", "insert", "update", "delete"]
@@ -138,11 +138,12 @@ class TestPGCraftSimpleViews:
 class TestPGCraftSimpleTriggers:
     def test_functions_registered(self):
         metadata = MetaData()
-        f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(
-            source=f,
-            grants=_CRUD_GRANTS,
-            plugins=[simple_trigger_plugin()],
+        PGCraftSimple(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
+            extra_plugins=[PostgRESTPlugin(grants=_CRUD_GRANTS)],
         )
         functions = metadata.info.get("functions")
         assert functions is not None
@@ -151,11 +152,12 @@ class TestPGCraftSimpleTriggers:
 
     def test_triggers_registered(self):
         metadata = MetaData()
-        f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(
-            source=f,
-            grants=_CRUD_GRANTS,
-            plugins=[simple_trigger_plugin()],
+        PGCraftSimple(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
+            extra_plugins=[PostgRESTPlugin(grants=_CRUD_GRANTS)],
         )
         triggers = metadata.info.get("triggers")
         assert triggers is not None
@@ -164,44 +166,48 @@ class TestPGCraftSimpleTriggers:
 
     def test_insert_function_exists(self):
         metadata = MetaData()
-        f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(
-            source=f,
-            grants=_CRUD_GRANTS,
-            plugins=[simple_trigger_plugin()],
+        PGCraftSimple(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
+            extra_plugins=[PostgRESTPlugin(grants=_CRUD_GRANTS)],
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_insert" in fn_names
 
     def test_update_function_exists(self):
         metadata = MetaData()
-        f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(
-            source=f,
-            grants=_CRUD_GRANTS,
-            plugins=[simple_trigger_plugin()],
+        PGCraftSimple(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
+            extra_plugins=[PostgRESTPlugin(grants=_CRUD_GRANTS)],
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_update" in fn_names
 
     def test_delete_function_exists(self):
         metadata = MetaData()
-        f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(
-            source=f,
-            grants=_CRUD_GRANTS,
-            plugins=[simple_trigger_plugin()],
+        PGCraftSimple(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
+            extra_plugins=[PostgRESTPlugin(grants=_CRUD_GRANTS)],
         )
         fn_names = {f.name for f in metadata.info["functions"].functions}
         assert "api_product_delete" in fn_names
 
     def test_insert_trigger_is_instead_of(self):
         metadata = MetaData()
-        f = PGCraftSimple("product", "dim", metadata, [Column("name", String)])
-        PostgRESTView(
-            source=f,
-            grants=_CRUD_GRANTS,
-            plugins=[simple_trigger_plugin()],
+        PGCraftSimple(
+            "product",
+            "dim",
+            metadata,
+            [Column("name", String)],
+            extra_plugins=[PostgRESTPlugin(grants=_CRUD_GRANTS)],
         )
         triggers = metadata.info["triggers"].triggers
         instead_of_inserts = [

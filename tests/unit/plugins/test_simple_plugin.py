@@ -1,6 +1,5 @@
-"""Unit tests for SimpleTablePlugin and simple_trigger_plugin."""
+"""Unit tests for SimpleTablePlugin and InsteadOfTriggerPlugin."""
 
-import pytest
 from sqlalchemy import (
     Column,
     Computed,
@@ -11,7 +10,12 @@ from sqlalchemy import (
 )
 
 from pgcraft.check import PGCraftCheck
-from pgcraft.plugins.simple import SimpleTablePlugin, simple_trigger_plugin
+from pgcraft.plugins.simple import (
+    _NAMING_DEFAULTS,
+    SimpleTablePlugin,
+    _build_simple_ops_with_columns,
+)
+from pgcraft.plugins.trigger import InsteadOfTriggerPlugin
 from tests.unit.plugins.conftest import make_ctx, make_view
 
 
@@ -130,7 +134,14 @@ class TestSimpleTriggerPlugin:
         return ctx
 
     def test_registers_functions(self):
-        plugin = simple_trigger_plugin()
+        plugin = InsteadOfTriggerPlugin(
+            ops_builder=_build_simple_ops_with_columns(None, "primary"),
+            naming_defaults=_NAMING_DEFAULTS,
+            function_key="simple_function",
+            trigger_key="simple_trigger",
+            view_key="api",
+            include_private_view=False,
+        )
         ctx = self._ctx_with_table_and_view()
         plugin.run(ctx)
         functions = ctx.metadata.info.get("functions")
@@ -138,7 +149,14 @@ class TestSimpleTriggerPlugin:
         assert len(functions.functions) == 3
 
     def test_registers_triggers(self):
-        plugin = simple_trigger_plugin()
+        plugin = InsteadOfTriggerPlugin(
+            ops_builder=_build_simple_ops_with_columns(None, "primary"),
+            naming_defaults=_NAMING_DEFAULTS,
+            function_key="simple_function",
+            trigger_key="simple_trigger",
+            view_key="api",
+            include_private_view=False,
+        )
         ctx = self._ctx_with_table_and_view()
         plugin.run(ctx)
         triggers = ctx.metadata.info.get("triggers")
@@ -146,14 +164,29 @@ class TestSimpleTriggerPlugin:
         assert len(triggers.triggers) == 3
 
     def test_custom_table_key_and_view_key(self):
-        plugin = simple_trigger_plugin(table_key="t", view_key="v")
+        plugin = InsteadOfTriggerPlugin(
+            ops_builder=_build_simple_ops_with_columns(None, "t"),
+            naming_defaults=_NAMING_DEFAULTS,
+            function_key="simple_function",
+            trigger_key="simple_trigger",
+            view_key="v",
+            include_private_view=False,
+        )
         ctx = self._ctx_with_table_and_view(table_key="t", view_key="v")
         plugin.run(ctx)
         assert len(ctx.metadata.info["functions"].functions) == 3
 
-    def test_missing_view_key_raises(self):
-        plugin = simple_trigger_plugin(view_key="nonexistent")
+    def test_missing_view_key_skips(self):
+        plugin = InsteadOfTriggerPlugin(
+            ops_builder=_build_simple_ops_with_columns(None, "primary"),
+            naming_defaults=_NAMING_DEFAULTS,
+            function_key="simple_function",
+            trigger_key="simple_trigger",
+            view_key="nonexistent",
+            include_private_view=False,
+        )
         ctx = make_ctx()
         SimpleTablePlugin().run(ctx)
-        with pytest.raises(KeyError):
-            plugin.run(ctx)
+        plugin.run(ctx)
+        # No view → no triggers registered
+        assert ctx.metadata.info.get("triggers") is None

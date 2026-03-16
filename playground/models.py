@@ -19,30 +19,24 @@ from pgcraft import (
     ledger_balances,
     pgcraft_build_naming_conventions,
 )
+from pgcraft.check import PGCraftCheck
 from pgcraft.config import PGCraftConfig
+from pgcraft.declarative import register
 from pgcraft.extensions.postgrest import (
     PostgRESTExtension,
+    PostgRESTPlugin,
     PostgRESTView,
 )
-from pgcraft.check import PGCraftCheck
-from pgcraft.declarative import register
 from pgcraft.factory.dimension.append_only import (
     PGCraftAppendOnly,
 )
 from pgcraft.factory.dimension.eav import PGCraftEAV
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.factory.ledger import PGCraftLedger
-from pgcraft.plugins.append_only import (
-    append_only_trigger_plugin,
-)
-from pgcraft.plugins.check import TriggerCheckPlugin
-from pgcraft.plugins.eav import eav_trigger_plugin
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
-    ledger_trigger_plugin,
 )
-from pgcraft.plugins.simple import simple_trigger_plugin
 from pgcraft.views.actions import LedgerActions
 from pgcraft.views.balance import BalanceView
 from pgcraft.views.view import PGCraftView
@@ -68,6 +62,16 @@ users = PGCraftSimple(
         Column("total", Integer, Computed("price * qty")),
         PGCraftCheck("{price} > 0", name="positive_price"),
         PGCraftCheck("{qty} >= 0", name="nonneg_qty"),
+    ],
+    extra_plugins=[
+        PostgRESTPlugin(
+            grants=[
+                "select",
+                "insert",
+                "update",
+                "delete",
+            ],
+        ),
     ],
 )
 
@@ -146,20 +150,6 @@ customers = PGCraftSimple(
 
 # -- View factories: create derived output --------------------------
 
-PostgRESTView(
-    source=users,
-    grants=["select", "insert", "update", "delete"],
-    plugins=[
-        simple_trigger_plugin(
-            permitted_operations=[
-                "insert",
-                "update",
-                "delete",
-            ],
-        ),
-    ],
-)
-
 # columns=: only expose specific columns
 PostgRESTView(
     source=students,
@@ -217,15 +207,6 @@ _iv = invoice_stats.table
 PostgRESTView(
     source=customers,
     grants=["select", "insert", "update", "delete"],
-    plugins=[
-        simple_trigger_plugin(
-            permitted_operations=[
-                "insert",
-                "update",
-                "delete",
-            ],
-        ),
-    ],
     query=lambda q, t: (
         select(
             t.c.id,
@@ -283,13 +264,11 @@ inventory = PGCraftLedger(
         Column("sku", String, nullable=False),
         Column("reason", String, nullable=True),
     ],
+    extra_plugins=[
+        PostgRESTPlugin(grants=["select", "insert"]),
+    ],
 )
 
-PostgRESTView(
-    source=inventory,
-    grants=["select", "insert"],
-    plugins=[ledger_trigger_plugin()],
-)
 BalanceView(
     source=inventory, dimensions=["warehouse", "sku"]
 )
@@ -358,14 +337,10 @@ ledger = PGCraftLedger(
     extra_plugins=[
         DoubleEntryPlugin(),
         DoubleEntryTriggerPlugin(),
+        PostgRESTPlugin(grants=["select", "insert"]),
     ],
 )
 
-PostgRESTView(
-    source=ledger,
-    grants=["select", "insert"],
-    plugins=[ledger_trigger_plugin()],
-)
 BalanceView(
     source=ledger,
     dimensions=[

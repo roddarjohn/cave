@@ -1,12 +1,14 @@
-"""Unit tests for AppendOnly{Table,View,Trigger}Plugin in isolation."""
+"""Unit tests for AppendOnly plugins in isolation."""
 
 from sqlalchemy import Column, String, Table
 
 from pgcraft.plugins.append_only import (
+    _NAMING_DEFAULTS,
     AppendOnlyTablePlugin,
     AppendOnlyViewPlugin,
-    append_only_trigger_plugin,
+    _make_ops_builder,
 )
+from pgcraft.plugins.trigger import InsteadOfTriggerPlugin
 from tests.unit.plugins.conftest import make_ctx, make_view
 
 
@@ -128,8 +130,18 @@ class TestAppendOnlyTriggerPlugin:
         ctx[view_key] = make_view("product", "api")
         return ctx
 
+    def _make_trigger_plugin(self, view_key="api"):
+        return InsteadOfTriggerPlugin(
+            ops_builder=_make_ops_builder("root_table", "attributes"),
+            naming_defaults=_NAMING_DEFAULTS,
+            function_key="append_only_function",
+            trigger_key="append_only_trigger",
+            view_key=view_key,
+            extra_requires=["root_table", "attributes"],
+        )
+
     def test_registers_functions_for_primary_view(self):
-        plugin = append_only_trigger_plugin()
+        plugin = self._make_trigger_plugin()
         ctx = self._ctx_with_tables_and_view()
         plugin.run(ctx)
         functions = ctx.metadata.info.get("functions")
@@ -138,13 +150,13 @@ class TestAppendOnlyTriggerPlugin:
         assert len(functions.functions) == 6
 
     def test_registers_triggers_for_primary_view(self):
-        plugin = append_only_trigger_plugin()
+        plugin = self._make_trigger_plugin()
         ctx = self._ctx_with_tables_and_view()
         plugin.run(ctx)
         assert len(ctx.metadata.info["triggers"].triggers) == 6
 
     def test_skips_api_view_when_key_absent(self):
-        plugin = append_only_trigger_plugin(view_key="nonexistent")
+        plugin = self._make_trigger_plugin(view_key="nonexistent")
         table_plugin = AppendOnlyTablePlugin()
         ctx = make_ctx()
         table_plugin.run(ctx)

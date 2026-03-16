@@ -17,6 +17,7 @@ from sqlalchemy.sql.expression import Label
 
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.extensions.postgrest import PostgRESTView
+from pgcraft.extensions.postgrest.plugin import PostgRESTPlugin
 from pgcraft.factory.dimension.eav import PGCraftEAV
 from pgcraft.plugins.check import TriggerCheckPlugin
 from pgcraft.plugins.eav import (
@@ -24,7 +25,6 @@ from pgcraft.plugins.eav import (
     _needed_value_columns,
     _pivot_aggregate,
     _resolve_value_column,
-    eav_trigger_plugin,
 )
 
 # -----------------------------------------------------------
@@ -387,17 +387,13 @@ _CRUD_GRANTS = ["select", "insert", "update", "delete"]
 class TestPGCraftEAVTriggers:
     def test_functions_registered(self):
         metadata = MetaData()
-        f = PGCraftEAV(
+        PGCraftEAV(
             "product",
             "dim",
             metadata,
             [Column("name", String)],
-        )
-        PostgRESTView(
-            source=f,
-            grants=_CRUD_GRANTS,
-            plugins=[
-                eav_trigger_plugin(),
+            extra_plugins=[
+                PostgRESTPlugin(grants=_CRUD_GRANTS),
                 TriggerCheckPlugin(table_key="api"),
             ],
         )
@@ -409,17 +405,13 @@ class TestPGCraftEAVTriggers:
 
     def test_triggers_registered(self):
         metadata = MetaData()
-        f = PGCraftEAV(
+        PGCraftEAV(
             "product",
             "dim",
             metadata,
             [Column("name", String)],
-        )
-        PostgRESTView(
-            source=f,
-            grants=_CRUD_GRANTS,
-            plugins=[
-                eav_trigger_plugin(),
+            extra_plugins=[
+                PostgRESTPlugin(grants=_CRUD_GRANTS),
                 TriggerCheckPlugin(table_key="api"),
             ],
         )

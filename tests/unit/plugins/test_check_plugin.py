@@ -213,13 +213,32 @@ class TestTriggerCheckPlugin:
 
     def test_ordering_valid_with_later_eav_triggers(self):
         """Check triggers (_check_) sort before EAV triggers (dim_)."""
-        from pgcraft.plugins.eav import eav_trigger_plugin
+        from pgcraft.plugins.eav import (
+            _NAMING_DEFAULTS as _EAV_NAMING,
+        )
+        from pgcraft.plugins.eav import (
+            _make_eav_ops_builder,
+        )
+        from pgcraft.plugins.trigger import InsteadOfTriggerPlugin
 
         ctx = self._ctx_with_eav()
         # Register check triggers first (_check_...)
         TriggerCheckPlugin(table_key="primary").run(ctx)
         # Then register EAV triggers (dim_product_...)
-        eav_trigger_plugin(view_key="nonexistent").run(ctx)
+        InsteadOfTriggerPlugin(
+            ops_builder=_make_eav_ops_builder(
+                "entity", "attribute", "eav_mappings"
+            ),
+            naming_defaults=_EAV_NAMING,
+            function_key="eav_function",
+            trigger_key="eav_trigger",
+            view_key="nonexistent",
+            extra_requires=[
+                "entity",
+                "attribute",
+                "eav_mappings",
+            ],
+        ).run(ctx)
         # No error — _check_ sorts before dim_
 
     def test_ordering_invalid_raises(self):

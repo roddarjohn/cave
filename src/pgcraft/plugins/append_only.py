@@ -27,7 +27,6 @@ from pgcraft.plugin import (
     singleton,
 )
 from pgcraft.plugins.trigger import (
-    InsteadOfTriggerPlugin,
     TriggerOp,
 )
 from pgcraft.plugins.view import ViewPlugin
@@ -267,37 +266,4 @@ def AppendOnlyViewPlugin(  # noqa: N802
             "pk_columns",
             "created_at_column",
         ],
-    )
-
-
-def append_only_trigger_plugin(
-    columns: list[str] | None = None,
-    root_key: str = "root_table",
-    attributes_key: str = "attributes",
-    view_key: str = "api",
-) -> InsteadOfTriggerPlugin:
-    """Create a configured InsteadOfTriggerPlugin for append-only.
-
-    Args:
-        root_key: Key in ``ctx`` for the root table
-            (default ``"root_table"``).
-        attributes_key: Key in ``ctx`` for the attribute
-            table (default ``"attributes"``).
-        view_key: Key in ``ctx`` for the API view
-            (default ``"api"``).
-        columns: Writable columns for the triggers.
-            When ``None``, uses all dim columns from ctx.
-
-    Returns:
-        A configured
-        :class:`~pgcraft.plugins.trigger.InsteadOfTriggerPlugin`.
-
-    """
-    return InsteadOfTriggerPlugin(
-        ops_builder=_make_ops_builder(root_key, attributes_key, columns),
-        naming_defaults=_NAMING_DEFAULTS,
-        function_key="append_only_function",
-        trigger_key="append_only_trigger",
-        view_key=view_key,
-        extra_requires=[root_key, attributes_key],
     )

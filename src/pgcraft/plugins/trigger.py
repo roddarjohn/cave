@@ -97,6 +97,8 @@ class InsteadOfTriggerPlugin(Plugin):
         """
         if self.include_private_view:
             return collect_trigger_views(ctx, self.view_key)
+        if self.view_key not in ctx:
+            return []
         api_view = ctx[self.view_key]
         api_schema = api_view.schema or "api"
         return [(api_schema, f"{api_schema}.{ctx.tablename}")]
@@ -104,11 +106,16 @@ class InsteadOfTriggerPlugin(Plugin):
     def run(self, ctx: FactoryContext) -> None:
         """Register INSTEAD OF triggers on target views.
 
-        When ``permitted_operations`` was not set at construction
+        Skips entirely when no target views are available (e.g.
+        no ``PostgRESTPlugin`` was added).  When
+        ``permitted_operations`` was not set at construction
         time, falls back to ``ctx["permitted_operations"]`` if
-        present.  This lets :class:`PostgRESTView` control which
-        DML operations get triggers based on grants.
+        present.
         """
+        views = self._collect_views(ctx)
+        if not views:
+            return
+
         ops = self.ops_builder(ctx)
         allowed = self.permitted_operations
         if allowed is None and "permitted_operations" in ctx:
@@ -120,7 +127,7 @@ class InsteadOfTriggerPlugin(Plugin):
         if not rendered:
             return
 
-        for view_schema, view_fullname in self._collect_views(ctx):
+        for view_schema, view_fullname in views:
             register_view_triggers(
                 metadata=ctx.metadata,
                 view_schema=view_schema,

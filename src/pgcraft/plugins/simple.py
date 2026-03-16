@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pgcraft.factory.context import FactoryContext
 
 from pgcraft.plugin import Dynamic, Plugin, produces, requires, singleton
-from pgcraft.plugins.trigger import InsteadOfTriggerPlugin, TriggerOp
+from pgcraft.plugins.trigger import TriggerOp
 from pgcraft.utils.template import load_template
 
 _TEMPLATES = Path(__file__).resolve().parent / "templates" / "simple"
@@ -119,39 +119,3 @@ class SimpleTablePlugin(Plugin):
         )
         ctx[self.table_key] = table
         ctx["__root__"] = table
-
-
-def simple_trigger_plugin(
-    columns: list[str] | None = None,
-    permitted_operations: list[str] | None = None,
-    table_key: str = "primary",
-    view_key: str = "api",
-) -> InsteadOfTriggerPlugin:
-    """Create a configured InsteadOfTriggerPlugin for simple dims.
-
-    Args:
-        columns: Writable columns for the triggers.
-            When ``None``, uses all dim columns from ctx.
-        permitted_operations: DML operations to create
-            INSTEAD OF triggers for (``"insert"``,
-            ``"update"``, ``"delete"``).  When ``None``,
-            creates all three.
-        table_key: Key in ``ctx`` for the backing table
-            (default ``"primary"``).
-        view_key: Key in ``ctx`` for the trigger target view
-            (default ``"api"``).
-
-    Returns:
-        A configured
-        :class:`~pgcraft.plugins.trigger.InsteadOfTriggerPlugin`.
-
-    """
-    return InsteadOfTriggerPlugin(
-        ops_builder=_build_simple_ops_with_columns(columns, table_key),
-        naming_defaults=_NAMING_DEFAULTS,
-        function_key="simple_function",
-        trigger_key="simple_trigger",
-        view_key=view_key,
-        permitted_operations=permitted_operations,
-        include_private_view=False,
-    )
