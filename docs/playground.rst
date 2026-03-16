@@ -12,6 +12,19 @@ It includes:
 * An Alembic setup for managing the local database schema
 * A ``Justfile`` with commands wrapping common database operations
 
+Getting the code
+----------------
+
+Clone the repository and install dependencies:
+
+.. code-block:: bash
+
+    git clone https://github.com/roddarjohn/pgcraft.git
+    cd pgcraft
+    uv sync --all-groups
+
+The ``playground/`` directory is inside the repository root.
+
 Prerequisites
 -------------
 

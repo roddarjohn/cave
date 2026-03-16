@@ -8,11 +8,13 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Table
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pgcraft.factory.context import FactoryContext
 
 from pgcraft.plugin import Dynamic, Plugin, produces, requires, singleton
+from pgcraft.plugins.trigger import TriggerOp
 from pgcraft.utils.template import load_template
-from pgcraft.utils.trigger import register_view_triggers
 
 _TEMPLATES = Path(__file__).resolve().parent / "templates" / "simple"
 
@@ -20,6 +22,70 @@ _NAMING_DEFAULTS = {
     "simple_function": "%(schema)s_%(table_name)s_%(op)s",
     "simple_trigger": "%(schema)s_%(table_name)s_%(op)s",
 }
+
+
+def _build_simple_ops_with_columns(
+    columns: list[str] | None,
+    table_key: str = "primary",
+) -> Callable[[FactoryContext], list[TriggerOp]]:
+    """Return an ops_builder that respects a column subset.
+
+    Args:
+        columns: Writable columns for the triggers.
+            When ``None``, uses all dim columns from ctx.
+        table_key: Key in ``ctx`` for the backing table.
+
+    Returns:
+        A callable suitable for ``InsteadOfTriggerPlugin``.
+
+    """
+
+    def builder(ctx: FactoryContext) -> list[TriggerOp]:
+        primary = ctx[table_key]
+        base_fullname = f"{ctx.schemaname}.{primary.name}"
+        if columns is not None:
+            dim_cols = columns
+        elif "writable_columns" in ctx:
+            dim_cols = ctx["writable_columns"]
+        else:
+            dim_cols = ctx.dim_column_names
+
+        if columns is not None:
+            pk_name = ctx.pk_column_name
+            ret = ", ".join([pk_name, *dim_cols])
+        else:
+            ret = "*"
+
+        template_vars = {
+            "base_table": base_fullname,
+            "cols": ", ".join(dim_cols),
+            "new_cols": ", ".join(f"NEW.{c}" for c in dim_cols),
+            "set_clause": ", ".join(f"{c} = NEW.{c}" for c in dim_cols),
+            "returning_cols": ret,
+        }
+
+        return [
+            TriggerOp(
+                "insert",
+                load_template(_TEMPLATES / "insert.plpgsql.mako").render(
+                    **template_vars
+                ),
+            ),
+            TriggerOp(
+                "update",
+                load_template(_TEMPLATES / "update.plpgsql.mako").render(
+                    **template_vars
+                ),
+            ),
+            TriggerOp(
+                "delete",
+                load_template(_TEMPLATES / "delete.plpgsql.mako").render(
+                    **template_vars
+                ),
+            ),
+        ]
+
+    return builder
 
 
 @produces(Dynamic("table_key"), "__root__")
@@ -53,101 +119,3 @@ class SimpleTablePlugin(Plugin):
         )
         ctx[self.table_key] = table
         ctx["__root__"] = table
-
-
-@requires(Dynamic("table_key"), Dynamic("view_key"))
-class SimpleTriggerPlugin(Plugin):
-    """Register INSERT/UPDATE/DELETE INSTEAD OF triggers on a view.
-
-    Args:
-        table_key: Key in ``ctx`` for the backing table
-            (default ``"primary"``).
-        view_key: Key in ``ctx`` for the trigger target view
-            (default ``"api"``).
-
-    """
-
-    def __init__(
-        self,
-        table_key: str = "primary",
-        view_key: str = "api",
-        columns: list[str] | None = None,
-        permitted_operations: list[str] | None = None,
-    ) -> None:
-        """Store the context keys.
-
-        Args:
-            table_key: Key in ``ctx`` for the backing table.
-            view_key: Key in ``ctx`` for the API view.
-            columns: Writable columns for the triggers.
-                When ``None``, uses all dim columns from ctx.
-            permitted_operations: DML operations to create
-                INSTEAD OF triggers for (``"insert"``,
-                ``"update"``, ``"delete"``).  When ``None``,
-                creates all three.
-
-        """
-        self.table_key = table_key
-        self.view_key = view_key
-        self.columns = columns
-        self.permitted_operations = permitted_operations
-
-    def run(self, ctx: FactoryContext) -> None:
-        """Register INSTEAD OF triggers on the target view."""
-        api_view = ctx[self.view_key]
-        primary = ctx[self.table_key]
-        base_fullname = f"{ctx.schemaname}.{primary.name}"
-        dim_cols = (
-            self.columns if self.columns is not None else ctx.dim_column_names
-        )
-
-        # When column subset is active, RETURNING must list
-        # only the view columns (PK + dim) instead of *.
-        if self.columns is not None:
-            pk_name = ctx.pk_column_name
-            ret = ", ".join([pk_name, *dim_cols])
-        else:
-            ret = "*"
-
-        template_vars = {
-            "base_table": base_fullname,
-            "cols": ", ".join(dim_cols),
-            "new_cols": ", ".join(f"NEW.{c}" for c in dim_cols),
-            "set_clause": ", ".join(f"{c} = NEW.{c}" for c in dim_cols),
-            "returning_cols": ret,
-        }
-
-        api_schema = api_view.schema or "api"
-
-        all_ops = [
-            (
-                "insert",
-                load_template(_TEMPLATES / "insert.plpgsql.mako"),
-            ),
-            (
-                "update",
-                load_template(_TEMPLATES / "update.plpgsql.mako"),
-            ),
-            (
-                "delete",
-                load_template(_TEMPLATES / "delete.plpgsql.mako"),
-            ),
-        ]
-        if self.permitted_operations is not None:
-            grant_set = set(self.permitted_operations)
-            all_ops = [(op, tmpl) for op, tmpl in all_ops if op in grant_set]
-
-        if not all_ops:
-            return
-
-        register_view_triggers(
-            metadata=ctx.metadata,
-            view_schema=api_schema,
-            view_fullname=f"{api_schema}.{ctx.tablename}",
-            tablename=ctx.tablename,
-            template_vars=template_vars,
-            ops=all_ops,
-            naming_defaults=_NAMING_DEFAULTS,
-            function_key="simple_function",
-            trigger_key="simple_trigger",
-        )

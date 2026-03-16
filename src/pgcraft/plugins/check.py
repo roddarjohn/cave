@@ -154,7 +154,7 @@ class TriggerCheckPlugin(_CheckPlugin):
         ]
 
         template = load_template(_TEMPLATES / "validate.plpgsql.mako")
-        template_vars = {"checks": resolved_checks}
+        body = template.render(checks=resolved_checks)
 
         if self.table_key not in ctx:
             return
@@ -168,10 +168,9 @@ class TriggerCheckPlugin(_CheckPlugin):
             view_schema=view_schema,
             view_fullname=view_fullname,
             tablename=ctx.tablename,
-            template_vars=template_vars,
             ops=[
-                ("insert", template),
-                ("update", template),
+                ("insert", body),
+                ("update", body),
             ],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="check_function",

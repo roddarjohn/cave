@@ -1,6 +1,5 @@
 """Unit tests for pgcraft.utils.trigger."""
 
-from mako.template import Template
 from sqlalchemy import MetaData
 
 from pgcraft.utils.trigger import register_view_triggers
@@ -11,22 +10,16 @@ _NAMING_DEFAULTS = {
 }
 
 
-def _make_template(body: str = "BEGIN RETURN NEW; END;") -> Template:
-    return Template(body)
-
-
 class TestRegisterViewTriggers:
     def test_function_registered_in_metadata(self):
         """After the call, a function should appear in metadata.info."""
         metadata = MetaData()
-        tpl = _make_template()
         register_view_triggers(
             metadata=metadata,
             view_schema="api",
             view_fullname="api.mytable",
             tablename="mytable",
-            template_vars={},
-            ops=[("insert", tpl)],
+            ops=[("insert", "BEGIN RETURN NEW; END;")],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="fn_key",
             trigger_key="tr_key",
@@ -37,14 +30,12 @@ class TestRegisterViewTriggers:
 
     def test_trigger_registered_in_metadata(self):
         metadata = MetaData()
-        tpl = _make_template()
         register_view_triggers(
             metadata=metadata,
             view_schema="api",
             view_fullname="api.mytable",
             tablename="mytable",
-            template_vars={},
-            ops=[("insert", tpl)],
+            ops=[("insert", "BEGIN RETURN NEW; END;")],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="fn_key",
             trigger_key="tr_key",
@@ -55,14 +46,12 @@ class TestRegisterViewTriggers:
 
     def test_function_name_follows_naming_template(self):
         metadata = MetaData()
-        tpl = _make_template()
         register_view_triggers(
             metadata=metadata,
             view_schema="api",
             view_fullname="api.products",
             tablename="products",
-            template_vars={},
-            ops=[("insert", tpl)],
+            ops=[("insert", "BEGIN RETURN NEW; END;")],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="fn_key",
             trigger_key="tr_key",
@@ -73,14 +62,12 @@ class TestRegisterViewTriggers:
 
     def test_trigger_name_follows_naming_template(self):
         metadata = MetaData()
-        tpl = _make_template()
         register_view_triggers(
             metadata=metadata,
             view_schema="api",
             view_fullname="api.products",
             tablename="products",
-            template_vars={},
-            ops=[("insert", tpl)],
+            ops=[("insert", "BEGIN RETURN NEW; END;")],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="fn_key",
             trigger_key="tr_key",
@@ -93,16 +80,15 @@ class TestRegisterViewTriggers:
         """Each op tuple should produce one function and one trigger."""
         metadata = MetaData()
         ops = [
-            ("insert", _make_template()),
-            ("update", _make_template()),
-            ("delete", _make_template()),
+            ("insert", "BEGIN RETURN NEW; END;"),
+            ("update", "BEGIN RETURN NEW; END;"),
+            ("delete", "BEGIN RETURN OLD; END;"),
         ]
         register_view_triggers(
             metadata=metadata,
             view_schema="api",
             view_fullname="api.orders",
             tablename="orders",
-            template_vars={},
             ops=ops,
             naming_defaults=_NAMING_DEFAULTS,
             function_key="fn_key",
@@ -113,14 +99,12 @@ class TestRegisterViewTriggers:
 
     def test_function_schema_is_view_schema(self):
         metadata = MetaData()
-        tpl = _make_template()
         register_view_triggers(
             metadata=metadata,
             view_schema="myapi",
             view_fullname="myapi.tbl",
             tablename="tbl",
-            template_vars={},
-            ops=[("insert", tpl)],
+            ops=[("insert", "BEGIN RETURN NEW; END;")],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="fn_key",
             trigger_key="tr_key",
@@ -130,14 +114,12 @@ class TestRegisterViewTriggers:
 
     def test_trigger_target_is_view_fullname(self):
         metadata = MetaData()
-        tpl = _make_template()
         register_view_triggers(
             metadata=metadata,
             view_schema="api",
             view_fullname="api.tbl",
             tablename="tbl",
-            template_vars={},
-            ops=[("insert", tpl)],
+            ops=[("insert", "BEGIN RETURN NEW; END;")],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="fn_key",
             trigger_key="tr_key",
@@ -147,14 +129,12 @@ class TestRegisterViewTriggers:
 
     def test_function_language_is_plpgsql(self):
         metadata = MetaData()
-        tpl = _make_template()
         register_view_triggers(
             metadata=metadata,
             view_schema="api",
             view_fullname="api.tbl",
             tablename="tbl",
-            template_vars={},
-            ops=[("insert", tpl)],
+            ops=[("insert", "BEGIN RETURN NEW; END;")],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="fn_key",
             trigger_key="tr_key",
@@ -162,17 +142,20 @@ class TestRegisterViewTriggers:
         fn = metadata.info["functions"].functions[0]
         assert fn.language == "plpgsql"
 
-    def test_template_vars_passed_to_template(self):
-        """Template variables should be rendered into the function body."""
+    def test_body_rendered_in_function(self):
+        """Pre-rendered body should appear in the function definition."""
         metadata = MetaData()
-        tpl = Template("BEGIN INSERT INTO ${target_table}; RETURN NEW; END;")
         register_view_triggers(
             metadata=metadata,
             view_schema="api",
             view_fullname="api.tbl",
             tablename="tbl",
-            template_vars={"target_table": "s.actual_table"},
-            ops=[("insert", tpl)],
+            ops=[
+                (
+                    "insert",
+                    "BEGIN INSERT INTO s.actual_table; RETURN NEW; END;",
+                )
+            ],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="fn_key",
             trigger_key="tr_key",
@@ -188,14 +171,12 @@ class TestRegisterViewTriggers:
                 "tr_key": "custom_%(table_name)s_%(op)s",
             }
         )
-        tpl = _make_template()
         register_view_triggers(
             metadata=metadata,
             view_schema="api",
             view_fullname="api.orders",
             tablename="orders",
-            template_vars={},
-            ops=[("insert", tpl)],
+            ops=[("insert", "BEGIN RETURN NEW; END;")],
             naming_defaults=_NAMING_DEFAULTS,
             function_key="fn_key",
             trigger_key="tr_key",

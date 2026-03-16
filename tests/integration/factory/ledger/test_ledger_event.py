@@ -14,7 +14,7 @@ from sqlalchemy import Column, MetaData, String, text
 from pgcraft.config import PGCraftConfig
 from pgcraft.extensions.postgrest import (
     PostgRESTExtension,
-    PostgRESTView,
+    PostgRESTPlugin,
 )
 from pgcraft.factory.ledger import PGCraftLedger
 from tests.integration.conftest import create_all_from_metadata
@@ -31,7 +31,7 @@ def inv(db_conn, db_schema):
     config.use(PostgRESTExtension())
 
     metadata = MetaData()
-    factory = PGCraftLedger(
+    PGCraftLedger(
         "inventory",
         db_schema,
         metadata,
@@ -42,10 +42,16 @@ def inv(db_conn, db_schema):
             Column("reason", String),
         ],
         config=config,
-    )
-    PostgRESTView(
-        source=factory,
-        grants=["select", "insert", "update", "delete"],
+        extra_plugins=[
+            PostgRESTPlugin(
+                grants=[
+                    "select",
+                    "insert",
+                    "update",
+                    "delete",
+                ],
+            ),
+        ],
     )
     create_all_from_metadata(db_conn, metadata)
     return db_conn, db_schema

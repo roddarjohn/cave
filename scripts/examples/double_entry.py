@@ -4,6 +4,7 @@ from sqlalchemy import Column, ForeignKey, MetaData, String
 
 from pgcraft import pgcraft_build_naming_conventions
 from pgcraft.extensions.postgrest import PostgRESTView
+from pgcraft.extensions.postgrest.plugin import PostgRESTPlugin
 from pgcraft.factory import PGCraftLedger, PGCraftSimple
 from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
@@ -39,12 +40,8 @@ journal = PGCraftLedger(
     extra_plugins=[
         DoubleEntryPlugin(),
         DoubleEntryTriggerPlugin(),
+        PostgRESTPlugin(grants=["select", "insert"]),
     ],
-)
-
-PostgRESTView(
-    source=journal,
-    grants=["select", "insert"],
 )
 # --- example end ---
 

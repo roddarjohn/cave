@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, Integer, MetaData, String, select
 
-from pgcraft.extensions.postgrest import PostgRESTView
+from pgcraft.extensions.postgrest.plugin import PostgRESTPlugin
 from pgcraft.factory import PGCraftLedger
 from pgcraft.ledger.events import LedgerEvent, ledger_balances
 from pgcraft.utils.naming_convention import build_naming_convention
@@ -41,9 +41,10 @@ inventory = PGCraftLedger(
         Column("sku", String, nullable=False),
         Column("source", String, nullable=True),
     ],
+    extra_plugins=[
+        PostgRESTPlugin(grants=["select", "insert"]),
+    ],
 )
-
-PostgRESTView(source=inventory, grants=["select", "insert"])
 BalanceView(
     source=inventory,
     dimensions=["warehouse", "sku"],

@@ -7,14 +7,16 @@ from sqlalchemy.dialects.postgresql import UUID
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
 from pgcraft.plugins.ledger import (
+    _NAMING_DEFAULTS,
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
     LedgerBalanceCheckPlugin,
     LedgerBalanceViewPlugin,
     LedgerLatestViewPlugin,
     LedgerTablePlugin,
-    LedgerTriggerPlugin,
+    _make_ledger_ops_builder,
 )
+from pgcraft.plugins.trigger import InsteadOfTriggerPlugin
 from tests.unit.plugins.conftest import make_ctx, make_view
 
 
@@ -134,8 +136,19 @@ class TestLedgerTriggerPlugin:
         ctx[view_key] = make_view("product", "api")
         return ctx
 
+    def _make_plugin(self, table_key="primary", view_key="api"):
+        return InsteadOfTriggerPlugin(
+            ops_builder=_make_ledger_ops_builder(table_key, view_key),
+            naming_defaults=_NAMING_DEFAULTS,
+            function_key="ledger_function",
+            trigger_key="ledger_trigger",
+            view_key=view_key,
+            include_private_view=False,
+            extra_requires=[table_key, "entry_id_column"],
+        )
+
     def test_registers_three_functions(self):
-        plugin = LedgerTriggerPlugin()
+        plugin = self._make_plugin()
         ctx = self._ctx_with_table_and_view()
         plugin.run(ctx)
         functions = ctx.metadata.info.get("functions")
@@ -143,7 +156,7 @@ class TestLedgerTriggerPlugin:
         assert len(functions.functions) == 3
 
     def test_registers_three_triggers(self):
-        plugin = LedgerTriggerPlugin()
+        plugin = self._make_plugin()
         ctx = self._ctx_with_table_and_view()
         plugin.run(ctx)
         triggers = ctx.metadata.info.get("triggers")
@@ -151,17 +164,18 @@ class TestLedgerTriggerPlugin:
         assert len(triggers.triggers) == 3
 
     def test_custom_table_key_and_view_key(self):
-        plugin = LedgerTriggerPlugin(table_key="t", view_key="v")
+        plugin = self._make_plugin(table_key="t", view_key="v")
         ctx = self._ctx_with_table_and_view(table_key="t", view_key="v")
         plugin.run(ctx)
         assert len(ctx.metadata.info["functions"].functions) == 3
 
-    def test_missing_view_key_raises(self):
-        plugin = LedgerTriggerPlugin(view_key="nonexistent")
+    def test_missing_view_key_no_triggers(self):
+        plugin = self._make_plugin(view_key="nonexistent")
         ctx = _ledger_ctx()
         LedgerTablePlugin().run(ctx)
-        with pytest.raises(KeyError):
-            plugin.run(ctx)
+        plugin.run(ctx)
+        triggers = ctx.metadata.info.get("triggers")
+        assert triggers is None
 
 
 class TestLedgerBalanceViewPlugin:

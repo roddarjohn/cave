@@ -15,20 +15,29 @@ from sqlalchemy import MetaData, create_engine, text
 from pgcraft.factory.base import ResourceFactory
 from pgcraft.plugin import Plugin
 from pgcraft.plugins.append_only import (
+    _NAMING_DEFAULTS as _AO_NAMING,
+)
+from pgcraft.plugins.append_only import (
     AppendOnlyTablePlugin,
-    AppendOnlyTriggerPlugin,
     AppendOnlyViewPlugin,
+)
+from pgcraft.plugins.append_only import (
+    _make_ops_builder as _ao_ops_builder,
 )
 from pgcraft.plugins.check import TableCheckPlugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.eav import (
+    _NAMING_DEFAULTS as _EAV_NAMING,
+)
+from pgcraft.plugins.eav import (
     EAVTablePlugin,
-    EAVTriggerPlugin,
     EAVViewPlugin,
+    _make_eav_ops_builder,
 )
 from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
 from pgcraft.plugins.ledger import LedgerTablePlugin
 from pgcraft.plugins.simple import SimpleTablePlugin
+from pgcraft.plugins.trigger import InsteadOfTriggerPlugin
 
 SCHEMA = "bench_test"
 
@@ -57,7 +66,14 @@ class BenchAppendOnly(ResourceFactory):
         CreatedAtPlugin(),
         AppendOnlyTablePlugin(),
         AppendOnlyViewPlugin(),
-        AppendOnlyTriggerPlugin(),
+        InsteadOfTriggerPlugin(
+            ops_builder=_ao_ops_builder("root_table", "attributes"),
+            naming_defaults=_AO_NAMING,
+            function_key="append_only_function",
+            trigger_key="append_only_trigger",
+            view_key="api",
+            extra_requires=["root_table", "attributes"],
+        ),
         TableCheckPlugin(),
     ]
 
@@ -69,7 +85,20 @@ class BenchEAV(ResourceFactory):
         CreatedAtPlugin(),
         EAVTablePlugin(),
         EAVViewPlugin(),
-        EAVTriggerPlugin(),
+        InsteadOfTriggerPlugin(
+            ops_builder=_make_eav_ops_builder(
+                "entity", "attribute", "eav_mappings"
+            ),
+            naming_defaults=_EAV_NAMING,
+            function_key="eav_function",
+            trigger_key="eav_trigger",
+            view_key="api",
+            extra_requires=[
+                "entity",
+                "attribute",
+                "eav_mappings",
+            ],
+        ),
     ]
 
 

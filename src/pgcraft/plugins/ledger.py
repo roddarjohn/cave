@@ -30,14 +30,16 @@ from sqlalchemy_declarative_extensions.dialects.postgresql import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pgcraft.factory.context import FactoryContext
 
 from pgcraft.errors import PGCraftValidationError
 from pgcraft.plugin import Dynamic, Plugin, produces, requires, singleton
+from pgcraft.plugins.trigger import TriggerOp
 from pgcraft.utils.naming import resolve_name
 from pgcraft.utils.query import compile_query
 from pgcraft.utils.template import load_template
-from pgcraft.utils.trigger import register_view_triggers
 
 _TEMPLATES = Path(__file__).resolve().parent / "templates" / "ledger"
 
@@ -95,6 +97,65 @@ def _require_dimensions(dimensions: list[str]) -> None:
     if not dimensions:
         msg = "dimensions must be a non-empty list"
         raise PGCraftValidationError(msg)
+
+
+def _make_ledger_ops_builder(
+    table_key: str,
+    view_key: str,
+) -> Callable[[FactoryContext], list[TriggerOp]]:
+    """Return an ops builder for ledger dimensions."""
+
+    def build(ctx: FactoryContext) -> list[TriggerOp]:
+        primary = ctx[table_key]
+        base_fullname = f"{ctx.schemaname}.{primary.name}"
+        entry_id_col = ctx["entry_id_column"]
+        dim_cols = ctx.dim_column_names
+
+        all_cols = [
+            entry_id_col.name,
+            "value",
+            *dim_cols,
+        ]
+        new_col_exprs = []
+        for c in all_cols:
+            if c == entry_id_col.name:
+                default = entry_id_col.server_default.arg.text
+                new_col_exprs.append(f"COALESCE(NEW.{c}, {default})")
+            else:
+                new_col_exprs.append(f"NEW.{c}")
+
+        api_view = ctx[view_key]
+        api_schema = api_view.schema or "api"
+        view_fullname = f"{api_schema}.{ctx.tablename}"
+        template_vars = {
+            "base_table": base_fullname,
+            "cols": ", ".join(all_cols),
+            "new_cols": ", ".join(new_col_exprs),
+            "view": view_fullname,
+        }
+
+        return [
+            TriggerOp(
+                "insert",
+                load_template(_TEMPLATES / "insert.plpgsql.mako").render(
+                    **template_vars
+                ),
+            ),
+            TriggerOp(
+                "update",
+                load_template(_TEMPLATES / "reject_update.plpgsql.mako").render(
+                    **template_vars
+                ),
+            ),
+            TriggerOp(
+                "delete",
+                load_template(_TEMPLATES / "reject_delete.plpgsql.mako").render(
+                    **template_vars
+                ),
+            ),
+        ]
+
+    return build
 
 
 @produces(Dynamic("table_key"), "__root__")
@@ -160,89 +221,6 @@ class LedgerTablePlugin(Plugin):
         ctx["__root__"] = table
 
 
-@requires(Dynamic("table_key"), Dynamic("view_key"), "entry_id_column")
-class LedgerTriggerPlugin(Plugin):
-    """Register an INSERT INSTEAD OF trigger on a ledger view.
-
-    Only INSERT is supported -- ledger entries are immutable.
-    UPDATE and DELETE on the API view will raise a PostgreSQL
-    error naturally (no INSTEAD OF trigger defined).
-
-    Args:
-        table_key: Key in ``ctx`` for the backing table
-            (default ``"primary"``).
-        view_key: Key in ``ctx`` for the trigger target view
-            (default ``"api"``).
-
-    """
-
-    def __init__(
-        self,
-        table_key: str = "primary",
-        view_key: str = "api",
-    ) -> None:
-        """Store the context keys."""
-        self.table_key = table_key
-        self.view_key = view_key
-
-    def run(self, ctx: FactoryContext) -> None:
-        """Register INSTEAD OF triggers on the API view.
-
-        Registers INSERT (routes to backing table), UPDATE
-        (raises error), and DELETE (raises error) triggers to
-        enforce append-only semantics.
-        """
-        api_view = ctx[self.view_key]
-        primary = ctx[self.table_key]
-        base_fullname = f"{ctx.schemaname}.{primary.name}"
-        entry_id_col = ctx["entry_id_column"]
-        dim_cols = ctx.dim_column_names
-
-        # Include entry_id and value alongside dimension columns.
-        all_cols = [entry_id_col.name, "value", *dim_cols]
-        new_col_exprs = []
-        for c in all_cols:
-            if c == entry_id_col.name:
-                default = entry_id_col.server_default.arg.text
-                new_col_exprs.append(f"COALESCE(NEW.{c}, {default})")
-            else:
-                new_col_exprs.append(f"NEW.{c}")
-
-        api_schema = api_view.schema or "api"
-        view_fullname = f"{api_schema}.{ctx.tablename}"
-        template_vars = {
-            "base_table": base_fullname,
-            "cols": ", ".join(all_cols),
-            "new_cols": ", ".join(new_col_exprs),
-            "view": view_fullname,
-        }
-
-        register_view_triggers(
-            metadata=ctx.metadata,
-            view_schema=api_schema,
-            view_fullname=view_fullname,
-            tablename=ctx.tablename,
-            template_vars=template_vars,
-            ops=[
-                (
-                    "insert",
-                    load_template(_TEMPLATES / "insert.plpgsql.mako"),
-                ),
-                (
-                    "update",
-                    load_template(_TEMPLATES / "reject_update.plpgsql.mako"),
-                ),
-                (
-                    "delete",
-                    load_template(_TEMPLATES / "reject_delete.plpgsql.mako"),
-                ),
-            ],
-            naming_defaults=_NAMING_DEFAULTS,
-            function_key="ledger_function",
-            trigger_key="ledger_trigger",
-        )
-
-
 class _LedgerDerivedViewPlugin(Plugin):
     """Base class for ledger views derived from the backing table.
 
@@ -297,7 +275,10 @@ class _LedgerDerivedViewPlugin(Plugin):
         view_name = resolve_name(
             ctx.metadata,
             self._view_name_key,
-            {"table_name": ctx.tablename, "schema": ctx.schemaname},
+            {
+                "table_name": ctx.tablename,
+                "schema": ctx.schemaname,
+            },
             _NAMING_DEFAULTS,
         )
 
@@ -565,7 +546,11 @@ class DoubleEntryPlugin(Plugin):
         ctx["double_entry_columns"] = self._column_name
 
 
-@requires(Dynamic("table_key"), "double_entry_columns", "entry_id_column")
+@requires(
+    Dynamic("table_key"),
+    "double_entry_columns",
+    "entry_id_column",
+)
 class DoubleEntryTriggerPlugin(Plugin):
     """Register an AFTER INSERT trigger enforcing balanced entries.
 

@@ -19,13 +19,14 @@ from pgcraft import (
     ledger_balances,
     pgcraft_build_naming_conventions,
 )
+from pgcraft.check import PGCraftCheck
 from pgcraft.config import PGCraftConfig
+from pgcraft.declarative import register
 from pgcraft.extensions.postgrest import (
     PostgRESTExtension,
+    PostgRESTPlugin,
     PostgRESTView,
 )
-from pgcraft.check import PGCraftCheck
-from pgcraft.declarative import register
 from pgcraft.factory.dimension.append_only import (
     PGCraftAppendOnly,
 )
@@ -61,6 +62,16 @@ users = PGCraftSimple(
         Column("total", Integer, Computed("price * qty")),
         PGCraftCheck("{price} > 0", name="positive_price"),
         PGCraftCheck("{qty} >= 0", name="nonneg_qty"),
+    ],
+    extra_plugins=[
+        PostgRESTPlugin(
+            grants=[
+                "select",
+                "insert",
+                "update",
+                "delete",
+            ],
+        ),
     ],
 )
 
@@ -138,11 +149,6 @@ customers = PGCraftSimple(
 )
 
 # -- View factories: create derived output --------------------------
-
-PostgRESTView(
-    source=users,
-    grants=["select", "insert", "update", "delete"],
-)
 
 # columns=: only expose specific columns
 PostgRESTView(
@@ -258,12 +264,11 @@ inventory = PGCraftLedger(
         Column("sku", String, nullable=False),
         Column("reason", String, nullable=True),
     ],
+    extra_plugins=[
+        PostgRESTPlugin(grants=["select", "insert"]),
+    ],
 )
 
-PostgRESTView(
-    source=inventory,
-    grants=["select", "insert"],
-)
 BalanceView(
     source=inventory, dimensions=["warehouse", "sku"]
 )
@@ -332,13 +337,10 @@ ledger = PGCraftLedger(
     extra_plugins=[
         DoubleEntryPlugin(),
         DoubleEntryTriggerPlugin(),
+        PostgRESTPlugin(grants=["select", "insert"]),
     ],
 )
 
-PostgRESTView(
-    source=ledger,
-    grants=["select", "insert"],
-)
 BalanceView(
     source=ledger,
     dimensions=[

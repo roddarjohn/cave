@@ -8,9 +8,13 @@ from pgcraft.factory.base import ResourceFactory
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
 from pgcraft.plugins.ledger import (
-    LedgerTablePlugin,
-    LedgerTriggerPlugin,
+    _NAMING_DEFAULTS as _LEDGER_NAMING,
 )
+from pgcraft.plugins.ledger import (
+    LedgerTablePlugin,
+    _make_ledger_ops_builder,
+)
+from pgcraft.plugins.trigger import InsteadOfTriggerPlugin
 
 if TYPE_CHECKING:
     from sqlalchemy import MetaData
@@ -34,13 +38,17 @@ class PGCraftLedger(ResourceFactory):
        ``created_at`` column name.
     3. :class:`~pgcraft.plugins.ledger.LedgerTablePlugin` --
        backing table with value column.
+    4. :class:`~pgcraft.plugins.trigger.InsteadOfTriggerPlugin`
+       -- INSTEAD OF triggers (activates when a view plugin
+       produces ``"api"``).
 
     A :class:`~pgcraft.plugins.pk.SerialPKPlugin` is auto-added
     when no user plugin produces ``pk_columns``.
 
-    Use :class:`~pgcraft.extensions.postgrest.PostgRESTView`
-    to expose this table through a PostgREST API view with
-    INSERT triggers.
+    Pass a
+    :class:`~pgcraft.extensions.postgrest.plugin.PostgRESTPlugin`
+    via ``extra_plugins`` to expose this table through a
+    PostgREST API view with INSERT triggers.
     Use :class:`~pgcraft.views.balance.BalanceView`,
     :class:`~pgcraft.views.latest.LatestView`, and
     :class:`~pgcraft.views.actions.LedgerActions` for derived
@@ -56,9 +64,19 @@ class PGCraftLedger(ResourceFactory):
         UUIDEntryIDPlugin(),
         CreatedAtPlugin(),
         LedgerTablePlugin(),
+        InsteadOfTriggerPlugin(
+            ops_builder=_make_ledger_ops_builder("primary", "api"),
+            naming_defaults=_LEDGER_NAMING,
+            function_key="ledger_function",
+            trigger_key="ledger_trigger",
+            view_key="api",
+            include_private_view=False,
+            extra_requires=[
+                "primary",
+                "entry_id_column",
+            ],
+        ),
     ]
-
-    TRIGGER_PLUGIN_CLS = LedgerTriggerPlugin
 
     def __init__(  # noqa: PLR0913
         self,

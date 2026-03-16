@@ -3,7 +3,7 @@
 from sqlalchemy import Column, MetaData, String
 
 from pgcraft import pgcraft_build_naming_conventions
-from pgcraft.extensions.postgrest import PostgRESTView
+from pgcraft.extensions.postgrest.plugin import PostgRESTPlugin
 from pgcraft.factory import PGCraftLedger
 from pgcraft.views import LatestView
 
@@ -18,9 +18,10 @@ order_events = PGCraftLedger(
         Column("order_id", String, nullable=False),
         Column("status", String, nullable=False),
     ],
+    extra_plugins=[
+        PostgRESTPlugin(grants=["select", "insert"]),
+    ],
 )
-
-PostgRESTView(source=order_events, grants=["select", "insert"])
 LatestView(source=order_events, dimensions=["order_id"])
 # --- example end ---
 

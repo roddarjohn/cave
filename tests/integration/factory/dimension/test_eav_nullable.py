@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import Column, MetaData, String, text
 
 from pgcraft.config import PGCraftConfig
-from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTView
+from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTPlugin
 from pgcraft.factory.dimension.eav import PGCraftEAV
 from tests.integration.conftest import create_all_from_metadata
 
@@ -26,7 +26,7 @@ def eav_nullable(db_conn, db_schema):
     config.use(PostgRESTExtension())
 
     metadata = MetaData()
-    factory = PGCraftEAV(
+    PGCraftEAV(
         "things",
         db_schema,
         metadata,
@@ -35,10 +35,11 @@ def eav_nullable(db_conn, db_schema):
             Column("color", String, nullable=True),
         ],
         config=config,
-    )
-    PostgRESTView(
-        source=factory,
-        grants=["select", "insert", "update"],
+        extra_plugins=[
+            PostgRESTPlugin(
+                grants=["select", "insert", "update"],
+            ),
+        ],
     )
     create_all_from_metadata(db_conn, metadata)
     return db_conn, db_schema

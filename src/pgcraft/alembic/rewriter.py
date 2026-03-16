@@ -22,8 +22,14 @@ def _sort_ops(
     context: "MigrationContext",
     ops: list[alembic_ops.MigrateOperation],
 ) -> list[alembic_ops.MigrateOperation]:
-    """Expand update ops and sort by dependency order."""
+    """Expand update ops and sort by dependency order.
+
+    Update ops are split into drop + create so the topological
+    sort can interleave them with dependent objects.
+    """
     metadata = context.opts.get("target_metadata")
+    # DropTableOp has no FK info, so we build the graph from
+    # metadata to ensure drops are ordered correctly.
     fk_graph = (
         build_fk_graph_from_metadata(metadata) if metadata is not None else {}
     )

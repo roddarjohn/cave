@@ -470,7 +470,7 @@ class TestSortMigrationOps:
             schema="myschema",
         )
         schema_op = CreateSchemaOp(Schema("myschema"))
-        result = sort_migration_ops([table_op, schema_op])
+        result = sort_migration_ops([table_op, schema_op], fk_graph={})
         schema_idx = next(
             i for i, op in enumerate(result) if isinstance(op, CreateSchemaOp)
         )
@@ -485,7 +485,7 @@ class TestSortMigrationOps:
         """DropTableOp should precede DropSchemaOp for the same schema."""
         table_op = alembic_ops.DropTableOp("mytable", schema="myschema")
         schema_op = DropSchemaOp(Schema("myschema"))
-        result = sort_migration_ops([schema_op, table_op])
+        result = sort_migration_ops([schema_op, table_op], fk_graph={})
         schema_idx = next(
             i for i, op in enumerate(result) if isinstance(op, DropSchemaOp)
         )
@@ -520,13 +520,13 @@ class TestSortMigrationOps:
         assert names.index("parent") < names.index("child")
 
     def test_empty_list_returns_empty(self):
-        assert sort_migration_ops([]) == []
+        assert sort_migration_ops([], fk_graph={}) == []
 
     def test_single_op_unchanged(self):
         op = alembic_ops.CreateTableOp(
             "t", [Column("id", Integer, primary_key=True)]
         )
-        result = sort_migration_ops([op])
+        result = sort_migration_ops([op], fk_graph={})
         assert result == [op]
 
     def test_unkeyed_ops_appended_at_end(self):
@@ -542,17 +542,7 @@ class TestSortMigrationOps:
             schema="s",
         )
         input_ops = [table_op, schema_op]
-        result = sort_migration_ops(input_ops)
-        assert len(result) == len(input_ops)
-
-    def test_no_fk_graph_argument_works(self):
-        """Calling without fk_graph does not raise."""
-        op = alembic_ops.CreateTableOp(
-            "t", [Column("id", Integer, primary_key=True)], schema="s"
-        )
-        schema_op = CreateSchemaOp(Schema("s"))
-        input_ops = [op, schema_op]
-        result = sort_migration_ops(input_ops)
+        result = sort_migration_ops(input_ops, fk_graph={})
         assert len(result) == len(input_ops)
 
     def test_schema_before_view(self):
@@ -560,7 +550,7 @@ class TestSortMigrationOps:
         schema_op = CreateSchemaOp(Schema("s"))
         view = View("myview", "SELECT 1", schema="s")
         view_op = CreateViewOp(view)
-        result = sort_migration_ops([view_op, schema_op])
+        result = sort_migration_ops([view_op, schema_op], fk_graph={})
         schema_idx = next(
             i for i, op in enumerate(result) if isinstance(op, CreateSchemaOp)
         )
@@ -1104,7 +1094,7 @@ class TestSortMigrationOpsWithFkGraph:
         create_op = alembic_ops.CreateTableOp(
             "t", [Column("id", Integer, primary_key=True)]
         )
-        result = sort_migration_ops([sentinel, create_op])
+        result = sort_migration_ops([sentinel, create_op], fk_graph={})
         assert result[-1] is sentinel
 
     def test_setof_function_after_referenced_view(self):
@@ -1120,7 +1110,10 @@ class TestSortMigrationOpsWithFkGraph:
         )
         fn_schema_op = CreateSchemaOp(Schema("private"))
         fn_op = CreateFunctionOp(fn)
-        result = sort_migration_ops([fn_op, fn_schema_op, view_op, schema_op])
+        result = sort_migration_ops(
+            [fn_op, fn_schema_op, view_op, schema_op],
+            fk_graph={},
+        )
         view_idx = next(
             i for i, op in enumerate(result) if isinstance(op, CreateViewOp)
         )

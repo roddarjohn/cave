@@ -22,10 +22,11 @@ Or with `uv <https://docs.astral.sh/uv/>`_:
 Dependencies
 ------------
 
-pgcraft installs SQLAlchemy and its declarative extensions automatically.
-You will also need Alembic for migrations. See the `Alembic documentation`_
-for a full project setup guide.
+pgcraft installs SQLAlchemy and its `declarative extensions`_
+automatically. You will also need Alembic for migrations. See the
+`Alembic documentation`_ for a full project setup guide.
 
+.. _declarative extensions: https://docs.sqlalchemy.org/en/latest/orm/extensions/declarative/index.html
 .. _Alembic documentation: https://alembic.sqlalchemy.org/en/latest/tutorial.html
 
 ``alembic.ini``
@@ -100,6 +101,9 @@ generated tables are registered for autogenerate detection.
 Simple dimension (single table)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+A simple dimension creates a single table in the specified
+schema:
+
 .. code-block:: python
 
    from sqlalchemy import Column, MetaData, String, Text
@@ -116,6 +120,10 @@ Simple dimension (single table)
            Column("description", Text),
        ],
    )
+
+This creates:
+
+- ``dim.products`` — the dimension table
 
 Append-only dimension (SCD Type 2)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -142,6 +150,14 @@ the attributes log:
        ],
    )
 
+This creates:
+
+- ``dim.prices_root`` — entity root table with PK and
+  ``created_at``
+- ``dim.prices_attributes`` — append-only attributes log
+- ``dim.prices`` — a view joining root and attributes to
+  show the current state
+
 Ledger (append-only value table)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -163,6 +179,10 @@ columns:
            Column("status", String, nullable=False),
        ],
    )
+
+This creates:
+
+- ``ops.order_events`` — the append-only ledger table
 
 See :doc:`ledgers` for balance views, double-entry enforcement,
 and numeric value types.
@@ -191,6 +211,13 @@ attributes are added frequently:
            Column("max_seats", Integer),
        ],
    )
+
+This creates:
+
+- ``dim.features_entity`` — entity table with PK and
+  ``created_at``
+- ``dim.features_attribute`` — attribute key/value rows
+- ``dim.features`` — a view pivoting attributes into columns
 
 Customising factory behaviour
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

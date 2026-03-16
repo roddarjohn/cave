@@ -9,7 +9,10 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy_declarative_extensions import View, register_view
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from sqlalchemy import Table
+    from sqlalchemy.sql.expression import Select
 
     from pgcraft.factory.context import FactoryContext
     from pgcraft.statistics import JoinedView
@@ -149,6 +152,10 @@ class PostgRESTPlugin(Plugin):
             exclusive with ``exclude_columns``.
         exclude_columns: Column names to exclude from the view.
             Mutually exclusive with ``columns``.
+        query: Optional callable ``(query, source_table) ->
+            Select`` for SQLAlchemy-style view customization.
+            When provided, overrides ``columns``,
+            ``exclude_columns``, and ``joins_key``.
         joins_key: Key in ``ctx`` holding a dict of
             :class:`~pgcraft.statistics.JoinedView` entries.
             LEFT JOINs each view into the API view when the key
@@ -164,6 +171,7 @@ class PostgRESTPlugin(Plugin):
         view_key: str = "api",
         columns: list[str] | None = None,
         exclude_columns: list[str] | None = None,
+        query: Callable[[Select, Table], Select] | None = None,
         joins_key: str = "joins",
     ) -> None:
         """Store the API configuration and context keys."""
@@ -173,11 +181,43 @@ class PostgRESTPlugin(Plugin):
         self.view_key = view_key
         self.columns = columns
         self.exclude_columns = exclude_columns
+        self.query = query
         self.joins_key = joins_key
 
     def run(self, ctx: FactoryContext) -> None:
         """Create the API view and register the resource."""
         primary = ctx[self.table_key]
+        definition = self._build_definition(ctx, primary)
+
+        view = View(
+            ctx.tablename,
+            definition,
+            schema=self.schema,
+        )
+        register_view(ctx.metadata, view)
+        ctx[self.view_key] = view
+
+        register_api_resource(
+            ctx.metadata,
+            APIResource(
+                name=ctx.tablename,
+                schema=self.schema,
+                grants=self.grants,
+            ),
+        )
+
+    def _build_definition(
+        self,
+        ctx: FactoryContext,
+        primary: Table,
+    ) -> str:
+        """Build the SQL definition for the API view."""
+        if self.query is not None:
+            base_query = select(
+                *[col.label(col.key) for col in primary.columns]
+            ).select_from(primary)
+            transformed = self.query(base_query, primary)
+            return compile_query(transformed)
 
         if self.joins_key in ctx:
             joins: dict[str, JoinedView] = ctx[self.joins_key]
@@ -214,7 +254,7 @@ class PostgRESTPlugin(Plugin):
             select_cols.extend(_build_join_columns(joins, aliases))
 
         if joins:
-            definition = self._build_join_sql(
+            return self._build_join_sql(
                 ctx,
                 primary,
                 select_cols,
@@ -222,29 +262,12 @@ class PostgRESTPlugin(Plugin):
                 aliases,
                 alias,
             )
-        else:
-            source = primary
-            if use_alias:
-                source = primary.alias(alias)
-            query = select(*select_cols).select_from(source)
-            definition = compile_query(query)
 
-        view = View(
-            ctx.tablename,
-            definition,
-            schema=self.schema,
-        )
-        register_view(ctx.metadata, view)
-        ctx[self.view_key] = view
-
-        register_api_resource(
-            ctx.metadata,
-            APIResource(
-                name=ctx.tablename,
-                schema=self.schema,
-                grants=self.grants,
-            ),
-        )
+        source = primary
+        if use_alias:
+            source = primary.alias(alias)
+        view_query = select(*select_cols).select_from(source)
+        return compile_query(view_query)
 
     @staticmethod
     def _build_join_sql(  # noqa: PLR0913

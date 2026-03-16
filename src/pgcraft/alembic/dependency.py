@@ -382,7 +382,12 @@ def _refs_for_role(
     op: CreateRoleOp | DropRoleOp,
     phase: Phase | None,
 ) -> set[EntityIdentifier]:
-    """Return references for a role op (member roles via in_roles)."""
+    """Return references for a role op.
+
+    Picks up: parent roles declared via ``in_roles`` (e.g.
+    ``authenticator`` inheriting ``anon``).  The parent role
+    must exist before the child role can be created.
+    """
     if not op.role.in_roles:
         return set()
     return {
@@ -399,7 +404,16 @@ def _refs_for_grant(
     op: GrantPrivilegesOp | RevokePrivilegesOp,
     phase: Phase | None,
 ) -> set[EntityIdentifier]:
-    """Return references for a grant/revoke op (target role + schemas)."""
+    """Return references for a grant/revoke op.
+
+    Picks up:
+    - The target role the privilege is granted to.
+    - For ``GrantStatement``: the schema and object being granted
+      on (e.g. ``GRANT SELECT ON api.students TO anon``
+      depends on the ``api`` schema and the ``students`` view).
+    - For ``DefaultGrantStatement``: the schemas the default
+      grant applies to.
+    """
     grant_obj = op.grant
     refs: set[EntityIdentifier] = set()
 
@@ -463,7 +477,14 @@ def _refs_for_trigger(
     op: AnyOp,
     phase: Phase | None,
 ) -> set[EntityIdentifier]:
-    """Return refs for trigger ops (target view and executed function)."""
+    """Return refs for trigger ops.
+
+    Picks up:
+    - The target table/view the trigger is attached to
+      (``ON schema.table``).
+    - The function the trigger executes (``EXECUTE
+      FUNCTION schema.func()``).
+    """
     trigger = getattr(op, "trigger", None)
     if trigger is None:
         return set()
@@ -571,7 +592,20 @@ def _refs_for_declarative_op(
     op: AnyOp,
     phase: Phase | None,
 ) -> set[EntityIdentifier]:
-    """Return references for view/function/procedure/trigger ops."""
+    """Return references for view/function/procedure/trigger ops.
+
+    Picks up:
+    - Triggers: delegated to ``_refs_for_trigger`` (target
+      table + executed function).
+    - For update ops that were split into drop+create: the
+      create phase depends on the drop phase of the same
+      entity (drop old definition before creating new one).
+    - The containing schema (view/function must be created
+      after its schema).
+    - Tables/views referenced in the SQL body, extracted by
+      parsing view definitions, PL/pgSQL bodies, SQL function
+      bodies, and ``SETOF`` return types.
+    """
     # Triggers have their own reference logic via the `on` field.
     trigger_refs = _refs_for_trigger(op, phase)
     if trigger_refs:
@@ -590,6 +624,7 @@ def _refs_for_declarative_op(
 
     refs: set[EntityIdentifier] = set()
 
+    # For split update ops: create must wait for drop.
     if phase == "create":
         refs.add(
             EntityIdentifier(
@@ -599,9 +634,11 @@ def _refs_for_declarative_op(
             )
         )
 
+    # Depend on the containing schema.
     if phase != "drop":
         refs.add(EntityIdentifier(schema=schema, phase=phase))
 
+    # Tables/views referenced in SQL definitions and bodies.
     refs |= _refs_from_definitions(op, phase)
 
     refs.discard(self_id)
@@ -613,8 +650,16 @@ def build_fk_graph_from_metadata(
 ) -> dict[tuple[str, str], set[tuple[str, str]]]:
     """Build a table FK dependency map from SQLAlchemy metadata.
 
-    Uses the metadata's knowledge of foreign key relationships
-    rather than parsing column objects from migration ops.
+    Alembic's ``DropTableOp`` carries only the table name and
+    schema — no column or foreign key information.  Without an
+    external FK graph the topological sort cannot order drop
+    operations correctly, leading to constraint violations when
+    a referenced table is dropped before its dependents.
+
+    This function reads FK relationships from SQLAlchemy's
+    ``MetaData`` (which has the full schema) so that
+    ``sort_migration_ops`` can order both create and drop
+    operations safely.
     """
     graph: dict[tuple[str, str], set[tuple[str, str]]] = {}
 
@@ -654,6 +699,8 @@ def _entity_references(
     """
     phase = _op_phase(op)
 
+    # Tables depend on their containing schema.  FK deps are
+    # handled separately via fk_graph in sort_migration_ops.
     if isinstance(op, (alembic_ops.CreateTableOp, alembic_ops.DropTableOp)):
         return {
             EntityIdentifier(
@@ -662,12 +709,15 @@ def _entity_references(
             )
         }
 
+    # Roles depend on parent roles (in_roles).
     if isinstance(op, (CreateRoleOp, DropRoleOp)):
         return _refs_for_role(op, phase)
 
+    # Grants depend on the target role, schema, and object.
     if isinstance(op, (GrantPrivilegesOp, RevokePrivilegesOp)):
         return _refs_for_grant(op, phase)
 
+    # Views, functions, procedures, triggers: schema + SQL refs.
     return _refs_for_declarative_op(op, phase)
 
 
@@ -729,7 +779,7 @@ def expand_update_ops(
 def sort_migration_ops(
     migration_ops: list[AnyOp],
     *,
-    fk_graph: (dict[tuple[str, str], set[tuple[str, str]]] | None) = None,
+    fk_graph: dict[tuple[str, str], set[tuple[str, str]]],
 ) -> list[AnyOp]:
     """Return *migration_ops* topologically sorted by entity dependencies.
 
@@ -773,18 +823,15 @@ def sort_migration_ops(
     # Use EntityIdentifier (frozen dataclass, hashable) as graph nodes.
     sorter: TopologicalSorter[EntityIdentifier] = TopologicalSorter()
 
-    if fk_graph is None:
-        fk_graph = {}
-
     for current_id, current_op in op_by_entity.items():
         sorter.add(current_id)
         phase = _op_phase(current_op)
 
         refs = _entity_references(current_op)
 
-        # Add FK-based refs for table ops.  For DropTableOp the
-        # op itself has no column info, so we consult the FK
-        # graph built from CreateTableOps.
+        # Add FK-based refs for both create and drop table ops.
+        # The fk_graph (built from metadata) is used because
+        # neither op type carries FK info at this point.
         if isinstance(
             current_op,
             (
