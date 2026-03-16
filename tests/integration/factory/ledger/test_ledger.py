@@ -12,26 +12,47 @@ from sqlalchemy import Column, MetaData, String, text
 from sqlalchemy.exc import ProgrammingError
 
 from pgcraft.config import PGCraftConfig
-from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTView
+from pgcraft.extensions.postgrest import (
+    PostgRESTExtension,
+    PostgRESTPlugin,
+)
 from pgcraft.factory.ledger import PGCraftLedger
 from pgcraft.plugin import Plugin
 from pgcraft.plugins.created_at import CreatedAtPlugin
 from pgcraft.plugins.entry_id import UUIDEntryIDPlugin
 from pgcraft.plugins.ledger import (
+    _NAMING_DEFAULTS as _LEDGER_NAMING,
+)
+from pgcraft.plugins.ledger import (
     DoubleEntryPlugin,
     DoubleEntryTriggerPlugin,
     LedgerTablePlugin,
+    _make_ledger_ops_builder,
 )
+from pgcraft.plugins.trigger import InsteadOfTriggerPlugin
+from pgcraft.views.balance import BalanceView
 from tests.integration.conftest import create_all_from_metadata
 
 
 class _NumericLedger(PGCraftLedger):
-    """Ledger with NUMERIC value column (for testing decimals)."""
+    """Ledger with NUMERIC value column."""
 
     _INTERNAL_PLUGINS: ClassVar[list[Plugin]] = [
         UUIDEntryIDPlugin(),
         CreatedAtPlugin(),
         LedgerTablePlugin(value_type="numeric"),
+        InsteadOfTriggerPlugin(
+            ops_builder=_make_ledger_ops_builder("primary", "api"),
+            naming_defaults=_LEDGER_NAMING,
+            function_key="ledger_function",
+            trigger_key="ledger_trigger",
+            view_key="api",
+            include_private_view=False,
+            extra_requires=[
+                "primary",
+                "entry_id_column",
+            ],
+        ),
     ]
 
 
@@ -43,19 +64,24 @@ def _make_ledger(  # noqa: PLR0913
     extra_items=None,
     extra_plugins=None,
 ):
-    factory = PGCraftLedger(
+    return PGCraftLedger(
         tablename,
         schema,
         metadata,
         schema_items=list(extra_items or []),
         config=config,
-        extra_plugins=extra_plugins,
+        extra_plugins=[
+            PostgRESTPlugin(
+                grants=[
+                    "select",
+                    "insert",
+                    "update",
+                    "delete",
+                ],
+            ),
+            *(extra_plugins or []),
+        ],
     )
-    PostgRESTView(
-        source=factory,
-        grants=["select", "insert", "update", "delete"],
-    )
-    return factory
 
 
 @pytest.fixture
@@ -68,7 +94,9 @@ def ledger(db_conn, db_schema):
         db_schema,
         metadata,
         config,
-        extra_items=[Column("category", String, nullable=False)],
+        extra_items=[
+            Column("category", String, nullable=False),
+        ],
     )
     create_all_from_metadata(db_conn, metadata)
     return db_conn, db_schema
@@ -80,16 +108,15 @@ def numeric_ledger(db_conn, db_schema):
     config = PGCraftConfig(auto_discover=False)
     config.use(PostgRESTExtension())
     metadata = MetaData()
-    factory = _NumericLedger(
+    _NumericLedger(
         "payments",
         db_schema,
         metadata,
         schema_items=[],
         config=config,
-    )
-    PostgRESTView(
-        source=factory,
-        grants=["select", "insert"],
+        extra_plugins=[
+            PostgRESTPlugin(grants=["select", "insert"]),
+        ],
     )
     create_all_from_metadata(db_conn, metadata)
     return db_conn, db_schema
@@ -199,22 +226,16 @@ def balance_ledger(db_conn, db_schema):
         "bal_ledger",
         db_schema,
         metadata,
-        schema_items=[Column("category", String, nullable=False)],
+        schema_items=[
+            Column("category", String, nullable=False),
+        ],
         config=config,
+        extra_plugins=[
+            PostgRESTPlugin(grants=["select", "insert"]),
+        ],
     )
-    PostgRESTView(
-        source=factory,
-        grants=["select", "insert"],
-    )
+    BalanceView(source=factory, dimensions=["category"])
     create_all_from_metadata(db_conn, metadata)
-    db_conn.execute(
-        text(
-            f"CREATE VIEW {db_schema}.bal_ledger_balances"
-            f" AS SELECT category, SUM(value) AS balance"
-            f" FROM {db_schema}.bal_ledger"
-            f" GROUP BY category"
-        )
-    )
     return db_conn, db_schema
 
 

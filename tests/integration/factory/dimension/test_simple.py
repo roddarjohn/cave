@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import Column, MetaData, String, text
 
 from pgcraft.config import PGCraftConfig
-from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTView
+from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTPlugin
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from tests.integration.conftest import create_all_from_metadata
 
@@ -20,16 +20,17 @@ def simple_dim(db_conn, db_schema):
     config.use(PostgRESTExtension())
 
     metadata = MetaData()
-    factory = PGCraftSimple(
+    PGCraftSimple(
         "widgets",
         db_schema,
         metadata,
         schema_items=[Column("name", String, nullable=False)],
         config=config,
-    )
-    PostgRESTView(
-        source=factory,
-        grants=["select", "insert", "update", "delete"],
+        extra_plugins=[
+            PostgRESTPlugin(
+                grants=["select", "insert", "update", "delete"],
+            ),
+        ],
     )
     create_all_from_metadata(db_conn, metadata)
     return db_conn, db_schema

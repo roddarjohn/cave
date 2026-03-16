@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import Column, Integer, MetaData, String, text
 
 from pgcraft.config import PGCraftConfig
-from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTView
+from pgcraft.extensions.postgrest import PostgRESTExtension, PostgRESTPlugin
 from pgcraft.factory.dimension.simple import PGCraftSimple
 from pgcraft.fk import PGCraftFK
 from pgcraft.index import PGCraftIndex
@@ -23,7 +23,7 @@ class TestUniqueIndex:
         config.use(PostgRESTExtension())
 
         metadata = MetaData()
-        factory = PGCraftSimple(
+        PGCraftSimple(
             "products",
             db_schema,
             metadata,
@@ -32,10 +32,9 @@ class TestUniqueIndex:
                 PGCraftIndex("uq_code", "{code}", unique=True),
             ],
             config=config,
-        )
-        PostgRESTView(
-            source=factory,
-            grants=["select", "insert"],
+            extra_plugins=[
+                PostgRESTPlugin(grants=["select", "insert"]),
+            ],
         )
         create_all_from_metadata(db_conn, metadata)
         self.conn = db_conn
@@ -65,7 +64,7 @@ class TestForeignKey:
 
         metadata = MetaData()
 
-        orgs = PGCraftSimple(
+        PGCraftSimple(
             "orgs",
             db_schema,
             metadata,
@@ -73,13 +72,12 @@ class TestForeignKey:
                 Column("name", String, nullable=False),
             ],
             config=config,
-        )
-        PostgRESTView(
-            source=orgs,
-            grants=["select", "insert"],
+            extra_plugins=[
+                PostgRESTPlugin(grants=["select", "insert"]),
+            ],
         )
 
-        factory = PGCraftSimple(
+        PGCraftSimple(
             "members",
             db_schema,
             metadata,
@@ -94,10 +92,9 @@ class TestForeignKey:
                 ),
             ],
             config=config,
-        )
-        PostgRESTView(
-            source=factory,
-            grants=["select", "insert"],
+            extra_plugins=[
+                PostgRESTPlugin(grants=["select", "insert"]),
+            ],
         )
         create_all_from_metadata(db_conn, metadata)
 
